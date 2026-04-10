@@ -5,8 +5,9 @@ StudentAnswer-*.pdf
 TeachingResource-*.pdf
 job_description.txt
 
-# Personal notes
+# Personal notes and working files
 notes/
+CLAUDE.md
 
 # OS / editor
 .DS_Store
