@@ -1,6 +1,6 @@
 # Grading Rubric Studio — Requirements
 
-**Version**: 0.3.1
+**Version**: 0.3.2
 **Date**: 2026-04-10
 **Status**: Draft
 **Author**: Wiktor Lisowski
@@ -68,6 +68,7 @@ The document follows a layered specification approach:
 | **Applicability** | Whether the rubric covers the diversity of possible student responses, leaving no valid answer type unaddressed. |
 | **Discrimination Power** | Whether the rubric clearly separates excellent work from poor work. |
 | **Evidence profile** | A per-run record of which optional inputs were provided to the system and in what quantity: presence and approximate volume of teaching material, form of the starting rubric (none, informal, partial, full draft), and number of sample student copies. The evidence profile determines which assessment paths the system can take on a given run and is the basis on which the system calibrates its own confidence in its findings. |
+| **Assessment finding** | An atomic output of the assessment stage: a single observation about the rubric, tagged with exactly one of the three criteria (Ambiguity, Applicability, Discrimination Power), supported by evidence drawn from the inputs, and carrying its own confidence indicator. One run typically produces several findings. Each finding is the seed from which the improvement stage may generate a proposed change to the rubric. |
 | **Large-size class** | An exam cohort of approximately 100 or more student copies. The application is designed to support rubric design for such cohorts. |
 
 A note on the word "evaluation". The challenge brief refers to *Evaluation Criteria* — the three properties used to judge a rubric's quality. To avoid confusion between the multiple senses of the verb "evaluate" (graders evaluate students, the application evaluates rubrics, the teacher evaluates the application's output), this document uses **grading**, **assessment**, and **review** as defined above. The word *evaluation* is reserved for the brief's term *Evaluation Criteria*.
@@ -171,7 +172,7 @@ The following concerns are intentionally **deferred to the Design Requirements**
 | **SR-AS-04** | The system shall ground its judgments of correctness in the provided teaching material whenever teaching material is available. | **Should** | UR-02, UR-06 |
 | **SR-AS-05** | The system shall use the provided sample student copies to test rubric coverage and discrimination whenever at least one copy is available. | **Should** | UR-04, UR-06 |
 | **SR-AS-06** | When no student copies are provided, the system shall fall back to synthetic candidate responses for coverage testing and shall mark any evidence so produced as synthetic. | **Could** | UR-06 |
-| **SR-AS-07** | Each individual assessment finding shall be tagged with exactly one of the three criteria (Ambiguity, Applicability, Discrimination Power). | **Must** | UR-06 |
+| **SR-AS-07** | Each assessment finding shall be tagged with exactly one of the three criteria (Ambiguity, Applicability, Discrimination Power). | **Must** | UR-06 |
 | **SR-AS-08** | The system shall attach a confidence indicator to each assessment finding, reflecting the strength and quantity of supporting evidence. | **Should** | UR-06 |
 
 ### 5.3 Improvement generation (SR-IM)
@@ -260,6 +261,7 @@ Every requirement at each layer traces to at least one requirement on the layer 
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.3.2 | 2026-04-10 | Wiktor Lisowski | Glossary: added *Assessment finding* entry. The term was used in SR-AS-07, SR-AS-08, SR-IM-05, and SR-OBS-01 but had not been anchored in the glossary. Dropped the redundant qualifier "individual" from SR-AS-07. |
 | 0.3.1 | 2026-04-10 | Wiktor Lisowski | Glossary: added *Evidence profile* entry. The term was already used in SR-IN-09 and underpins SR-AS-04, SR-AS-05, SR-AS-06, SR-AS-08, and SR-OBS-01 but had not been anchored in the glossary. |
 | 0.3.0 | 2026-04-10 | Wiktor Lisowski | Added § 5 *System Requirements* with 44 SRs across seven groups (SR-IN, SR-AS, SR-IM, SR-UI, SR-OUT, SR-OBS, SR-PRF). Distribution: 21 Must / 14 Should / 9 Could. SRs are technology-neutral; choices of language, framework, model provider, file format, schema, library, configuration, secrets, caching, deterministic execution, and orchestration layer are deferred to the Design Requirements. Renumbered the existing single-table traceability section to § 6 *Traceability* and added § 6.2 *User Requirements → System Requirements*. |
 | 0.2.0 | 2026-04-10 | Wiktor Lisowski | Added a *Criticality* column (MoSCoW) to all User Requirement tables. Result: 5 Must / 2 Should / 2 Could. Per-change accept/reject (UR-07) and its dependent re-run (UR-08) reclassified as *Could* — the canonical flow is whole-accept or regenerate with different inputs. |
