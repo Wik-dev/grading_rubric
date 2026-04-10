@@ -1,6 +1,6 @@
 # Grading Rubric Studio — Requirements
 
-**Version**: 0.3.4
+**Version**: 0.3.5
 **Date**: 2026-04-10
 **Status**: Draft
 **Author**: Wiktor Lisowski
@@ -72,6 +72,7 @@ The document follows a layered specification approach:
 | **Confidence indicator** | A measure attached to each assessment finding that expresses how much weight the system places in that finding given the available evidence. Confidence reflects both the strength and the quantity of supporting evidence: a finding grounded in many real student copies and the teaching material carries higher confidence than one inferred from synthetic responses alone. The confidence indicator is what allows the system to remain useful across the full range of evidence profiles, from no optional inputs at all to a fully populated run. |
 | **Proposed change** | A discrete modification to the rubric proposed by the system, consisting of: the original passage, the modified passage, the criterion (Ambiguity, Applicability, or Discrimination Power) it addresses, and a human-readable rationale. Each proposed change traces back to one or more assessment findings. The teacher's review acts on proposed changes one at a time. |
 | **Audit bundle** | A per-run record produced by the system, capturing the inputs received, the evidence profile, the assessment findings, the model invocations made, and the final rubric. The audit bundle is the artifact that lets the teacher, or a reviewer, reconstruct *why* the system produced what it produced for a given run. |
+| **Explained rubric file** | The single JSON file produced by the system as the deliverable of every successful run. It is a wrapper containing two parts: the improved rubric, and the explanation of changes organized by criterion. The teacher downloads the explained rubric file and hands the rubric within it to the grading team. |
 | **Large-size class** | An exam cohort of approximately 100 or more student copies. The application is designed to support rubric design for such cohorts. |
 
 A note on the word "evaluation". The challenge brief refers to *Evaluation Criteria* — the three properties used to judge a rubric's quality. To avoid confusion between the multiple senses of the verb "evaluate" (graders evaluate students, the application evaluates rubrics, the teacher evaluates the application's output), this document uses **grading**, **assessment**, and **review** as defined above. The word *evaluation* is reserved for the brief's term *Evaluation Criteria*.
@@ -208,11 +209,11 @@ The following concerns are intentionally **deferred to the Design Requirements**
 
 | ID | Requirement | Criticality | Traces to |
 |---|---|---|---|
-| **SR-OUT-01** | The system shall produce a single JSON file as the deliverable output of every successful run. | **Must** | UR-09 |
-| **SR-OUT-02** | The JSON output shall contain one top-level field for the improved rubric and one top-level field for the explanation of changes. | **Must** | UR-09 |
-| **SR-OUT-03** | The explanation of changes in the JSON output shall be organized by the three quality criteria (Ambiguity, Applicability, Discrimination Power). | **Must** | UR-06, UR-09 |
-| **SR-OUT-04** | The JSON output shall validate against a documented schema. | **Should** | UR-09 |
-| **SR-OUT-05** | The JSON output shall reflect the teacher's per-change accept and reject decisions when such decisions have been made. | **Could** | UR-07, UR-09 |
+| **SR-OUT-01** | The system shall produce an *explained rubric file* as the deliverable of every successful run. | **Must** | UR-09 |
+| **SR-OUT-02** | The explained rubric file shall contain, at the root of the JSON document, one field for the improved rubric and one field for the explanation of changes. | **Must** | UR-09 |
+| **SR-OUT-03** | The explanation of changes in the explained rubric file shall be organized by the three quality criteria (Ambiguity, Applicability, Discrimination Power). | **Must** | UR-06, UR-09 |
+| **SR-OUT-04** | The explained rubric file shall validate against a documented schema. | **Should** | UR-09 |
+| **SR-OUT-05** | The explained rubric file shall reflect the teacher's per-change accept and reject decisions when such decisions have been made. | **Could** | UR-07, UR-09 |
 
 ### 5.6 Observability (SR-OBS)
 
@@ -264,6 +265,7 @@ Every requirement at each layer traces to at least one requirement on the layer 
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.3.5 | 2026-04-10 | Wiktor Lisowski | Glossary: added *Explained rubric file* — the deliverable JSON file that wraps the improved rubric and the explanation of changes. SR-OUT-01..05 rewritten to use the anchored term consistently in place of the previous loose phrase *"JSON output"*. SR-OUT-02 also tightened: *"top-level field"* (ambiguous) replaced with *"at the root of the JSON document"*. |
 | 0.3.4 | 2026-04-10 | Wiktor Lisowski | SR-UI-06: replaced *"teacher-facing language"* with *"teacher-native language"* — clearer intent (the UI speaks the teacher's own vocabulary), no semantic change. |
 | 0.3.3 | 2026-04-10 | Wiktor Lisowski | Glossary: added *Confidence indicator*, *Proposed change*, and *Audit bundle* entries. All three were already used in the SR section (SR-AS-08; SR-IM-03/05/06, SR-UI-08/09, SR-OUT-05; SR-OBS-01/03 respectively) but had not been anchored. Sweep complete: every load-bearing term in the SR layer is now defined. |
 | 0.3.2 | 2026-04-10 | Wiktor Lisowski | Glossary: added *Assessment finding* entry. The term was used in SR-AS-07, SR-AS-08, SR-IM-05, and SR-OBS-01 but had not been anchored in the glossary. Dropped the redundant qualifier "individual" from SR-AS-07. |
