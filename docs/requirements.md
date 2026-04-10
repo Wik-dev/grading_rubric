@@ -1,6 +1,6 @@
 # Grading Rubric Studio — Requirements
 
-**Version**: 0.3.0
+**Version**: 0.3.1
 **Date**: 2026-04-10
 **Status**: Draft
 **Author**: Wiktor Lisowski
@@ -67,6 +67,7 @@ The document follows a layered specification approach:
 | **Ambiguity** | Whether the rubric is formulated with objective, unambiguous criteria such that all graders reach the same interpretation independently. |
 | **Applicability** | Whether the rubric covers the diversity of possible student responses, leaving no valid answer type unaddressed. |
 | **Discrimination Power** | Whether the rubric clearly separates excellent work from poor work. |
+| **Evidence profile** | A per-run record of which optional inputs were provided to the system and in what quantity: presence and approximate volume of teaching material, form of the starting rubric (none, informal, partial, full draft), and number of sample student copies. The evidence profile determines which assessment paths the system can take on a given run and is the basis on which the system calibrates its own confidence in its findings. |
 | **Large-size class** | An exam cohort of approximately 100 or more student copies. The application is designed to support rubric design for such cohorts. |
 
 A note on the word "evaluation". The challenge brief refers to *Evaluation Criteria* — the three properties used to judge a rubric's quality. To avoid confusion between the multiple senses of the verb "evaluate" (graders evaluate students, the application evaluates rubrics, the teacher evaluates the application's output), this document uses **grading**, **assessment**, and **review** as defined above. The word *evaluation* is reserved for the brief's term *Evaluation Criteria*.
@@ -259,6 +260,7 @@ Every requirement at each layer traces to at least one requirement on the layer 
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.3.1 | 2026-04-10 | Wiktor Lisowski | Glossary: added *Evidence profile* entry. The term was already used in SR-IN-09 and underpins SR-AS-04, SR-AS-05, SR-AS-06, SR-AS-08, and SR-OBS-01 but had not been anchored in the glossary. |
 | 0.3.0 | 2026-04-10 | Wiktor Lisowski | Added § 5 *System Requirements* with 44 SRs across seven groups (SR-IN, SR-AS, SR-IM, SR-UI, SR-OUT, SR-OBS, SR-PRF). Distribution: 21 Must / 14 Should / 9 Could. SRs are technology-neutral; choices of language, framework, model provider, file format, schema, library, configuration, secrets, caching, deterministic execution, and orchestration layer are deferred to the Design Requirements. Renumbered the existing single-table traceability section to § 6 *Traceability* and added § 6.2 *User Requirements → System Requirements*. |
 | 0.2.0 | 2026-04-10 | Wiktor Lisowski | Added a *Criticality* column (MoSCoW) to all User Requirement tables. Result: 5 Must / 2 Should / 2 Could. Per-change accept/reject (UR-07) and its dependent re-run (UR-08) reclassified as *Could* — the canonical flow is whole-accept or regenerate with different inputs. |
 | 0.1.1 | 2026-04-10 | Wiktor Lisowski | Glossary: dropped *Grading intentions* as a separate term (it was redundant with the broad definition of *Rubric*). Folded the natural-language example into the *Rubric* definition. |
