@@ -1,6 +1,6 @@
 # Grading Rubric Studio — Requirements
 
-**Version**: 0.3.3
+**Version**: 0.3.4
 **Date**: 2026-04-10
 **Status**: Draft
 **Author**: Wiktor Lisowski
@@ -198,7 +198,7 @@ The following concerns are intentionally **deferred to the Design Requirements**
 | **SR-UI-03** | The user interface shall visually mark each input field as either required or optional. | **Must** | UR-01, UR-02, UR-03, UR-04 |
 | **SR-UI-04** | The user interface shall provide a single action control that triggers the full assessment and improvement operation. | **Must** | UR-05 |
 | **SR-UI-05** | The user interface shall display progress feedback to the teacher while the operation is running. | **Should** | UR-05 |
-| **SR-UI-06** | The user interface shall use teacher-facing language and shall not expose internal model, prompt, or pipeline terminology to the user. | **Should** | UR-05, UR-06 |
+| **SR-UI-06** | The user interface shall use teacher-native language and shall not expose internal model, prompt, or pipeline terminology to the user. | **Should** | UR-05, UR-06 |
 | **SR-UI-07** | The user interface shall display the original rubric and the improved rubric side by side after the operation completes. | **Must** | UR-06 |
 | **SR-UI-08** | The user interface shall display each proposed change together with its criterion tag and its rationale. | **Must** | UR-06 |
 | **SR-UI-09** | The user interface shall provide controls to accept or reject each proposed change individually. | **Could** | UR-07 |
@@ -264,6 +264,7 @@ Every requirement at each layer traces to at least one requirement on the layer 
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.3.4 | 2026-04-10 | Wiktor Lisowski | SR-UI-06: replaced *"teacher-facing language"* with *"teacher-native language"* — clearer intent (the UI speaks the teacher's own vocabulary), no semantic change. |
 | 0.3.3 | 2026-04-10 | Wiktor Lisowski | Glossary: added *Confidence indicator*, *Proposed change*, and *Audit bundle* entries. All three were already used in the SR section (SR-AS-08; SR-IM-03/05/06, SR-UI-08/09, SR-OUT-05; SR-OBS-01/03 respectively) but had not been anchored. Sweep complete: every load-bearing term in the SR layer is now defined. |
 | 0.3.2 | 2026-04-10 | Wiktor Lisowski | Glossary: added *Assessment finding* entry. The term was used in SR-AS-07, SR-AS-08, SR-IM-05, and SR-OBS-01 but had not been anchored in the glossary. Dropped the redundant qualifier "individual" from SR-AS-07. |
 | 0.3.1 | 2026-04-10 | Wiktor Lisowski | Glossary: added *Evidence profile* entry. The term was already used in SR-IN-09 and underpins SR-AS-04, SR-AS-05, SR-AS-06, SR-AS-08, and SR-OBS-01 but had not been anchored in the glossary. |
