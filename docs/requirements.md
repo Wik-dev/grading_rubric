@@ -1,6 +1,6 @@
 # Grading Rubric Studio — Requirements
 
-**Version**: 0.2.0
+**Version**: 0.3.0
 **Date**: 2026-04-10
 **Status**: Draft
 **Author**: Wiktor Lisowski
@@ -128,7 +128,110 @@ The current set is **5 Must / 2 Should / 2 Could**.
 
 ---
 
-## 5. Traceability — User Needs to User Requirements
+## 5. System Requirements
+
+System requirements describe what the system must do in order to satisfy the user requirements. They are deliberately **technology-neutral** at this layer: choices of language, framework, model provider, file format, schema, library, deployment target, and algorithm are made one level down in the Design Requirements. A system requirement that mandates a specific library or vendor is in the wrong document.
+
+System requirements are organized below into seven groups by the area of the system they constrain:
+
+- **SR-IN** — Input handling
+- **SR-AS** — Assessment
+- **SR-IM** — Improvement generation
+- **SR-UI** — User interface
+- **SR-OUT** — Output
+- **SR-OBS** — Observability
+- **SR-PRF** — Performance and scale
+
+The same MoSCoW criticality scale defined in § 4 applies. The current set is **44 system requirements: 21 Must / 14 Should / 9 Could**.
+
+The following concerns are intentionally **deferred to the Design Requirements** layer and do not appear here: choice of LLM provider and prompting approach, choice of UI framework, choice of file/document parsing libraries, choice of schema language, configuration mechanism, secret handling, caching strategy, deterministic execution policy, deployment topology, packaging, and orchestration layer.
+
+### 5.1 Input handling (SR-IN)
+
+| ID | Requirement | Criticality | Traces to |
+|---|---|---|---|
+| **SR-IN-01** | The system shall accept an exam question provided as a text, markdown, or PDF document. | **Must** | UR-01 |
+| **SR-IN-02** | The system shall refuse to start the assessment operation when no exam question has been provided. | **Must** | UR-01, UR-05 |
+| **SR-IN-03** | The system shall extract structured text content from the provided exam question document for use by downstream stages. | **Must** | UR-01 |
+| **SR-IN-04** | The system shall accept teaching material as one or more text, markdown, or PDF documents when provided. | **Should** | UR-02 |
+| **SR-IN-05** | The system shall accept a starting rubric in any of the forms covered by the glossary definition of *Rubric*: file upload, pasted text, or no input at all. | **Should** | UR-03 |
+| **SR-IN-06** | The system shall accept zero or more sample student copies as file uploads, including handwritten copies. | **Could** | UR-04 |
+| **SR-IN-07** | The system shall extract text from handwritten student copies before they are used by the assessment stage. | **Could** | UR-04 |
+| **SR-IN-08** | The system shall surface partial input parsing failures to the teacher without aborting the operation, provided that a usable subset of inputs remains. | **Should** | UR-01, UR-02, UR-03, UR-04 |
+| **SR-IN-09** | The system shall determine and record, for each run, an *evidence profile* describing which optional inputs were provided and in what quantity. | **Must** | UR-05, UR-06 |
+
+### 5.2 Assessment (SR-AS)
+
+| ID | Requirement | Criticality | Traces to |
+|---|---|---|---|
+| **SR-AS-01** | The system shall produce an assessment of the rubric's **Ambiguity** for every successful run. | **Must** | UR-05, UR-06 |
+| **SR-AS-02** | The system shall produce an assessment of the rubric's **Applicability** for every successful run. | **Must** | UR-05, UR-06 |
+| **SR-AS-03** | The system shall produce an assessment of the rubric's **Discrimination Power** for every successful run. | **Must** | UR-05, UR-06 |
+| **SR-AS-04** | The system shall ground its judgments of correctness in the provided teaching material whenever teaching material is available. | **Should** | UR-02, UR-06 |
+| **SR-AS-05** | The system shall use the provided sample student copies to test rubric coverage and discrimination whenever at least one copy is available. | **Should** | UR-04, UR-06 |
+| **SR-AS-06** | When no student copies are provided, the system shall fall back to synthetic candidate responses for coverage testing and shall mark any evidence so produced as synthetic. | **Could** | UR-06 |
+| **SR-AS-07** | Each individual assessment finding shall be tagged with exactly one of the three criteria (Ambiguity, Applicability, Discrimination Power). | **Must** | UR-06 |
+| **SR-AS-08** | The system shall attach a confidence indicator to each assessment finding, reflecting the strength and quantity of supporting evidence. | **Should** | UR-06 |
+
+### 5.3 Improvement generation (SR-IM)
+
+| ID | Requirement | Criticality | Traces to |
+|---|---|---|---|
+| **SR-IM-01** | The system shall produce an improved rubric for every successful run. | **Must** | UR-05, UR-09 |
+| **SR-IM-02** | The improved rubric shall be a structured object containing criteria, sub-criteria, point allocations, and scoring guidance. | **Must** | UR-09 |
+| **SR-IM-03** | The system shall produce a list of proposed changes, where each change records the original passage, the modified passage, the criterion it addresses, and a human-readable rationale. | **Must** | UR-06 |
+| **SR-IM-04** | The improved rubric shall not contradict the provided teaching material whenever teaching material is available. | **Should** | UR-02, UR-06 |
+| **SR-IM-05** | Each proposed change shall trace back to the assessment finding that motivated it. | **Should** | UR-06 |
+| **SR-IM-06** | The system shall return an empty list of proposed changes, together with an explanation, when the assessment finds no improvement warranted. | **Could** | UR-06, UR-09 |
+
+### 5.4 User interface (SR-UI)
+
+| ID | Requirement | Criticality | Traces to |
+|---|---|---|---|
+| **SR-UI-01** | The system shall present a graphical user interface accessible from a standard web browser running on the teacher's local machine. | **Must** | UR-01, UR-02, UR-03, UR-04, UR-05, UR-06, UR-09 |
+| **SR-UI-02** | The user interface shall provide a single input screen exposing all four input fields (exam question, teaching material, starting rubric, sample copies). | **Must** | UR-01, UR-02, UR-03, UR-04 |
+| **SR-UI-03** | The user interface shall visually mark each input field as either required or optional. | **Must** | UR-01, UR-02, UR-03, UR-04 |
+| **SR-UI-04** | The user interface shall provide a single action control that triggers the full assessment and improvement operation. | **Must** | UR-05 |
+| **SR-UI-05** | The user interface shall display progress feedback to the teacher while the operation is running. | **Should** | UR-05 |
+| **SR-UI-06** | The user interface shall use teacher-facing language and shall not expose internal model, prompt, or pipeline terminology to the user. | **Should** | UR-05, UR-06 |
+| **SR-UI-07** | The user interface shall display the original rubric and the improved rubric side by side after the operation completes. | **Must** | UR-06 |
+| **SR-UI-08** | The user interface shall display each proposed change together with its criterion tag and its rationale. | **Must** | UR-06 |
+| **SR-UI-09** | The user interface shall provide controls to accept or reject each proposed change individually. | **Could** | UR-07 |
+| **SR-UI-10** | The user interface shall provide an action to re-run the assessment after the teacher has accepted or rejected changes. | **Could** | UR-08 |
+
+### 5.5 Output (SR-OUT)
+
+| ID | Requirement | Criticality | Traces to |
+|---|---|---|---|
+| **SR-OUT-01** | The system shall produce a single JSON file as the deliverable output of every successful run. | **Must** | UR-09 |
+| **SR-OUT-02** | The JSON output shall contain one top-level field for the improved rubric and one top-level field for the explanation of changes. | **Must** | UR-09 |
+| **SR-OUT-03** | The explanation of changes in the JSON output shall be organized by the three quality criteria (Ambiguity, Applicability, Discrimination Power). | **Must** | UR-06, UR-09 |
+| **SR-OUT-04** | The JSON output shall validate against a documented schema. | **Should** | UR-09 |
+| **SR-OUT-05** | The JSON output shall reflect the teacher's per-change accept and reject decisions when such decisions have been made. | **Could** | UR-07, UR-09 |
+
+### 5.6 Observability (SR-OBS)
+
+| ID | Requirement | Criticality | Traces to |
+|---|---|---|---|
+| **SR-OBS-01** | The system shall record an audit bundle for each run, capturing the inputs, the evidence profile, the intermediate assessment findings, and the final rubric. | **Should** | UR-05, UR-06 |
+| **SR-OBS-02** | The system shall log every model invocation made during a run, recording its purpose, the prompt identifier used, and its outcome. | **Should** | UR-06 |
+| **SR-OBS-03** | The audit bundle for the current run shall be retrievable from the user interface. | **Could** | UR-06 |
+
+### 5.7 Performance and scale (SR-PRF)
+
+| ID | Requirement | Criticality | Traces to |
+|---|---|---|---|
+| **SR-PRF-01** | The system shall accept and process up to 100 sample student copies in a single run without functional degradation. | **Should** | UR-04 |
+| **SR-PRF-02** | The system shall provide visible progress feedback for any operation expected to take longer than five seconds. | **Must** | UR-05 |
+| **SR-PRF-03** | The system shall remain responsive to user input (in particular, allowing the teacher to cancel the run) while the assessment operation is in progress. | **Could** | UR-05 |
+
+---
+
+## 6. Traceability
+
+Every requirement at each layer traces to at least one requirement on the layer above it, and every requirement on each layer is covered by at least one requirement on the layer below it.
+
+### 6.1 User Needs → User Requirements
 
 | User Need | Covered by |
 |---|---|
@@ -136,7 +239,19 @@ The current set is **5 Must / 2 Should / 2 Could**.
 | UN-02 — Trust and understand proposed changes | UR-06, UR-07, UR-08 |
 | UN-03 — Portable handoff to graders | UR-09 |
 
-Every user requirement traces back to at least one user need. Every user need is covered by at least one user requirement.
+### 6.2 User Requirements → System Requirements
+
+| User Requirement | Covered by |
+|---|---|
+| UR-01 — Provide exam question | SR-IN-01, SR-IN-02, SR-IN-03, SR-IN-08, SR-UI-01, SR-UI-02, SR-UI-03 |
+| UR-02 — Provide teaching material | SR-IN-04, SR-IN-08, SR-AS-04, SR-IM-04, SR-UI-01, SR-UI-02, SR-UI-03 |
+| UR-03 — Provide starting rubric or grading intentions | SR-IN-05, SR-IN-08, SR-UI-01, SR-UI-02, SR-UI-03 |
+| UR-04 — Provide sample student copies | SR-IN-06, SR-IN-07, SR-IN-08, SR-AS-05, SR-UI-01, SR-UI-02, SR-UI-03, SR-PRF-01 |
+| UR-05 — Trigger the operation with a single action | SR-IN-02, SR-IN-09, SR-AS-01, SR-AS-02, SR-AS-03, SR-IM-01, SR-UI-04, SR-UI-05, SR-UI-06, SR-OBS-01, SR-OBS-02, SR-PRF-02, SR-PRF-03 |
+| UR-06 — View each change with criterion and rationale | SR-IN-09, SR-AS-01, SR-AS-02, SR-AS-03, SR-AS-04, SR-AS-05, SR-AS-06, SR-AS-07, SR-AS-08, SR-IM-03, SR-IM-04, SR-IM-05, SR-IM-06, SR-UI-06, SR-UI-07, SR-UI-08, SR-OUT-03, SR-OBS-01, SR-OBS-02, SR-OBS-03 |
+| UR-07 — Accept or reject changes individually | SR-UI-09, SR-OUT-05 |
+| UR-08 — Re-run after edits | SR-UI-10 |
+| UR-09 — Download the final rubric and explanation as JSON | SR-IM-01, SR-IM-02, SR-IM-06, SR-OUT-01, SR-OUT-02, SR-OUT-03, SR-OUT-04, SR-OUT-05, SR-UI-01 |
 
 ---
 
@@ -144,6 +259,7 @@ Every user requirement traces back to at least one user need. Every user need is
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.3.0 | 2026-04-10 | Wiktor Lisowski | Added § 5 *System Requirements* with 44 SRs across seven groups (SR-IN, SR-AS, SR-IM, SR-UI, SR-OUT, SR-OBS, SR-PRF). Distribution: 21 Must / 14 Should / 9 Could. SRs are technology-neutral; choices of language, framework, model provider, file format, schema, library, configuration, secrets, caching, deterministic execution, and orchestration layer are deferred to the Design Requirements. Renumbered the existing single-table traceability section to § 6 *Traceability* and added § 6.2 *User Requirements → System Requirements*. |
 | 0.2.0 | 2026-04-10 | Wiktor Lisowski | Added a *Criticality* column (MoSCoW) to all User Requirement tables. Result: 5 Must / 2 Should / 2 Could. Per-change accept/reject (UR-07) and its dependent re-run (UR-08) reclassified as *Could* — the canonical flow is whole-accept or regenerate with different inputs. |
 | 0.1.1 | 2026-04-10 | Wiktor Lisowski | Glossary: dropped *Grading intentions* as a separate term (it was redundant with the broad definition of *Rubric*). Folded the natural-language example into the *Rubric* definition. |
 | 0.1.0 | 2026-04-10 | Wiktor Lisowski | Initial draft. User Needs (3), User Requirements (9), glossary, scope. System requirements to be added in the next iteration. |
