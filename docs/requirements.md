@@ -1,6 +1,6 @@
 # Grading Rubric Studio — Requirements
 
-**Version**: 0.3.2
+**Version**: 0.3.3
 **Date**: 2026-04-10
 **Status**: Draft
 **Author**: Wiktor Lisowski
@@ -69,6 +69,9 @@ The document follows a layered specification approach:
 | **Discrimination Power** | Whether the rubric clearly separates excellent work from poor work. |
 | **Evidence profile** | A per-run record of which optional inputs were provided to the system and in what quantity: presence and approximate volume of teaching material, form of the starting rubric (none, informal, partial, full draft), and number of sample student copies. The evidence profile determines which assessment paths the system can take on a given run and is the basis on which the system calibrates its own confidence in its findings. |
 | **Assessment finding** | An atomic output of the assessment stage: a single observation about the rubric, tagged with exactly one of the three criteria (Ambiguity, Applicability, Discrimination Power), supported by evidence drawn from the inputs, and carrying its own confidence indicator. One run typically produces several findings. Each finding is the seed from which the improvement stage may generate a proposed change to the rubric. |
+| **Confidence indicator** | A measure attached to each assessment finding that expresses how much weight the system places in that finding given the available evidence. Confidence reflects both the strength and the quantity of supporting evidence: a finding grounded in many real student copies and the teaching material carries higher confidence than one inferred from synthetic responses alone. The confidence indicator is what allows the system to remain useful across the full range of evidence profiles, from no optional inputs at all to a fully populated run. |
+| **Proposed change** | A discrete modification to the rubric proposed by the system, consisting of: the original passage, the modified passage, the criterion (Ambiguity, Applicability, or Discrimination Power) it addresses, and a human-readable rationale. Each proposed change traces back to one or more assessment findings. The teacher's review acts on proposed changes one at a time. |
+| **Audit bundle** | A per-run record produced by the system, capturing the inputs received, the evidence profile, the assessment findings, the model invocations made, and the final rubric. The audit bundle is the artifact that lets the teacher, or a reviewer, reconstruct *why* the system produced what it produced for a given run. |
 | **Large-size class** | An exam cohort of approximately 100 or more student copies. The application is designed to support rubric design for such cohorts. |
 
 A note on the word "evaluation". The challenge brief refers to *Evaluation Criteria* — the three properties used to judge a rubric's quality. To avoid confusion between the multiple senses of the verb "evaluate" (graders evaluate students, the application evaluates rubrics, the teacher evaluates the application's output), this document uses **grading**, **assessment**, and **review** as defined above. The word *evaluation* is reserved for the brief's term *Evaluation Criteria*.
@@ -261,6 +264,7 @@ Every requirement at each layer traces to at least one requirement on the layer 
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.3.3 | 2026-04-10 | Wiktor Lisowski | Glossary: added *Confidence indicator*, *Proposed change*, and *Audit bundle* entries. All three were already used in the SR section (SR-AS-08; SR-IM-03/05/06, SR-UI-08/09, SR-OUT-05; SR-OBS-01/03 respectively) but had not been anchored. Sweep complete: every load-bearing term in the SR layer is now defined. |
 | 0.3.2 | 2026-04-10 | Wiktor Lisowski | Glossary: added *Assessment finding* entry. The term was used in SR-AS-07, SR-AS-08, SR-IM-05, and SR-OBS-01 but had not been anchored in the glossary. Dropped the redundant qualifier "individual" from SR-AS-07. |
 | 0.3.1 | 2026-04-10 | Wiktor Lisowski | Glossary: added *Evidence profile* entry. The term was already used in SR-IN-09 and underpins SR-AS-04, SR-AS-05, SR-AS-06, SR-AS-08, and SR-OBS-01 but had not been anchored in the glossary. |
 | 0.3.0 | 2026-04-10 | Wiktor Lisowski | Added § 5 *System Requirements* with 44 SRs across seven groups (SR-IN, SR-AS, SR-IM, SR-UI, SR-OUT, SR-OBS, SR-PRF). Distribution: 21 Must / 14 Should / 9 Could. SRs are technology-neutral; choices of language, framework, model provider, file format, schema, library, configuration, secrets, caching, deterministic execution, and orchestration layer are deferred to the Design Requirements. Renumbered the existing single-table traceability section to § 6 *Traceability* and added § 6.2 *User Requirements → System Requirements*. |
