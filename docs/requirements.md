@@ -1,6 +1,6 @@
 # Grading Rubric Studio — Requirements
 
-**Version**: 0.1.1
+**Version**: 0.2.0
 **Date**: 2026-04-10
 **Status**: Draft
 **Author**: Wiktor Lisowski
@@ -89,34 +89,42 @@ User needs capture the underlying problems and outcomes that matter to the teach
 
 User requirements are derived from the user needs and express what the teacher must be able to do, perceive, or accomplish. They are organized below by the surface they touch: inputs, operation, review, and output.
 
+**Criticality** is assigned per requirement using a MoSCoW scale:
+
+- **Must** — required for the application to satisfy the challenge brief or to be usable at all. Failure to deliver a *Must* invalidates the deliverable.
+- **Should** — strongly improves the quality or value of the result. The application is materially weaker without it but still functional.
+- **Could** — refinement that improves the user experience or supports advanced workflows. The application is fully functional without it.
+
+The current set is **5 Must / 2 Should / 2 Could**.
+
 ### 4.1 Inputs
 
-| ID | Requirement | Rationale | Traces to |
-|---|---|---|---|
-| **UR-01** | The teacher shall be able to provide an exam question to the application. | Without an exam question there is nothing to grade and no anchor for any rubric. This is the only mandatory input. | UN-01 |
-| **UR-02** | The teacher shall be able to provide teaching material (course content the exam is based on) to the application as an optional input. | Teaching material defines what counts as correct in the domain and surfaces ambiguities present in the domain itself. A rubric criterion that contradicts the teaching material is unfair to students; the application needs the teaching material to detect this. | UN-01 |
-| **UR-03** | The teacher shall be able to provide a starting rubric — ranging from no input at all, through informal grading intentions in natural language, to a complete draft rubric — as an optional input. | The challenge brief implicitly assumes the teacher arrives with a rubric, but in practice the teacher may arrive with anything from nothing to a polished draft. The application accepts all of these as valid starting points for the same operation. | UN-01 |
-| **UR-04** | The teacher shall be able to provide one or more sample student copies as an optional input. | Real student copies allow the application to ground its assessment in actual student behavior, in particular for checking that the rubric covers the diversity of real responses and for proposing concrete anchor examples inside the improved rubric. | UN-01 |
+| ID | Requirement | Criticality | Rationale | Traces to |
+|---|---|---|---|---|
+| **UR-01** | The teacher shall be able to provide an exam question to the application. | **Must** | Without an exam question there is nothing to grade and no anchor for any rubric. This is the only mandatory input. | UN-01 |
+| **UR-02** | The teacher shall be able to provide teaching material (course content the exam is based on) to the application as an optional input. | **Should** | Teaching material defines what counts as correct in the domain and surfaces ambiguities present in the domain itself. A rubric criterion that contradicts the teaching material is unfair to students; the application needs the teaching material to detect this. | UN-01 |
+| **UR-03** | The teacher shall be able to provide a starting rubric — ranging from no input at all, through informal grading intentions in natural language, to a complete draft rubric — as an optional input. | **Should** | The challenge brief implicitly assumes the teacher arrives with a rubric, but in practice the teacher may arrive with anything from nothing to a polished draft. The application accepts all of these as valid starting points for the same operation. | UN-01 |
+| **UR-04** | The teacher shall be able to provide one or more sample student copies as an optional input. | **Could** | Real student copies allow the application to ground its assessment in actual student behavior, in particular for checking that the rubric covers the diversity of real responses and for proposing concrete anchor examples inside the improved rubric. The application is fully functional without copies. | UN-01 |
 
 ### 4.2 Operation
 
-| ID | Requirement | Rationale | Traces to |
-|---|---|---|---|
-| **UR-05** | The teacher shall be able to trigger an assessment of the rubric and a generation of an improved rubric from the application interface, with a single user action. | A clear, single action — not a command-line invocation. The brief calls this an "AI application", which to the teacher means a user interface with controls. Whatever inputs are present on the input screen are used by the operation; missing optional inputs are simply not used. | UN-01 |
+| ID | Requirement | Criticality | Rationale | Traces to |
+|---|---|---|---|---|
+| **UR-05** | The teacher shall be able to trigger an assessment of the rubric and a generation of an improved rubric from the application interface, with a single user action. | **Must** | A clear, single action — not a command-line invocation. The brief calls this an "AI application", which to the teacher means a user interface with controls. Whatever inputs are present on the input screen are used by the operation; missing optional inputs are simply not used. | UN-01 |
 
 ### 4.3 Review
 
-| ID | Requirement | Rationale | Traces to |
-|---|---|---|---|
-| **UR-06** | The teacher shall be able to view each proposed change to the rubric together with the criterion (Ambiguity, Applicability, or Discrimination Power) it addresses and a human-readable rationale for the change. | Trust requires transparency. The teacher must see *why* each change was proposed and against *which* of the three quality criteria it acts. | UN-02 |
-| **UR-07** | The teacher shall be able to accept or reject each proposed change individually before finalizing the rubric. | The teacher is the domain expert and may have institutional, pedagogical, or contextual reasons to reject a change that the application cannot know. | UN-02 |
-| **UR-08** | The teacher shall be able to re-run the assessment after accepting or rejecting changes, in order to see the effect of their decisions on the rubric. | Rubric design is iterative. A teacher may not know in advance how rejecting a change affects overall rubric quality, and may want to explore alternatives before finalizing. | UN-02 |
+| ID | Requirement | Criticality | Rationale | Traces to |
+|---|---|---|---|---|
+| **UR-06** | The teacher shall be able to view each proposed change to the rubric together with the criterion (Ambiguity, Applicability, or Discrimination Power) it addresses and a human-readable rationale for the change. | **Must** | The brief explicitly mandates that the output include an explanation of the suggested improvements organized by the three criteria. Beyond the brief, trust requires transparency: the teacher must see *why* each change was proposed and *which* of the three quality criteria it acts on. | UN-02 |
+| **UR-07** | The teacher shall be able to accept or reject each proposed change individually before finalizing the rubric. | **Could** | A refinement on top of the canonical flow. The canonical flow is whole-accept or regenerate with different inputs; per-change cherry-picking is convenient but not essential. The teacher who disagrees with the result can always re-run with adjusted inputs. | UN-02 |
+| **UR-08** | The teacher shall be able to re-run the assessment after accepting or rejecting changes, in order to see the effect of their decisions on the rubric. | **Could** | Dependent on UR-07. If per-change edits are a refinement, then re-running across them is also a refinement. Re-running the application from scratch with different inputs is always available via UR-05 and is a separate flow. | UN-02 |
 
 ### 4.4 Output
 
-| ID | Requirement | Rationale | Traces to |
-|---|---|---|---|
-| **UR-09** | The teacher shall be able to download the final rubric, together with the explanation of all accepted changes organized by criterion, as a single JSON file. | The challenge brief mandates a JSON deliverable containing the improved rubric and the explanation of improvements. The downloaded file is what the teacher takes to their grading team. | UN-03 |
+| ID | Requirement | Criticality | Rationale | Traces to |
+|---|---|---|---|---|
+| **UR-09** | The teacher shall be able to download the final rubric, together with the explanation of all accepted changes organized by criterion, as a single JSON file. | **Must** | The challenge brief mandates a JSON deliverable containing the improved rubric and the explanation of improvements. The downloaded file is what the teacher takes to their grading team. | UN-03 |
 
 ---
 
@@ -136,5 +144,6 @@ Every user requirement traces back to at least one user need. Every user need is
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.2.0 | 2026-04-10 | Wiktor Lisowski | Added a *Criticality* column (MoSCoW) to all User Requirement tables. Result: 5 Must / 2 Should / 2 Could. Per-change accept/reject (UR-07) and its dependent re-run (UR-08) reclassified as *Could* — the canonical flow is whole-accept or regenerate with different inputs. |
 | 0.1.1 | 2026-04-10 | Wiktor Lisowski | Glossary: dropped *Grading intentions* as a separate term (it was redundant with the broad definition of *Rubric*). Folded the natural-language example into the *Rubric* definition. |
 | 0.1.0 | 2026-04-10 | Wiktor Lisowski | Initial draft. User Needs (3), User Requirements (9), glossary, scope. System requirements to be added in the next iteration. |
