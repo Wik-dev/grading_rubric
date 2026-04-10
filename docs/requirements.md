@@ -1,6 +1,6 @@
 # Grading Rubric Studio — Requirements
 
-**Version**: 0.3.6
+**Version**: 0.4.0
 **Date**: 2026-04-10
 **Status**: Draft
 **Author**: Wiktor Lisowski
@@ -138,21 +138,25 @@ The current set is **5 Must / 2 Should / 2 Could**.
 
 System requirements describe what the system must do in order to satisfy the user requirements. They are deliberately **technology-neutral** at this layer: choices of language, framework, model provider, file format, schema, library, deployment target, and algorithm are made one level down in the Design Requirements. A system requirement that mandates a specific library or vendor is in the wrong document.
 
-System requirements are organized below into seven groups by the area of the system they constrain:
+System requirements are split into two sub-sections at the same V-model layer:
 
-- **SR-IN** — Input handling
-- **SR-AS** — Assessment
-- **SR-IM** — Improvement generation
-- **SR-UI** — User interface
-- **SR-OUT** — Output
-- **SR-OBS** — Observability
-- **SR-PRF** — Performance and scale
+- **§ 5.1 Functional system requirements** — what the system *does*. Behaviors, inputs, outputs, screens, structures.
+- **§ 5.2 Non-functional system requirements** — *how well* the system does it. Quality attributes such as observability and performance.
 
-The same MoSCoW criticality scale defined in § 4 applies. The current set is **44 system requirements: 21 Must / 14 Should / 9 Could**.
+Within each sub-section, requirements are organized into groups by the area of the system they constrain:
+
+- **§ 5.1** — SR-IN (input handling), SR-AS (assessment), SR-IM (improvement generation), SR-UI (user interface), SR-OUT (output)
+- **§ 5.2** — SR-OBS (observability), SR-PRF (performance and scale)
+
+The same MoSCoW criticality scale defined in § 4 applies. The current set is **44 system requirements: 21 Must / 14 Should / 9 Could**, of which 38 are functional and 6 are non-functional.
 
 The following concerns are intentionally **deferred to the Design Requirements** layer and do not appear here: choice of LLM provider and prompting approach, choice of UI framework, choice of file/document parsing libraries, choice of schema language, configuration mechanism, secret handling, caching strategy, deterministic execution policy, deployment topology, packaging, and orchestration layer.
 
-### 5.1 Input handling (SR-IN)
+### 5.1 Functional system requirements
+
+Functional system requirements specify *what the system does*: the behaviors, inputs, outputs, screens, and data structures that realize the user requirements. They are grouped by the area of the system they constrain.
+
+#### 5.1.1 Input handling (SR-IN)
 
 | ID | Requirement | Criticality | Traces to |
 |---|---|---|---|
@@ -166,7 +170,7 @@ The following concerns are intentionally **deferred to the Design Requirements**
 | **SR-IN-08** | The system shall surface partial input parsing failures to the teacher without aborting the operation, provided that a usable subset of inputs remains. | **Should** | UR-01, UR-02, UR-03, UR-04 |
 | **SR-IN-09** | The system shall determine and record, for each run, an *evidence profile* describing which optional inputs were provided and in what quantity. | **Must** | UR-05, UR-06 |
 
-### 5.2 Assessment (SR-AS)
+#### 5.1.2 Assessment (SR-AS)
 
 | ID | Requirement | Criticality | Traces to |
 |---|---|---|---|
@@ -179,7 +183,7 @@ The following concerns are intentionally **deferred to the Design Requirements**
 | **SR-AS-07** | Each assessment finding shall be tagged with exactly one of the three criteria (Ambiguity, Applicability, Discrimination Power). | **Must** | UR-06 |
 | **SR-AS-08** | The system shall attach a confidence indicator to each assessment finding, reflecting the strength and quantity of supporting evidence. | **Should** | UR-06 |
 
-### 5.3 Improvement generation (SR-IM)
+#### 5.1.3 Improvement generation (SR-IM)
 
 | ID | Requirement | Criticality | Traces to |
 |---|---|---|---|
@@ -190,7 +194,7 @@ The following concerns are intentionally **deferred to the Design Requirements**
 | **SR-IM-05** | Each proposed change shall trace back to the assessment finding that motivated it. | **Should** | UR-06 |
 | **SR-IM-06** | The system shall return an empty list of proposed changes, together with an explanation, when the assessment finds no improvement warranted. | **Could** | UR-06, UR-09 |
 
-### 5.4 User interface (SR-UI)
+#### 5.1.4 User interface (SR-UI)
 
 | ID | Requirement | Criticality | Traces to |
 |---|---|---|---|
@@ -205,7 +209,7 @@ The following concerns are intentionally **deferred to the Design Requirements**
 | **SR-UI-09** | The user interface shall provide controls to accept or reject each proposed change individually. | **Could** | UR-07 |
 | **SR-UI-10** | The user interface shall provide an action to re-run the assessment after the teacher has accepted or rejected changes. | **Could** | UR-08 |
 
-### 5.5 Output (SR-OUT)
+#### 5.1.5 Output (SR-OUT)
 
 | ID | Requirement | Criticality | Traces to |
 |---|---|---|---|
@@ -215,7 +219,11 @@ The following concerns are intentionally **deferred to the Design Requirements**
 | **SR-OUT-04** | The explained rubric file shall validate against a documented schema. | **Should** | UR-09 |
 | **SR-OUT-05** | The explained rubric file shall reflect the teacher's per-change accept and reject decisions when such decisions have been made. | **Could** | UR-07, UR-09 |
 
-### 5.6 Observability (SR-OBS)
+### 5.2 Non-functional system requirements
+
+Non-functional system requirements specify *how well* the system must do what it does: quality attributes such as observability and performance. They live at the same V-model layer as functional system requirements and trace to the same user requirements, but they constrain the system's qualities rather than its behaviors.
+
+#### 5.2.1 Observability (SR-OBS)
 
 | ID | Requirement | Criticality | Traces to |
 |---|---|---|---|
@@ -223,7 +231,7 @@ The following concerns are intentionally **deferred to the Design Requirements**
 | **SR-OBS-02** | The system shall log every model invocation made during a run, recording its purpose, the prompt identifier used, and its outcome. | **Should** | UR-06 |
 | **SR-OBS-03** | The audit bundle for the current run shall be retrievable from the user interface. | **Could** | UR-06 |
 
-### 5.7 Performance and scale (SR-PRF)
+#### 5.2.2 Performance and scale (SR-PRF)
 
 | ID | Requirement | Criticality | Traces to |
 |---|---|---|---|
@@ -265,6 +273,7 @@ Every requirement at each layer traces to at least one requirement on the layer 
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.4.0 | 2026-04-10 | Wiktor Lisowski | Restructured § 5 *System Requirements* into two sub-sections at the same V-model layer: § 5.1 *Functional system requirements* (SR-IN, SR-AS, SR-IM, SR-UI, SR-OUT — 38 SRs) and § 5.2 *Non-functional system requirements* (SR-OBS, SR-PRF — 6 SRs). Group sub-sub-sections renumbered (5.1 → 5.1.1, …, 5.7 → 5.2.2). Intent: make the functional / non-functional split explicit without inventing a top-level § 6 that would imply NFRs sit at a different V-model layer than functional SRs (they don't). No requirements added, removed, modified or re-traced. |
 | 0.3.6 | 2026-04-10 | Wiktor Lisowski | Glossary: tightened *Audit bundle* — the bundle is a *trace* (what the system did, in what order), not a *reasoning artifact*. The "why" of any individual change lives in the proposed change's rationale; the audit bundle stores it but does not generate it. Also dropped the undefined actor "reviewer". |
 | 0.3.5 | 2026-04-10 | Wiktor Lisowski | Glossary: added *Explained rubric file* — the deliverable JSON file that wraps the improved rubric and the explanation of changes. SR-OUT-01..05 rewritten to use the anchored term consistently in place of the previous loose phrase *"JSON output"*. SR-OUT-02 also tightened: *"top-level field"* (ambiguous) replaced with *"at the root of the JSON document"*. |
 | 0.3.4 | 2026-04-10 | Wiktor Lisowski | SR-UI-06: replaced *"teacher-facing language"* with *"teacher-native language"* — clearer intent (the UI speaks the teacher's own vocabulary), no semantic change. |
