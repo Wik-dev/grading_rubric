@@ -1,6 +1,6 @@
 # Grading Rubric Studio — Requirements
 
-**Version**: 0.1.0
+**Version**: 0.1.1
 **Date**: 2026-04-10
 **Status**: Draft
 **Author**: Wiktor Lisowski
@@ -59,8 +59,7 @@ The document follows a layered specification approach:
 | **Copy** | A student's answer to an exam question. May be handwritten or digital. |
 | **Exam question** | The question, including any scenario and instructions, that students answer in the exam. |
 | **Teaching material** | Course content (slides, notes, textbook excerpts) on which the exam is based. |
-| **Rubric** | Any structured set of positive and negative points mapping to questions and evaluation criteria, used by graders to guide their grading. May range from informal grading intentions in natural language to a fully structured table with weights, sub-criteria, and penalties. |
-| **Grading intentions** | An informal, human-readable description of what the teacher wants graded and how (e.g. *"weight part 1 more, focus on reasoning depth in part 2"*). Considered a valid form of rubric input. |
+| **Rubric** | Any expression of how positive and negative points are distributed across exam questions and evaluation criteria, for the purpose of guiding graders. The form may range from an informal natural-language description (e.g. *"weight part 1 more, focus on reasoning depth in part 2"*) through a partial draft, up to a fully structured table with weights, sub-criteria, and penalties. All of these are valid rubrics under this definition. |
 | **Grading** | The act of applying a rubric to a copy in order to produce a grade. Performed by graders. *Not* performed by this application. |
 | **Assessment** *(of a rubric)* | The analysis of a rubric's quality against the three criteria (Ambiguity, Applicability, Discrimination Power). Performed by this application. |
 | **Review** *(of an assessment)* | The teacher's examination of the application's proposed changes, including the acceptance or rejection of individual proposals. |
@@ -137,4 +136,5 @@ Every user requirement traces back to at least one user need. Every user need is
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.1.1 | 2026-04-10 | Wiktor Lisowski | Glossary: dropped *Grading intentions* as a separate term (it was redundant with the broad definition of *Rubric*). Folded the natural-language example into the *Rubric* definition. |
 | 0.1.0 | 2026-04-10 | Wiktor Lisowski | Initial draft. User Needs (3), User Requirements (9), glossary, scope. System requirements to be added in the next iteration. |
