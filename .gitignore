@@ -1,0 +1,26 @@
+# Challenge reference materials (confidential)
+EPFL_Coding_Challenge.pdf
+ExamQuestionAndRubric.pdf
+StudentAnswer-*.pdf
+TeachingResource-*.pdf
+job_description.txt
+
+# Personal notes
+notes/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.env
+.env.*
