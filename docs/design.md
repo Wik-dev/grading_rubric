@@ -1,8 +1,8 @@
 # Grading Rubric Studio — Design
 
-**Version**: 0.8.0
+**Version**: 0.9.0
 **Date**: 2026-04-11
-**Status**: Architectural overview filled; technology-stack decisions #1–#6 locked; data models and DR groups still to be filled
+**Status**: Architectural overview filled; technology-stack decisions #1–#7 locked; data models and DR groups still to be filled
 **Author**: Wiktor Lisowski
 
 ---
@@ -170,7 +170,7 @@ Each technology decision deferred from the SR layer is tracked in the register b
 | 4 | File and document parsing libraries | **decided** | `pypdf` for simple PDF text extraction, `pdfplumber` when layout matters, stdlib for `.txt`, `markdown-it-py` for `.md`, `python-docx` for `.docx`; a single `InputParser` module returns a uniform `ParsedDocument` regardless of source format | § 3.4 |
 | 5 | OCR for handwritten student copies | **decided** | Claude Sonnet 4.6 multimodal input as the primary OCR path, invoked through the same LLM Gateway as every other model call; `StudentCopyReader` interface in DR-IO keeps the backend swappable for a dedicated OCR service | § 3.5 |
 | 6 | Schema language for the *Explained rubric file* | **decided** | Pydantic is the single source of truth; a `make schemas` step emits a versioned JSON Schema file that ships alongside the deliverable; the front-end derives its TypeScript types and zod validators from the same JSON Schema | § 3.6 |
-| 7 | Configuration mechanism and secret handling | pending | — | § 3.7 |
+| 7 | Configuration mechanism and secret handling | **decided** | `pydantic-settings` `Settings` class as the typed loader; environment variables as the only runtime source; gitignored `.env` for dev convenience; secrets held as `SecretStr`; workflows registered with an external orchestrator declare required secret *names*, not values | § 3.7 |
 | 8 | Caching strategy | pending | — | § 3.8 |
 | 9 | Deterministic execution policy | pending | — | § 3.9 |
 | 10 | Deployment topology, packaging | pending | — | § 3.10 |
@@ -329,6 +329,63 @@ The file itself carries its schema version in a top-level `schema_version` field
 - **Why an independent version on the schema itself.** The application might ship many releases without changing the contract shape; conversely, a contract change might happen on a mid-release refactor. Tying the schema version to the application version would either delay needed bumps or force spurious ones. A separate semver on `ExplainedRubricFile` lets the contract evolve at its own pace and lets consumers assert what they rely on.
 - **What this decision does not commit.** The *content* of the schema — the specific fields of `ExplainedRubricFile`, their types, their required/optional status — is § 4 *Data models* and § 5.3 *DR-DAT*. The versioning policy for the schemas of *non-deliverable* objects (Assessment finding, Proposed change, Audit bundle) is also a DR-DAT concern; this decision covers the deliverable file only.
 
+### 3.7 Configuration mechanism and secret handling
+
+**Decision.** All runtime configuration is held in a single typed `Settings` class built on `pydantic-settings`. It reads from process environment variables; for developer convenience, it also loads a **gitignored `.env`** file if present. Secrets are held as `SecretStr`, whose raw value is only ever read at the single call site that needs it. A committed `.env.example` enumerates every variable the application understands, with empty values for all secrets.
+
+No secret ever appears in any artefact that is committed to the repository, baked into a Docker image, or recorded in an audit bundle. The only place a secret exists is the environment of the process that needs it.
+
+```python
+# (illustrative — actual definition lives in DR-ARC, § 5.1)
+from pathlib import Path
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",                 # dev-only convenience; ignored if absent
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+    # Secrets
+    anthropic_api_key: SecretStr
+    # Non-secret runtime config
+    default_model: str = "claude-sonnet-4-6"
+    llm_max_samples: int = 5
+    cache_dir: Path = Path(".cache/grading_rubric")
+    audit_bundle_dir: Path = Path("runs")
+    prompts_dir: Path = Path("prompts")
+    schemas_dir: Path = Path("schemas")
+    # HTTP back-end
+    api_host: str = "127.0.0.1"
+    api_port: int = 8765
+```
+
+This class is instantiated once at process start, imported by the modules that need it, and never mutated at runtime.
+
+**Rationale.**
+
+- **Why `pydantic-settings` rather than a hand-rolled config loader.** Pydantic is already in the stack (§ 3.2 for LLM structured output validation, § 3.6 for the deliverable's schema). Reusing it for application configuration means one validation library, one typed-model mental model, and one way to talk about required versus optional fields. The `Settings` class is also the auditable list of every tunable the application exposes — if a reviewer wants to know *what can be configured*, the answer is to open one file.
+- **Why environment variables as the only runtime source.** This is the 12-factor default and is also the pattern that orchestrators (Validance, Snakemake, Airflow, plain `docker run`) already know how to feed into a process. Anything more elaborate creates a second path the orchestrator must learn to populate.
+- **Why `.env` is *dev-only convenience*, not a config format.** The `.env` loader is strictly syntactic sugar on top of the environment-variable path: if the file exists, its entries are loaded into `os.environ` before `Settings` reads them. A reviewer cloning the repository copies `.env.example` to `.env`, fills in `ANTHROPIC_API_KEY`, and the application runs. In any environment that already supplies the variables (CI, container runtime, orchestrator), the `.env` file is simply absent and the loader is a no-op. The application has **no two modes** — there is only one path, and `.env` is an optional entry-point to it.
+- **Why `SecretStr` rather than `str`.** `SecretStr` makes accidental leakage structurally difficult. Its default repr is `SecretStr('**********')`; it never stringifies to its value; serialising it to JSON emits a redaction token rather than the secret. The only way to get the raw bytes is `get_secret_value()`, which is called in exactly one place — inside the LLM Gateway, when constructing the Anthropic client. This means secrets are structurally impossible to land in log lines, stack traces, or the audit bundle (§ 5.8 *DR-OBS*).
+- **Why a committed `.env.example` rather than hand-maintained documentation.** The example file is the single source of truth for *which variables exist*. It is generated from the `Settings` class (or kept in lock-step with it by a small check in tests) so a new field cannot be added without the reviewer also seeing it in the example. A prose README table would drift.
+
+**Runtime under an external orchestrator.**
+
+The same `Settings` class and the same code run unchanged whether the application is invoked standalone or as one task in an external workflow engine. The difference is only in *who puts variables into the environment*:
+
+| Mode | Source of `ANTHROPIC_API_KEY` | Source of `default_model` etc. |
+|---|---|---|
+| Standalone | Reviewer's `.env` file, loaded by `pydantic-settings` at boot | Same, or the built-in defaults on the `Settings` class |
+| External orchestrator (e.g. Validance) | The orchestrator's secret store, injected as an env var when the task container starts | Task parameters in the workflow definition, passed through to the task container as env vars |
+
+The workflow definition that registers the application as a task with such an orchestrator declares **the *names* of the environment variables it requires**, not their values. The secret store and the workflow definition are therefore two separate things: the workflow is secret-free by construction, and any committed artefact that describes it (catalog entry, compose file, registration script) is also secret-free. At task launch, the orchestrator resolves the declared names against its secret store and injects the resulting env vars into the container; the task then boots the same `Settings` class and is unaware that a different layer supplied them.
+
+This arrangement is the concrete realisation of the hermetic-task philosophy from § 2.2 on the *configuration* axis: the task declares its inputs (including the names of secrets it requires), and the environment that supplies them is pluggable. The application therefore satisfies both locked architectural commitment #4 (*Validance is one possible execution layer, the deliverable runs standalone with no Validance dependency*) and the invariant that registered workflows must never carry secret values.
+
+- **What this decision does not commit.** The caching strategy that uses `cache_dir` and the exact on-disk layout of that cache is decision **#8** (§ 3.8). The deterministic-execution policy (temperature, seed, sampling discipline) that `llm_max_samples` ties into is decision **#9** (§ 3.9). The packaging and deployment topology that decides whether the back-end is a long-running server, a one-shot task, or both is decision **#10** (§ 3.10). The exact list of `Settings` fields will grow as later decisions land — this section locks the mechanism, not the full field list.
+
 ---
 
 ## 4. Data models
@@ -444,6 +501,7 @@ Every DR shall trace back to at least one SR. Every SR shall be covered by at le
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.9.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #7 (configuration mechanism and secret handling) in § 3.7: single typed `Settings` class built on `pydantic-settings`; process environment variables as the only runtime source; gitignored `.env` for dev convenience loaded automatically when present; committed `.env.example` as the single source of truth for *which* variables exist; secrets held as `SecretStr` so they cannot land in logs, stack traces, or the audit bundle. The same code runs unchanged under an external orchestrator (e.g. Validance): the registered workflow declares the *names* of required secrets, not their values; the orchestrator's secret store injects them into the container's environment at task launch; the task boots the same `Settings` class. Committed artefacts — repo, image, workflow definition — are secret-free by construction. Decisions #8–#11 still pending. |
 | 0.8.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #6 (schema language for the *Explained rubric file*) in § 3.6: the Pydantic class is the single source of truth; a `make schemas` build step emits a versioned `schemas/explained_rubric_file.vMAJOR.MINOR.schema.json` file that is checked into the repo as the language-agnostic inspection artefact for reviewers; the front-end derives TypeScript types (`json-schema-to-typescript`) and runtime zod validators (`json-schema-to-zod`) from the same JSON Schema file; the deliverable JSON carries its `schema_version` in a top-level field and the schema is versioned independently of the application. Decisions #7–#11 still pending. |
 | 0.7.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #5 (OCR for handwritten student copies) in § 3.5: Claude Sonnet 4.6 multimodal input as the primary OCR backend, invoked through the same `gateway.measure()` entry point as every other model call (same caching, same audit logging, same retry-once validation). The `InputParser` delegates to a `StudentCopyReader` interface whose contract is specified in § 5.7 *DR-IO*; a dedicated-OCR backend (Azure Document Intelligence, Textract, Cloud Vision, TrOCR, etc.) can replace the primary implementation without touching any other module. Avoids adding a second cloud dependency beyond Anthropic. Decisions #6–#11 still pending. |
 | 0.6.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #4 (file and document parsing libraries) in § 3.4: a single `InputParser` module with one entry point per format, returning a uniform `ParsedDocument` (text + metadata + provenance). Libraries: `pypdf` as the default PDF extractor with `pdfplumber` as a layout-aware fallback; stdlib + `charset-normalizer` for `.txt`; `markdown-it-py` for `.md`; `python-docx` for `.docx`. OCR for handwritten copies remains decision #5. Decisions #5–#11 still pending. |
