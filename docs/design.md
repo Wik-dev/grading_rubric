@@ -1,8 +1,8 @@
 # Grading Rubric Studio — Design
 
-**Version**: 0.11.0
+**Version**: 0.12.1
 **Date**: 2026-04-11
-**Status**: Architectural overview filled; **all 11 technology-stack decisions locked**; data models and DR groups still to be filled
+**Status**: Architectural overview filled; all 11 technology-stack decisions locked; **§ 4 data models filled (review pass applied)**; DR groups still to be filled
 **Author**: Wiktor Lisowski
 
 ---
@@ -498,18 +498,547 @@ The hermetic-task structure of § 2.2 nonetheless makes the same code **triviall
 
 ## 4. Data models
 
-*To be filled in step 4.*
+This section defines the core data shapes that flow through the system. They are the contract between back-end stages, the front-end, the audit bundle, and the deliverable. **Pydantic is the single source of truth** (§ 3.6); JSON Schema and TypeScript types are generated from these classes.
 
-This section will define the schemas of the system's contract objects. These are the data structures that the modules pass between each other and that the *Explained rubric file* serializes:
+The shapes are organized in three layers:
 
-- **Rubric** — the structured form of the rubric (criteria, sub-criteria, point allocations, scoring guidance).
-- **Assessment finding** — one observation about the rubric, with criterion tag, evidence references, and confidence indicator.
-- **Proposed change** — original passage, modified passage, criterion, rationale, source findings.
-- **Evidence profile** — per-run record of which optional inputs were provided.
-- **Audit bundle** — per-run trace of inputs, intermediate findings, model invocations, and outputs.
-- **Explained rubric file** — the deliverable wrapper containing the improved rubric and the explanation of changes.
+1. **Domain models** — `Rubric`, `EvidenceProfile`, `AssessmentFinding`, `ProposedChange`, `Explanation`, `ExplainedRubricFile`. Pipeline-agnostic. They describe *what* was found and *what* changed, not *how*.
+2. **Provenance models** — `AuditBundle`, `StageRecord`, `OperationRecord`, `OperationDetails` union, `IterationSnapshot`. Implementation-aware but pipeline-agnostic via a discriminated union over operation kinds.
+3. **Shared primitives** — `RubricTarget`, `ConfidenceIndicator`, `QualityCriterion`, `QualityMethod`, ID types.
 
-Each schema will be presented in the chosen schema language (decision § 3.6) and will trace to the SRs that depend on it.
+The model code below is **canonical pseudo-Pydantic** — close to literal Pydantic v2 syntax, trimmed of imports and decorators that add no design content. Forward references within § 4 (e.g. `IterationSnapshot.quality_scores: list[CriterionScore]` referencing the type defined in § 4.9) are valid in actual Pydantic via `from __future__ import annotations`. The implementation lives in `backend/grading_rubric/models/` (§ 3.10).
+
+### 4.1 Conventions
+
+- All identifiers are UUIDs (`uuid.UUID`). Human-readable `slug` fields exist for display only and are never used as references.
+- All timestamps are timezone-aware UTC (`datetime`).
+- All hashes are lowercase hex SHA-256 of canonical UTF-8 JSON.
+- `JsonValue` denotes any JSON-serializable value (`str | int | float | bool | None | list[JsonValue] | dict[str, JsonValue]`).
+- Type aliases for clarity:
+
+```python
+RubricId    = UUID
+CriterionId = UUID
+LevelId     = UUID
+FindingId   = UUID
+ChangeId    = UUID
+OperationId = UUID
+RunId       = UUID
+```
+
+### 4.2 Rubric
+
+The rubric is a tree of criteria. Each criterion may have sub-criteria (recursive) and/or levels. Leaves carry actual point allocations; parents aggregate their children. This satisfies SR-IM-02 (criteria, sub-criteria, point allocations, scoring guidance) in a single shape.
+
+```python
+class RubricLevel(BaseModel):
+    id: LevelId
+    slug: str | None = None              # display only
+    label: str                           # e.g. "Excellent", "4/4"
+    points: float                        # 0 ≤ points ≤ parent criterion points
+    descriptor: str                      # qualitative description of this level
+
+
+class RubricCriterion(BaseModel):
+    id: CriterionId
+    slug: str | None = None              # display only
+    name: str
+    description: str
+    scoring_guidance: str | None = None
+    points: float | None = None          # actual point allocation; required on every criterion that participates in a total (see invariants below)
+    weight: float | None = None          # optional normalized display metadata, 0..1; never used in arithmetic
+    additive: bool = True                # if False, parent points are not the sum of children (max/avg/etc.)
+    levels: list[RubricLevel] = []       # may be empty for parent (grouping) nodes
+    sub_criteria: list["RubricCriterion"] = []
+
+
+class Rubric(BaseModel):
+    id: RubricId
+    schema_version: str
+    title: str
+    exam_question_ref: str | None = None
+    total_points: float
+    criteria: list[RubricCriterion]
+    metadata: dict[str, JsonValue] = {}
+```
+
+**Invariants enforced by `Rubric.model_validator`:**
+
+- Every criterion that participates in a total has `points` set. Concretely: every leaf criterion has `points` set, and every parent criterion has `points` set. `points` may be `None` only on a hypothetical purely-grouping node that no current rubric shape produces — the validator therefore requires `points` on every criterion in `criteria` and every node reached through `sub_criteria`.
+- Additive parent (`additive=True`): `points == sum(child.points for child in sub_criteria)`. Non-additive parents (`additive=False`) are an explicit escape hatch for max / average / other aggregations and the validator does not enforce a sum on them; the parent's `points` is taken as authoritative.
+- For each leaf criterion, every `level.points` satisfies `0 ≤ level.points ≤ criterion.points`.
+- `rubric.total_points == sum(root_criterion.points for root_criterion in criteria)`.
+- All UUIDs unique within the rubric.
+
+**Rationale.** A single recursive `RubricCriterion` covers flat rubrics, two-level criterion / sub-criterion rubrics, and arbitrarily nested rubrics without a separate `RubricSubcriterion` class. The `additive` flag makes non-additive aggregation explicit, so the validator never silently ignores a sum mismatch. `weight` is preserved as display-only metadata because some real rubrics expose it, but it never participates in arithmetic — `points` is the only authoritative allocation.
+
+### 4.3 RubricTarget
+
+A `RubricTarget` addresses a node or field inside a rubric. It is used by `AssessmentFinding` (where the issue is) and by the `REPLACE_FIELD` and `UPDATE_POINTS` variants of `ProposedChange`. Structural changes (add / remove / reorder) do not use `RubricTarget`; they carry their own payloads (§ 4.6).
+
+```python
+class RubricFieldName(StrEnum):
+    NAME             = "name"
+    DESCRIPTION      = "description"
+    SCORING_GUIDANCE = "scoring_guidance"
+    POINTS           = "points"
+    WEIGHT           = "weight"
+    LEVEL_LABEL      = "level.label"
+    LEVEL_DESCRIPTOR = "level.descriptor"
+    LEVEL_POINTS     = "level.points"
+
+
+class RubricTarget(BaseModel):
+    criterion_path: list[CriterionId]    # root → leaf, never empty
+    level_id: LevelId | None = None      # required when field starts with "level."
+    field: RubricFieldName
+```
+
+**Invariants:**
+
+- `criterion_path` is non-empty.
+- `level_id` is set if and only if `field ∈ {LEVEL_LABEL, LEVEL_DESCRIPTOR, LEVEL_POINTS}`.
+- All referenced IDs exist in the bound rubric.
+
+**Rationale.** Path-by-UUID is rename-stable. `field` is a closed enum so the front-end can render targeted UI without string parsing. There is no `"structure"` field value: structural operations are different shapes (§ 4.6), not different targets.
+
+### 4.4 EvidenceProfile
+
+Captures, per input artefact, what was actually available to the run. Used to make limitations honest in the deliverable and to support SR-IN-09.
+
+```python
+class EvidenceProfile(BaseModel):
+    starting_rubric_present: bool
+    exam_question_present: bool
+    teaching_material_present: bool
+    teaching_material_count: int = 0     # number of teaching-material documents
+    student_copies_present: bool
+    student_copies_count: int = 0
+    student_copies_pages_total: int = 0
+
+    starting_rubric_hash: str | None = None
+    exam_question_hash: str | None = None
+    teaching_material_hashes: list[str] = []
+    student_copies_hashes: list[str] = []
+
+    notes: list[str] = []                # e.g. "OCR confidence below threshold on copy 3"
+```
+
+**Rationale.** Booleans are explicit so downstream consumers (Explanation narrative, scoring, audit) can branch without re-reading inputs. Hashes give per-input provenance without exposing content. The four input categories — starting rubric, exam question, teaching material, student copies — match the four UR-01..UR-04 inputs and the four SR-IN-01..SR-IN-04 ingestion requirements. There is no `answer_key` field because no requirement calls for one; the teaching material is the grounding source per UR-02 and SR-AS-04.
+
+### 4.5 AssessmentFinding
+
+A single observation about a rubric node, tagged with **exactly one** quality criterion (SR-AS-07). The `measured_against_rubric_id` and `iteration` fields make findings staleness-aware so the re-measurement loop (SR-AS-09) can invalidate findings whose rubric snapshot has changed underneath them.
+
+```python
+class QualityCriterion(StrEnum):
+    AMBIGUITY            = "ambiguity"
+    APPLICABILITY        = "applicability"
+    DISCRIMINATION_POWER = "discrimination_power"
+
+
+class Severity(StrEnum):
+    LOW    = "low"
+    MEDIUM = "medium"
+    HIGH   = "high"
+
+
+class ConfidenceLevel(StrEnum):
+    LOW    = "low"
+    MEDIUM = "medium"
+    HIGH   = "high"
+
+
+class ConfidenceIndicator(BaseModel):
+    score: float                         # 0.0–1.0
+    level: ConfidenceLevel               # derived from score by fixed thresholds (below)
+    rationale: str                       # why this confidence, grounded in evidence
+```
+
+**Confidence-level thresholds (locked):**
+
+- `score < 0.40` → `LOW`
+- `0.40 ≤ score < 0.75` → `MEDIUM`
+- `score ≥ 0.75` → `HIGH`
+
+`level` is derived from `score` and validated for consistency on construction. It exists as a field rather than as a property so the JSON Schema (§ 3.6) exposes it explicitly to the front-end.
+
+```python
+class QualityMethod(StrEnum):
+    LLM_PANEL_AGREEMENT           = "llm_panel_agreement"            # multi-rater Krippendorff's α
+    PAIRWISE_CONSISTENCY          = "pairwise_consistency"           # head-to-head ranking vs absolute scores
+    SYNTHETIC_COVERAGE            = "synthetic_coverage"             # coverage over candidate-response space
+    SCORE_DISTRIBUTION_SEPARATION = "score_distribution_separation"  # separation across difficulty tiers
+
+
+class Measurement(BaseModel):
+    method: QualityMethod
+    samples: int                         # number of independent measurements aggregated
+    agreement: float | None = None       # interpretation depends on method
+
+
+class AssessmentFinding(BaseModel):
+    id: FindingId
+    criterion: QualityCriterion          # exactly one (SR-AS-07)
+    severity: Severity
+    target: RubricTarget | None          # None for rubric-wide findings and absence findings
+    observation: str                     # short statement of the issue
+    evidence: str                        # what in the inputs supports the observation
+    measurement: Measurement
+    confidence: ConfidenceIndicator
+    measured_against_rubric_id: RubricId # which rubric snapshot was measured (SR-AS-09)
+    iteration: int = 0                   # 0 for single-pass runs; 1+ for re-measurement iterations
+    source_operations: list[OperationId] = []   # links to audit operations (§ 4.8)
+    linked_finding_ids: list[FindingId] = []    # for the SR-AS-10 dual-signal pattern (see below)
+```
+
+**Optional `target`.** Not every finding addresses a specific node. Three concrete cases require `target = None`:
+
+- **Absence findings** (SR-AS-02 *Applicability*): "no criterion covers a valid response type X" — there is no existing node to point at; the *missing* node is the finding.
+- **Rubric-wide findings** (SR-AS-03 *Discrimination Power*): "the rubric's overall scoring distribution shows no separation across difficulty tiers" — the subject is the rubric as a whole.
+- **Total-scale findings**: "the rubric's total points are inconsistent with its declared maximum" — again, the rubric as a whole.
+
+When `target` is set, all `RubricTarget` invariants from § 4.3 apply unchanged. When `target` is `None`, the finding is interpreted as scoped to the rubric identified by `measured_against_rubric_id`.
+
+**Linked findings.** SR-AS-10 calls for two findings when a pairwise inconsistency traces to ambiguous criterion wording: a discrimination-power finding and a separately-tagged ambiguity finding over the same evidence. **Each finding still carries exactly one `criterion`** (preserving SR-AS-07). The relationship between them is expressed by `linked_finding_ids` (symmetric: each links to the other), not by overloading `criterion`.
+
+**Staleness.** A finding is stale when its `measured_against_rubric_id` no longer equals the rubric the teacher is currently looking at. The front-end can render staleness visually; the engine prunes stale findings before re-measurement. For non-loop runs, `iteration` is `0` and `measured_against_rubric_id` is the starting rubric's id (or the from-scratch placeholder).
+
+### 4.6 ProposedChange
+
+A discriminated union over operation kinds. The discriminator is the `operation` literal field. The common envelope is shared via a base class.
+
+```python
+class ApplicationStatus(StrEnum):
+    APPLIED      = "applied"             # change is reflected in improved_rubric
+    NOT_APPLIED  = "not_applied"         # change is proposed but not in improved_rubric
+
+
+class TeacherDecision(StrEnum):
+    PENDING  = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+
+
+class _ProposedChangeBase(BaseModel):
+    id: ChangeId
+    primary_criterion: QualityCriterion           # display bucket
+    source_findings: list[FindingId]              # may span criteria; primary_criterion is the bucket
+    rationale: str
+    confidence: ConfidenceIndicator
+    application_status: ApplicationStatus
+    teacher_decision: TeacherDecision | None = None   # None when no review yet
+
+
+class ReplaceFieldChange(_ProposedChangeBase):
+    operation: Literal["REPLACE_FIELD"] = "REPLACE_FIELD"
+    target: RubricTarget
+    before: JsonValue | None             # None when no starting rubric
+    after:  JsonValue
+
+
+class UpdatePointsChange(_ProposedChangeBase):
+    operation: Literal["UPDATE_POINTS"] = "UPDATE_POINTS"
+    target: RubricTarget                 # field must be POINTS or LEVEL_POINTS
+    before: float | None
+    after:  float
+
+
+class NodeKind(StrEnum):
+    CRITERION = "criterion"
+    LEVEL     = "level"
+
+
+class AddNodeChange(_ProposedChangeBase):
+    operation: Literal["ADD_NODE"] = "ADD_NODE"
+    parent_path: list[CriterionId]       # empty list = root
+    insert_index: int                    # 0-based position among siblings
+    node_kind: NodeKind
+    node: RubricCriterion | RubricLevel  # full snapshot of the new node
+
+
+class RemoveNodeChange(_ProposedChangeBase):
+    operation: Literal["REMOVE_NODE"] = "REMOVE_NODE"
+    criterion_path: list[CriterionId]    # root → criterion (the criterion itself, or the criterion that owns the level)
+    level_id: LevelId | None = None      # required when node_kind == LEVEL; None when node_kind == CRITERION
+    node_kind: NodeKind
+    removed_snapshot: RubricCriterion | RubricLevel   # for reversibility and audit
+
+
+class ReorderNodesChange(_ProposedChangeBase):
+    operation: Literal["REORDER_NODES"] = "REORDER_NODES"
+    parent_path: list[CriterionId]
+    node_kind: NodeKind
+    before_order: list[UUID]
+    after_order:  list[UUID]             # permutation of before_order
+
+
+ProposedChange = Annotated[
+    ReplaceFieldChange | UpdatePointsChange |
+    AddNodeChange | RemoveNodeChange | ReorderNodesChange,
+    Field(discriminator="operation"),
+]
+```
+
+**Rationale.** A discriminated union covers point edits, structural edits, and from-scratch generation (a sequence of `ADD_NODE` operations on an empty starting rubric). Each variant carries exactly the payload it needs, so validators are tight and the front-end can render operation-specific UI without ad-hoc casts. `primary_criterion` is the single display bucket; multi-criterion sourcing remains visible through `source_findings` (which carry their own per-finding `criterion`) and may be surfaced narratively via `CrossCuttingGroup` (§ 4.7). The split between `application_status` (system) and `teacher_decision` (human) keeps SR-OUT-05 and SR-IM-01 cleanly separable. `RemoveNodeChange` splits its address into `criterion_path` + `level_id` so that removing a level under a criterion is unambiguous; for a criterion-level removal, `level_id` is `None` and `criterion_path` ends at the criterion to remove.
+
+### 4.7 Explanation
+
+The teacher-facing structured rationale. Organized by quality criterion to satisfy SR-OUT-03 *structurally*, not just by convention. Scores live in `ExplainedRubricFile.quality_scores` (§ 4.9) and are referenced by criterion, never duplicated here.
+
+```python
+class CriterionSection(BaseModel):
+    """
+    A criterion-organized section of the explanation.
+
+    Canonical representation of SR-IM-06 ("no improvement warranted") for a single
+    criterion: a CriterionSection with empty finding_refs and empty change_refs and
+    a narrative explaining why no issues were found is valid. The Explanation
+    invariant requires one CriterionSection per QualityCriterion regardless of
+    whether any findings were produced for that criterion.
+    """
+    criterion: QualityCriterion
+    finding_refs: list[FindingId] = []
+    change_refs: list[ChangeId] = []
+    unaddressed_finding_refs: list[FindingId] = []
+    narrative: str                       # required even when refs are empty
+
+
+class CrossCuttingGroup(BaseModel):
+    title: str
+    narrative: str
+    finding_refs: list[FindingId]        # findings already tagged in by_criterion
+    change_refs: list[ChangeId]          # changes already listed in by_criterion
+
+
+class Explanation(BaseModel):
+    summary: str                         # 1–2 paragraphs, teacher-readable
+    by_criterion: dict[QualityCriterion, CriterionSection]
+    cross_cutting: list[CrossCuttingGroup] = []
+```
+
+**Invariants:**
+
+- `by_criterion` has exactly one entry per `QualityCriterion` value (three sections, always).
+- Every `finding_ref` and `change_ref` in any `CrossCuttingGroup` must also appear in exactly one `CriterionSection`. `cross_cutting` is a *grouping over already-tagged items*, never a fourth category and never a home for untagged findings.
+- When all `by_criterion[*]` sections have empty `finding_refs` and empty `change_refs`, `Explanation.summary` MUST state explicitly that no improvements were warranted (SR-IM-06).
+
+**Rationale.** `by_criterion` makes the three-criterion structure a hard contract instead of a convention. `cross_cutting` preserves SR-AS-07's single-criterion-per-finding rule because every referenced item is *already* tagged under exactly one criterion. Narrative fields are written for a teacher audience: no method jargon, no model names, no token counts.
+
+### 4.8 Provenance: AuditBundle
+
+The provenance layer is generic over operation kinds. LLM calls are one variant among several; OCR, deterministic functions, ML inference, tool calls, human decisions, and agent steps are first-class citizens. This makes § 2.3's "LLMs as one possible measurement instrument" structurally true in § 4 rather than only rhetorical.
+
+```python
+class StageStatus(StrEnum):
+    SUCCESS = "success"
+    SKIPPED = "skipped"
+    FAILED  = "failed"
+
+
+class OperationStatus(StrEnum):
+    SUCCESS = "success"
+    FAILED  = "failed"
+    SKIPPED = "skipped"
+
+
+class StageRecord(BaseModel):
+    stage_id: str                        # "ingest","ocr","assess","propose","score","render"
+    started_at: datetime
+    ended_at: datetime
+    status: StageStatus
+    operation_ids: list[OperationId] = []   # operations executed inside this stage
+```
+
+#### Operation details — discriminated union
+
+```python
+class LlmCallDetails(BaseModel):
+    kind: Literal["llm_call"] = "llm_call"
+    prompt_id: str
+    prompt_version: str
+    prompt_hash: str
+    schema_id: str
+    schema_hash: str
+    model: str
+    temperature: float
+    samples: int
+    tokens_in: int
+    tokens_out: int
+    raw_responses: list[JsonValue]       # may contain transcribed student text; see privacy note
+
+
+class OcrCallDetails(BaseModel):
+    kind: Literal["ocr_call"] = "ocr_call"
+    backend: str                         # "claude-multimodal","tesseract", ...
+    pages: int
+    underlying_operation_id: OperationId | None = None  # set when OCR runs through the LLM gateway
+
+
+class MlInferenceDetails(BaseModel):
+    kind: Literal["ml_inference"] = "ml_inference"
+    model_id: str
+    model_version: str
+    confidence: float | None = None
+
+
+class ToolCallDetails(BaseModel):
+    kind: Literal["tool_call"] = "tool_call"
+    tool_name: str
+    arguments_digest: str
+
+
+class HumanDecisionDetails(BaseModel):
+    kind: Literal["human_decision"] = "human_decision"
+    actor: str                           # "teacher","reviewer"
+    prompt_shown: str
+    decision: str
+
+
+class AgentStepDetails(BaseModel):
+    kind: Literal["agent_step"] = "agent_step"
+    agent_id: str
+    step_index: int
+    action: str
+
+
+class DeterministicDetails(BaseModel):
+    kind: Literal["deterministic"] = "deterministic"
+    function: str                        # e.g. "parse_pdf","compute_evidence_profile"
+    library_version: str | None = None
+
+
+OperationDetails = Annotated[
+    LlmCallDetails | OcrCallDetails | MlInferenceDetails |
+    ToolCallDetails | HumanDecisionDetails | AgentStepDetails | DeterministicDetails,
+    Field(discriminator="kind"),
+]
+```
+
+#### OperationRecord, IterationSnapshot, AuditBundle
+
+```python
+class ErrorRecord(BaseModel):
+    code: str
+    message: str
+    stage_id: str | None = None
+    operation_id: OperationId | None = None
+
+
+class OperationRecord(BaseModel):
+    id: OperationId
+    stage_id: str
+    started_at: datetime
+    ended_at: datetime
+    status: OperationStatus              # SUCCESS | FAILED | SKIPPED — no "RETRIED"
+    attempt: int = 1                     # 1 for first try, 2+ for retries
+    retry_of: OperationId | None = None  # previous OperationRecord this one retries
+    inputs_digest: str
+    outputs_digest: str | None           # None when status ∈ {FAILED, SKIPPED} or the operation produced no outputs
+    details: OperationDetails
+    error: ErrorRecord | None = None
+
+
+class IterationSnapshot(BaseModel):
+    iteration: int                       # 0 = starting rubric measurement; 1+ = post-improvement re-measurements
+    rubric_id: RubricId
+    rubric_snapshot: Rubric              # full snapshot at this iteration
+    quality_scores: list["CriterionScore"]    # measurements taken on this snapshot (defined § 4.9)
+    finding_ids: list[FindingId]              # findings produced against this snapshot
+    applied_change_ids: list[ChangeId] = []   # changes applied to produce the next iteration
+    measured_at: datetime
+
+
+class InputProvenance(BaseModel):
+    starting_rubric_path: str | None = None
+    exam_question_path: str | None = None
+    teaching_material_paths: list[str] = []
+    student_copies_paths: list[str] = []
+    starting_rubric_hash: str | None = None
+    exam_question_hash: str | None = None
+    teaching_material_hashes: list[str] = []
+    student_copies_hashes: list[str] = []
+
+
+class AuditBundle(BaseModel):
+    run_id: RunId
+    schema_version: str
+    started_at: datetime
+    ended_at: datetime
+    status: Literal["success","partial","failed"]
+    input_provenance: InputProvenance
+    evidence_profile: EvidenceProfile
+    stages: list[StageRecord]
+    operations: list[OperationRecord]
+    findings: list[AssessmentFinding]
+    proposed_changes: list[ProposedChange]
+    iteration_history: list[IterationSnapshot] = []   # empty for single-pass runs (SR-AS-09)
+    output_file_path: str | None = None
+    errors: list[ErrorRecord] = []
+```
+
+**Rationale.** `OperationRecord.details` is a discriminated union, so a future ML classifier path or a human-only path slots into the same audit shape without schema migration. Each retry is its own `OperationRecord` linked via `retry_of`, so the audit trail shows the full chain instead of collapsing it into a single ambiguous status. `validation_retry_count` from § 3.2 is therefore a *derived view* (count of retried operations following the chain), not a stored counter on `LlmCallDetails`. `iteration_history` is the complete trajectory of the SR-AS-09 re-measurement loop and is empty for single-pass runs.
+
+**Privacy note.** The deliverable (`ExplainedRubricFile`, § 4.9) **never contains raw student copy text**. The audit bundle may contain transcribed student text inside `LlmCallDetails.raw_responses` and inside operations linked from `OcrCallDetails.underlying_operation_id`, because faithful reconstruction of a measurement requires the exact input and output. The audit bundle is a local artefact under `runs/<run_id>/`; sharing it is the teacher's decision. The deliverable and the audit bundle are separate files for exactly this reason.
+
+### 4.9 Deliverable: ExplainedRubricFile
+
+The deliverable is a single JSON file. It is teacher-readable through its narrative fields and reviewer-inspectable through its references and quality scores. SR-OUT-01 mandates this artefact for every successful run; SR-OUT-02 mandates the two-field root structure (improved rubric + explanation); SR-OUT-03 mandates organization by the three quality criteria; SR-OUT-04 mandates schema validation; SR-OUT-05 mandates that teacher decisions are reflected.
+
+```python
+class CriterionScore(BaseModel):
+    criterion: QualityCriterion
+    score: float                         # 0.0–1.0; the measurement against one rubric snapshot
+    confidence: ConfidenceIndicator
+    method: QualityMethod                # closed enum, shared with Measurement.method
+
+
+class ExplainedRubricFile(BaseModel):
+    schema_version: str
+    generated_at: datetime
+    run_id: RunId
+
+    starting_rubric: Rubric | None       # None for from-scratch generation
+    improved_rubric: Rubric
+
+    findings: list[AssessmentFinding]
+    proposed_changes: list[ProposedChange]
+    explanation: Explanation
+    quality_scores: list[CriterionScore]                          # canonical, one per QualityCriterion (improved rubric)
+    previous_quality_scores: list[CriterionScore] | None = None   # one per QualityCriterion against starting rubric (SR-AS-09)
+    evidence_profile: EvidenceProfile
+```
+
+**Invariants:**
+
+- `quality_scores` has exactly one entry per `QualityCriterion` value.
+- `previous_quality_scores`, when present, has the same shape (one per `QualityCriterion`).
+- `previous_quality_scores` is set whenever `starting_rubric is not None` and at least one re-measurement iteration ran; it is `None` for from-scratch generation and for single-pass runs that never re-measured.
+- Every finding referenced from `explanation` exists in `findings`.
+- Every change referenced from `explanation` exists in `proposed_changes`.
+- Every change with `application_status=APPLIED` is reflected in `improved_rubric`.
+
+**Rationale.** One file serves both audiences. `explanation` carries the teacher narrative; `findings`, `proposed_changes`, `quality_scores`, and `evidence_profile` make the file self-auditing. `CriterionScore` carries a single `score` — the measurement of *one* rubric snapshot — so there is exactly one place in the file where any given (criterion, snapshot) pair appears. The before/after comparison required by SR-AS-09 is expressed at the file level by the `quality_scores` / `previous_quality_scores` pair, not by per-score `before`/`delta` fields that would duplicate the same data. `delta` is then a presentation-layer computation (`quality_scores[i].score - previous_quality_scores[i].score`), not a stored field that can drift. The full iteration trajectory still lives in the audit bundle (`AuditBundle.iteration_history`); the deliverable surfaces only the two endpoints needed by the front-end.
+
+### 4.10 Schema versioning
+
+Each top-level shape (`Rubric`, `AuditBundle`, `ExplainedRubricFile`) carries a `schema_version` string. Schema versions follow semver and evolve **independently of the application version** (§ 3.6). The `make schemas` target writes versioned JSON Schema files to `schemas/` for the front-end codegen step. A change to any field shape bumps the schema's MINOR version; an incompatible change bumps MAJOR.
+
+### 4.11 Trace summary — data models to System Requirements
+
+| Data model | Backs SRs |
+|---|---|
+| `Rubric` (recursive criteria + levels + points + scoring guidance) | SR-IM-01, SR-IM-02 |
+| `RubricTarget` (path-by-UUID + closed field enum) | SR-IM-03, SR-IM-05 |
+| `EvidenceProfile` | SR-IN-09, SR-AS-04, SR-AS-05, SR-AS-06, SR-AS-08 |
+| `AssessmentFinding` (single criterion + linked findings + staleness fields) | SR-AS-01, SR-AS-02, SR-AS-03, SR-AS-07, SR-AS-08, SR-AS-09, SR-AS-10 |
+| `Measurement` + `QualityMethod` enum | SR-AS-08, SR-AS-09, SR-AS-10 |
+| `ProposedChange` (discriminated union, application_status + teacher_decision split) | SR-IM-01, SR-IM-03, SR-IM-04, SR-IM-05, SR-IM-06, SR-OUT-05 |
+| `Explanation` (by_criterion + cross_cutting + SR-IM-06 empty case) | SR-OUT-03, SR-IM-06 |
+| `AuditBundle` (generic operations + iteration_history) | SR-OBS-01, SR-OBS-02, SR-AS-09 |
+| `ExplainedRubricFile` (with previous_quality_scores) | SR-OUT-01, SR-OUT-02, SR-OUT-03, SR-OUT-04, SR-OUT-05, SR-AS-09 |
+
+The full SR → DR traceability table will be populated in § 6 as the DR groups in § 5 are filled.
 
 ---
 
@@ -577,7 +1106,7 @@ Defines the on-disk layout of the *audit bundle*, the logging format for model i
 
 *To be filled.*
 
-Defines the caching strategy (decision § 3.8) — likely a content-hashed cache borrowed from patterns proven in adjacent repositories — and how concurrent processing of multiple student copies is handled while keeping the run hermetic.
+The caching question is already settled by decision § 3.8: **the application has no application-level cache**. DR-PER therefore does not introduce one. What this group does specify is (a) how concurrent processing of multiple student copies and multi-sample LLM calls is handled while keeping each pipeline stage hermetic, (b) which work units are parallelized and which run sequentially, and (c) the back-pressure and timeout policy that protects the run from a single slow upstream call.
 
 ### 5.10 Scorer interface and train-button capability (DR-SCR)
 
@@ -609,6 +1138,8 @@ Every DR shall trace back to at least one SR. Every SR shall be covered by at le
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.12.1 | 2026-04-11 | Wiktor Lisowski | § 4 review pass after a second-round review of the v0.12.0 fill. Seven fixes, no new shapes introduced. **(1) EvidenceProfile + InputProvenance — teaching material instead of answer key.** The v0.12.0 fill carried `answer_key_present` / `answer_key_hash` as a slip; no SR calls for an answer key. Replaced with `teaching_material_present` / `teaching_material_count` / `teaching_material_hashes` (and the matching `teaching_material_paths` / `teaching_material_hashes` on `InputProvenance`), so the four EvidenceProfile categories now match UR-01..UR-04 and SR-IN-01..SR-IN-04 one-for-one. **(2) AssessmentFinding.target is now `RubricTarget \| None`.** SR-AS-02 *Applicability* findings of the form "no criterion covers a valid response type X" are absence findings — the missing node is the finding — and have no existing target to point at. SR-AS-03 *Discrimination Power* findings about overall scoring distribution are rubric-wide. The previous required `target` could not represent either; the new field is `None` for these cases and behaves exactly as before when set. Added an explicit *Optional `target`* paragraph. **(3) `RemoveNodeChange` now addresses levels unambiguously.** The previous `node_path: list[CriterionId]` could not identify *which* level under a criterion to remove. Split into `criterion_path: list[CriterionId]` plus `level_id: LevelId \| None` (required when `node_kind == LEVEL`, `None` otherwise). Rationale paragraph updated. **(4) Removed before/after duplication on `CriterionScore`.** v0.12.0 carried `score_after`, `score_before`, and `delta` on `CriterionScore` *and* `previous_quality_scores: list[CriterionScore]` on `ExplainedRubricFile` — two encodings of the same data, a drift surface. Collapsed to a single `score: float` per `CriterionScore`; the before/after pair is expressed at the file level by `quality_scores` + `previous_quality_scores`; `delta` is computed by the front-end at presentation time. Invariants updated to require `previous_quality_scores` whenever a starting rubric existed and re-measurement ran. **(5) Tightened `Rubric.points` invariants for parents.** v0.12.0 said "leaf has `points` set" but left parents underspecified, conflicting with `total_points == sum(root.points)`. The validator now requires `points` on every criterion that participates in a total (which is every criterion in current rubric shapes); the additive sum invariant is unchanged; non-additive parents take their declared `points` as authoritative. **(6) DR-PER placeholder no longer contradicts § 3.8.** § 5.9 used to say "likely a content-hashed cache borrowed from patterns proven in adjacent repositories", which directly contradicts the locked § 3.8 *no application-level cache* decision. Rewritten to say DR-PER does not introduce a cache and instead specifies concurrency, parallelism boundaries, and back-pressure / timeout policy. **(7) `OperationRecord.outputs_digest` is now `str \| None`.** Failed and skipped operations may produce no outputs; the previous required `str` would have forced sentinel values. Comment notes the `None` is permitted for `FAILED` / `SKIPPED` status or for operations that produced no outputs. No traceability impact — § 4.11 trace summary is unchanged. |
+| 0.12.0 | 2026-04-11 | Wiktor Lisowski | Filled § 4 *Data models* end-to-end. Three layers documented: domain models (`Rubric`, `EvidenceProfile`, `AssessmentFinding`, `ProposedChange`, `Explanation`, `ExplainedRubricFile`), provenance models (`AuditBundle`, `StageRecord`, `OperationRecord`, `OperationDetails` discriminated union, `IterationSnapshot`), and shared primitives (`RubricTarget`, `ConfidenceIndicator`, `QualityCriterion`, `QualityMethod`, ID type aliases). Key design choices. **Rubric**: recursive `RubricCriterion` with `sub_criteria` covers SR-IM-02 in a single shape; locked `points` / `weight` invariants (`points` is the only authoritative allocation, `weight` is display-only metadata) and an explicit `additive` flag for non-additive parent aggregation. **RubricTarget**: path-of-UUIDs with a closed `RubricFieldName` enum — rename-stable, no string parsing, no overloaded `"structure"` value. **AssessmentFinding**: single `criterion` (preserving SR-AS-07), staleness-aware via `measured_against_rubric_id` + `iteration` (SR-AS-09), SR-AS-10 dual signal expressed by `linked_finding_ids` between two single-criterion findings. **ConfidenceIndicator**: structured as `score` + `level` + `rationale` with locked thresholds; replaces the bare-float regression flagged in review. **Measurement** + **`QualityMethod`** closed enum (`LLM_PANEL_AGREEMENT`, `PAIRWISE_CONSISTENCY`, `SYNTHETIC_COVERAGE`, `SCORE_DISTRIBUTION_SEPARATION`) shared with `CriterionScore.method` to prevent drift between assessment engine and explanation generator. **ProposedChange**: discriminated union over `REPLACE_FIELD` / `UPDATE_POINTS` / `ADD_NODE` / `REMOVE_NODE` / `REORDER_NODES` covering both improvement and from-scratch generation; `primary_criterion` as the display bucket; `application_status` (system) and `teacher_decision` (human) split. **Explanation**: `by_criterion` mandatory three-section structure makes SR-OUT-03 a hard contract; `CrossCuttingGroup` is a grouping over already-tagged items, never a fourth category; SR-IM-06 empty case is the canonical shape of an empty `CriterionSection` with a narrative. **AuditBundle**: provenance generic over `OperationDetails` (`llm_call` / `ocr_call` / `ml_inference` / `tool_call` / `human_decision` / `agent_step` / `deterministic`) so the audit shape supports any pipeline kind; retries are separate `OperationRecord`s linked by `retry_of` (no `RETRIED` final status); `iteration_history: list[IterationSnapshot]` carries the full SR-AS-09 re-measurement trajectory and is empty for single-pass runs. **ExplainedRubricFile**: deliverable stays single-file and self-contained; gains `previous_quality_scores` so the front-end can render before/after evidence without needing the audit bundle. **Privacy claim recast**: deliverable never contains raw student text; audit bundle may contain transcribed text in `LlmCallDetails.raw_responses` because faithful reconstruction requires it; deliverable and audit bundle are separate files for exactly this reason. § 4.11 *Trace summary* maps each data model to the SRs it backs (cross-checked against `requirements.md` v0.5.0). § 5 DR groups are next; § 6 traceability will be regenerated as DRs are added. |
 | 0.11.0 | 2026-04-11 | Wiktor Lisowski | Locked the final three technology decisions. **#9 Deterministic execution (§ 3.9)**: temperature 0 for single-sample extraction/classification, temperature > 0 for `samples > 1` reliability measurements (default `k = 5`, temperature `0.7`), model pinned to a snapshot version when the provider publishes one; bit-identical LLM reproducibility explicitly *not* claimed (GPU floating-point non-determinism, server-side batching, no `seed` parameter on the Anthropic Messages API) — the honest guarantee is measurement-level stability plus audit-level reconstructability via the audit bundle. **#10 Deployment topology and packaging (§ 3.10)**: two artefacts forming one deliverable — a Python package with `pyproject.toml` and two console-script entry points (`grading-rubric-api`, `grading-rubric-cli`) plus a Vite static build for the front-end; FastAPI as the HTTP server (Pydantic-native, no second mapping layer); a top-level `Makefile` (`install` / `dev` / `build` / `test` / `schemas` / `run`) as the single entry-point surface; `make run` serves the built SPA from the FastAPI process for the one-command demo path; repository layout is `backend/` + `frontend/` + `schemas/` + top-level meta files; Docker is a possible secondary target, not the primary path. **#11 Orchestration layer (§ 3.11)**: none embedded in the deliverable — default mode is a single Python process plus a static SPA; the hermetic-task structure of § 2.2 makes the same code trivially wrappable by any external engine (the conditions are already paid for by § 3.7 env-only secrets and § 3.8 no-cache); § 5.11 *DR-DEP* will include one concrete Validance wrap as a reference example, not as a shipping requirement. All 11 technology decisions now locked; § 4 *Data models* and § 5 *Design Requirements* are next. |
 | 0.10.1 | 2026-04-11 | Wiktor Lisowski | § 3.8 wording fix: re-cast the *cost of repeated external calls* row to argue from engineering cost and scale rather than from API-key provenance. No change to the decision itself. |
 | 0.10.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #8 (caching strategy) in § 3.8: the application has **no application-level cache**. Cost at this scale is not a decision driver; cross-run deduplication is the external orchestrator's job at task granularity; transient-error retries are the Anthropic SDK's job; reproducibility of tests is handled by mocking at the Gateway seam. Consequences: hermetic tasks stay hermetic (no hidden I/O to a cache directory), audit bundles describe *everything* a run did (no "we did not run this step because of a cache hit" complexity), and orchestrator cache behaviour is unopposed. Cleanups in the same change: removed the *Content cache* module from § 2.1; dropped the cache reference from § 2.3's *one door to the API* bullet; removed `cache_dir` from the illustrative `Settings` class in § 3.7 and dropped its forward reference. Decisions #9–#11 still pending. |

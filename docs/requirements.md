@@ -1,7 +1,7 @@
 # Grading Rubric Studio — Requirements
 
-**Version**: 0.4.0
-**Date**: 2026-04-10
+**Version**: 0.5.0
+**Date**: 2026-04-11
 **Status**: Draft
 **Author**: Wiktor Lisowski
 
@@ -101,7 +101,7 @@ User requirements are derived from the user needs and express what the teacher m
 - **Should** — strongly improves the quality or value of the result. The application is materially weaker without it but still functional.
 - **Could** — refinement that improves the user experience or supports advanced workflows. The application is fully functional without it.
 
-The current set is **5 Must / 2 Should / 2 Could**.
+The current set is **4 Must / 3 Should / 2 Could**.
 
 ### 4.1 Inputs
 
@@ -124,7 +124,7 @@ The current set is **5 Must / 2 Should / 2 Could**.
 |---|---|---|---|---|
 | **UR-06** | The teacher shall be able to view each proposed change to the rubric together with the criterion (Ambiguity, Applicability, or Discrimination Power) it addresses and a human-readable rationale for the change. | **Must** | The brief explicitly mandates that the output include an explanation of the suggested improvements organized by the three criteria. Beyond the brief, trust requires transparency: the teacher must see *why* each change was proposed and *which* of the three quality criteria it acts on. | UN-02 |
 | **UR-07** | The teacher shall be able to accept or reject each proposed change individually before finalizing the rubric. | **Could** | A refinement on top of the canonical flow. The canonical flow is whole-accept or regenerate with different inputs; per-change cherry-picking is convenient but not essential. The teacher who disagrees with the result can always re-run with adjusted inputs. | UN-02 |
-| **UR-08** | The teacher shall be able to re-run the assessment after accepting or rejecting changes, in order to see the effect of their decisions on the rubric. | **Could** | Dependent on UR-07. If per-change edits are a refinement, then re-running across them is also a refinement. Re-running the application from scratch with different inputs is always available via UR-05 and is a separate flow. | UN-02 |
+| **UR-08** | The teacher shall be able to re-run the assessment against an updated rubric — whether updated by accepting or rejecting individual proposed changes, by editing the rubric directly, or by adopting the system's improved rubric in full — in order to see quantitative evidence of how the change affects rubric quality. | **Should** | Re-running against an updated rubric is what turns the system from a one-shot suggestion engine into a measurement instrument the teacher can iterate with. The resulting before/after evidence per quality criterion is what makes proposed changes empirically defensible to the teacher and to their grading team. Without this capability the teacher must trust the system's judgments on faith. | UN-02 |
 
 ### 4.4 Output
 
@@ -148,7 +148,7 @@ Within each sub-section, requirements are organized into groups by the area of t
 - **§ 5.1** — SR-IN (input handling), SR-AS (assessment), SR-IM (improvement generation), SR-UI (user interface), SR-OUT (output)
 - **§ 5.2** — SR-OBS (observability), SR-PRF (performance and scale)
 
-The same MoSCoW criticality scale defined in § 4 applies. The current set is **44 system requirements: 21 Must / 14 Should / 9 Could**, of which 38 are functional and 6 are non-functional.
+The same MoSCoW criticality scale defined in § 4 applies. The current set is **46 system requirements: 21 Must / 17 Should / 8 Could**, of which 40 are functional and 6 are non-functional.
 
 The following concerns are intentionally **deferred to the Design Requirements** layer and do not appear here: choice of LLM provider and prompting approach, choice of UI framework, choice of file/document parsing libraries, choice of schema language, configuration mechanism, secret handling, caching strategy, deterministic execution policy, deployment topology, packaging, and orchestration layer.
 
@@ -182,6 +182,8 @@ Functional system requirements specify *what the system does*: the behaviors, in
 | **SR-AS-06** | When no student copies are provided, the system shall fall back to synthetic candidate responses for coverage testing and shall mark any evidence so produced as synthetic. | **Could** | UR-06 |
 | **SR-AS-07** | Each assessment finding shall be tagged with exactly one of the three criteria (Ambiguity, Applicability, Discrimination Power). | **Must** | UR-06 |
 | **SR-AS-08** | The system shall attach a confidence indicator to each assessment finding, reflecting the strength and quantity of supporting evidence. | **Should** | UR-06 |
+| **SR-AS-09** | The system shall be able to re-measure the rubric's quality scores against an improved or teacher-edited rubric and present the resulting before/after evidence in the deliverable. | **Should** | UR-06, UR-08 |
+| **SR-AS-10** | The discrimination-power assessment shall include a pairwise-consistency check that compares the rubric's absolute scoring of candidate responses (real student copies when available, synthetic responses otherwise) against head-to-head pairwise rankings of the same responses. Pairwise inconsistencies shall be reported as a discrimination-power finding. When such an inconsistency is traced to ambiguous criterion wording rather than to a weak scoring scale, the system shall also produce a linked ambiguity finding over the same evidence. | **Should** | UR-06 |
 
 #### 5.1.3 Improvement generation (SR-IM)
 
@@ -207,7 +209,7 @@ Functional system requirements specify *what the system does*: the behaviors, in
 | **SR-UI-07** | The user interface shall display the original rubric and the improved rubric side by side after the operation completes. | **Must** | UR-06 |
 | **SR-UI-08** | The user interface shall display each proposed change together with its criterion tag and its rationale. | **Must** | UR-06 |
 | **SR-UI-09** | The user interface shall provide controls to accept or reject each proposed change individually. | **Could** | UR-07 |
-| **SR-UI-10** | The user interface shall provide an action to re-run the assessment after the teacher has accepted or rejected changes. | **Could** | UR-08 |
+| **SR-UI-10** | The user interface shall provide a way for the teacher to supply or edit an updated rubric — whether by accepting or rejecting individual proposed changes, by editing the rubric directly, or by adopting the system's improved rubric in full — and to re-run the assessment against it. | **Should** | UR-08 |
 
 #### 5.1.5 Output (SR-OUT)
 
@@ -262,9 +264,9 @@ Every requirement at each layer traces to at least one requirement on the layer 
 | UR-03 — Provide starting rubric or grading intentions | SR-IN-05, SR-IN-08, SR-UI-01, SR-UI-02, SR-UI-03 |
 | UR-04 — Provide sample student copies | SR-IN-06, SR-IN-07, SR-IN-08, SR-AS-05, SR-UI-01, SR-UI-02, SR-UI-03, SR-PRF-01 |
 | UR-05 — Trigger the operation with a single action | SR-IN-02, SR-IN-09, SR-AS-01, SR-AS-02, SR-AS-03, SR-IM-01, SR-UI-04, SR-UI-05, SR-UI-06, SR-OBS-01, SR-OBS-02, SR-PRF-02, SR-PRF-03 |
-| UR-06 — View each change with criterion and rationale | SR-IN-09, SR-AS-01, SR-AS-02, SR-AS-03, SR-AS-04, SR-AS-05, SR-AS-06, SR-AS-07, SR-AS-08, SR-IM-03, SR-IM-04, SR-IM-05, SR-IM-06, SR-UI-06, SR-UI-07, SR-UI-08, SR-OUT-03, SR-OBS-01, SR-OBS-02, SR-OBS-03 |
+| UR-06 — View each change with criterion and rationale | SR-IN-09, SR-AS-01, SR-AS-02, SR-AS-03, SR-AS-04, SR-AS-05, SR-AS-06, SR-AS-07, SR-AS-08, SR-AS-09, SR-AS-10, SR-IM-03, SR-IM-04, SR-IM-05, SR-IM-06, SR-UI-06, SR-UI-07, SR-UI-08, SR-OUT-03, SR-OBS-01, SR-OBS-02, SR-OBS-03 |
 | UR-07 — Accept or reject changes individually | SR-UI-09, SR-OUT-05 |
-| UR-08 — Re-run after edits | SR-UI-10 |
+| UR-08 — Re-run after edits | SR-AS-09, SR-UI-10 |
 | UR-09 — Download the final rubric and explanation as JSON | SR-IM-01, SR-IM-02, SR-IM-06, SR-OUT-01, SR-OUT-02, SR-OUT-03, SR-OUT-04, SR-OUT-05, SR-UI-01 |
 
 ---
@@ -273,6 +275,7 @@ Every requirement at each layer traces to at least one requirement on the layer 
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.5.0 | 2026-04-11 | Wiktor Lisowski | Promoted UR-08 (re-run assessment after edits) from *Could* to *Should*: re-measurement gives the teacher quantitative before/after evidence per quality criterion, which materially strengthens the trust loop the application is built around and turns the system from a one-shot suggestion engine into a measurement instrument the teacher can iterate with. UR-08 text broadened to cover any updated rubric (per-change accept/reject, direct edit, or full adoption of the improved rubric). Added two new system requirements under SR-AS to back the promotion. SR-AS-09: re-measurement of an improved or teacher-edited rubric, with before/after evidence in the deliverable. SR-AS-10: pairwise-consistency check as a discrimination-power assessment method, using real student copies when available and synthetic responses otherwise; pairwise inconsistencies are reported as a discrimination-power finding, and when the cause is ambiguous criterion wording rather than a weak scoring scale the system also produces a linked ambiguity finding over the same evidence (each finding still carries exactly one criterion per SR-AS-07; the dual signal is captured by linkage between two findings, not by a multi-criterion finding). Promoted SR-UI-10 from *Could* to *Should* and broadened its text to cover supplying or editing an updated rubric and re-running, so the UI hook matches the broader UR-08 contract. Updated counts: UR table to **4 Must / 3 Should / 2 Could** (this also corrects a long-standing off-by-one in the UR Must column carried since v0.2.0 — the v0.4.0 line "5 Must / 2 Should / 2 Could" should have been "4 Must / 2 Should / 3 Could"); SR table to 46 SRs (21 Must / 17 Should / 8 Could, of which 40 functional and 6 non-functional). Traceability updated: UR-06 gains SR-AS-09 and SR-AS-10; UR-08 gains SR-AS-09. |
 | 0.4.0 | 2026-04-10 | Wiktor Lisowski | Restructured § 5 *System Requirements* into two sub-sections at the same V-model layer: § 5.1 *Functional system requirements* (SR-IN, SR-AS, SR-IM, SR-UI, SR-OUT — 38 SRs) and § 5.2 *Non-functional system requirements* (SR-OBS, SR-PRF — 6 SRs). Group sub-sub-sections renumbered (5.1 → 5.1.1, …, 5.7 → 5.2.2). Intent: make the functional / non-functional split explicit without inventing a top-level § 6 that would imply NFRs sit at a different V-model layer than functional SRs (they don't). No requirements added, removed, modified or re-traced. |
 | 0.3.6 | 2026-04-10 | Wiktor Lisowski | Glossary: tightened *Audit bundle* — the bundle is a *trace* (what the system did, in what order), not a *reasoning artifact*. The "why" of any individual change lives in the proposed change's rationale; the audit bundle stores it but does not generate it. Also dropped the undefined actor "reviewer". |
 | 0.3.5 | 2026-04-10 | Wiktor Lisowski | Glossary: added *Explained rubric file* — the deliverable JSON file that wraps the improved rubric and the explanation of changes. SR-OUT-01..05 rewritten to use the anchored term consistently in place of the previous loose phrase *"JSON output"*. SR-OUT-02 also tightened: *"top-level field"* (ambiguous) replaced with *"at the root of the JSON document"*. |
