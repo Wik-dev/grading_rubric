@@ -1,8 +1,8 @@
 # Grading Rubric Studio — Design
 
-**Version**: 0.9.0
+**Version**: 0.10.0
 **Date**: 2026-04-11
-**Status**: Architectural overview filled; technology-stack decisions #1–#7 locked; data models and DR groups still to be filled
+**Status**: Architectural overview filled; technology-stack decisions #1–#8 locked; data models and DR groups still to be filled
 **Author**: Wiktor Lisowski
 
 ---
@@ -102,8 +102,6 @@ This section frames the system at a level above any specific technology choice. 
   - Audit Recorder    Captures the per-run trace -> audit bundle.
                       Subscribes to events from every other module.
   - Scorer interface  Abstraction for the train-button capability.
-  - Content cache     Content-hashed memoization of expensive calls
-                      (LLM, OCR, parsing) keyed by input fingerprint.
   - Data models       Rubric, Assessment finding, Proposed change,
                       Evidence profile, Audit bundle, Explained rubric
                       file. The contract layer the modules pass between
@@ -171,7 +169,7 @@ Each technology decision deferred from the SR layer is tracked in the register b
 | 5 | OCR for handwritten student copies | **decided** | Claude Sonnet 4.6 multimodal input as the primary OCR path, invoked through the same LLM Gateway as every other model call; `StudentCopyReader` interface in DR-IO keeps the backend swappable for a dedicated OCR service | § 3.5 |
 | 6 | Schema language for the *Explained rubric file* | **decided** | Pydantic is the single source of truth; a `make schemas` step emits a versioned JSON Schema file that ships alongside the deliverable; the front-end derives its TypeScript types and zod validators from the same JSON Schema | § 3.6 |
 | 7 | Configuration mechanism and secret handling | **decided** | `pydantic-settings` `Settings` class as the typed loader; environment variables as the only runtime source; gitignored `.env` for dev convenience; secrets held as `SecretStr`; workflows registered with an external orchestrator declare required secret *names*, not values | § 3.7 |
-| 8 | Caching strategy | pending | — | § 3.8 |
+| 8 | Caching strategy | **decided** | No application-level cache. Cost is not a concern; cross-run deduplication is the external orchestrator's job at the task granularity; transient-error retries are the Anthropic SDK's job; test reproducibility is handled by mocking at the Gateway seam. | § 3.8 |
 | 9 | Deterministic execution policy | pending | — | § 3.9 |
 | 10 | Deployment topology, packaging | pending | — | § 3.10 |
 | 11 | Orchestration layer | pending | — | § 3.11 |
@@ -211,7 +209,7 @@ The implementation choices behind this signature are:
 - **Schemas are Pydantic models.** Each call site declares its expected output as a Pydantic class. Pydantic validates the model's tool arguments before the Gateway returns them.
 - **Retry-once on validation failure.** If validation fails, the Gateway re-issues the call once, appending the validation error message to the prompt context. A second failure raises and is recorded in the audit bundle as a measurement failure for that call. There is no infinite retry loop and no silent fallback to "best-effort" parsing.
 - **Sampling is a parameter, not a separate code path.** `samples=1` covers the extraction-style calls; `samples=k` covers reliability-style measurements where the *spread across samples* is the signal (see § 1.4 *Design glossary*). The Gateway parallelizes the `k` draws but otherwise treats them identically. Aggregation (mean, agreement coefficient, panel inter-rater reliability) is the caller's responsibility, not the Gateway's, because aggregation logic is measurement-specific.
-- **One door to the API.** No module other than the LLM Gateway holds an `anthropic.Anthropic` client. This is what makes the backend pluggable (swap the implementation behind `gateway.measure`), what makes the audit bundle complete (every call passes through one place), and what makes the Content cache effective (the cache key is `(prompt_hash, schema_hash, inputs_hash, model, sample_index)` and lives inside the Gateway).
+- **One door to the API.** No module other than the LLM Gateway holds an `anthropic.Anthropic` client. This is what makes the backend pluggable (swap the implementation behind `gateway.measure`) and what makes the audit bundle complete (every call passes through one place).
 
 **Rationale.**
 
@@ -352,7 +350,6 @@ class Settings(BaseSettings):
     # Non-secret runtime config
     default_model: str = "claude-sonnet-4-6"
     llm_max_samples: int = 5
-    cache_dir: Path = Path(".cache/grading_rubric")
     audit_bundle_dir: Path = Path("runs")
     prompts_dir: Path = Path("prompts")
     schemas_dir: Path = Path("schemas")
@@ -384,7 +381,30 @@ The workflow definition that registers the application as a task with such an or
 
 This arrangement is the concrete realisation of the hermetic-task philosophy from § 2.2 on the *configuration* axis: the task declares its inputs (including the names of secrets it requires), and the environment that supplies them is pluggable. The application therefore satisfies both locked architectural commitment #4 (*Validance is one possible execution layer, the deliverable runs standalone with no Validance dependency*) and the invariant that registered workflows must never carry secret values.
 
-- **What this decision does not commit.** The caching strategy that uses `cache_dir` and the exact on-disk layout of that cache is decision **#8** (§ 3.8). The deterministic-execution policy (temperature, seed, sampling discipline) that `llm_max_samples` ties into is decision **#9** (§ 3.9). The packaging and deployment topology that decides whether the back-end is a long-running server, a one-shot task, or both is decision **#10** (§ 3.10). The exact list of `Settings` fields will grow as later decisions land — this section locks the mechanism, not the full field list.
+- **What this decision does not commit.** The deterministic-execution policy (temperature, seed, sampling discipline) that `llm_max_samples` ties into is decision **#9** (§ 3.9). The packaging and deployment topology that decides whether the back-end is a long-running server, a one-shot task, or both is decision **#10** (§ 3.10). The exact list of `Settings` fields will grow as later decisions land — this section locks the mechanism, not the full field list.
+
+### 3.8 Caching strategy
+
+**Decision.** The application has **no application-level cache**. No on-disk cache directory, no in-memory content-hash map, no request deduplication inside the LLM Gateway or the `InputParser`. Every run performs every call it needs from scratch.
+
+**Rationale.**
+
+A caching layer solves one or more of four concerns. For this deliverable, none of the four belongs in application code:
+
+| Concern | Why it is not a reason to cache at the application layer |
+|---|---|
+| *Cost of repeated external calls* | EPFL provides an API key for the challenge; a run is a handful of calls. Cost is not a decision driver. |
+| *Cross-run deduplication when the same inputs are seen twice* | This is the **external orchestrator's** job at the *task* granularity. Content-hashed task caching is a first-class feature of Validance, Snakemake, Airflow, and every comparable engine. A second cache inside the application competes with the orchestrator's cache at a finer granularity, with different keys and different invalidation semantics — that is a bug surface, not a feature. |
+| *Recovery from transient API errors* | This is the **Anthropic SDK's** job. The SDK retries on rate limits and 5xx responses with exponential backoff. Re-implementing retry inside the Gateway would duplicate well-tested behaviour. |
+| *Reproducibility of tests without live API calls* | Handled by **mocking at the Gateway seam**: unit tests replace `gateway.measure()` with a stub that returns canned responses. This is test hygiene, not caching. It also keeps CI deterministic and offline, which a cache would not. |
+
+The positive consequences of **not** building a cache are:
+
+- **Hermetic tasks stay hermetic.** A task that reads from and writes to an undeclared cache directory has hidden I/O. The hermetic-task philosophy of § 2.2 is undermined. Dropping the cache means every input and output of every task is declared and visible.
+- **One source of truth per run.** With no cache, an audit bundle describes *everything* the run did. With a cache, part of the story is *"we did not run this step because a previous run had the same key"*, which the audit bundle would have to reconstruct after the fact. Removing the cache removes this whole category of audit-log complexity.
+- **Orchestrator compatibility is clean.** Under Validance (or any other external engine), the engine's task-level cache works exactly as designed. The application does not fight it, does not shadow it, and does not need to know it exists.
+
+- **What this decision does not commit.** Deterministic execution (temperature, seed, sampling discipline) is decision **#9** (§ 3.9). The test fixture strategy for mocking `gateway.measure()` is a DR-LLM concern (§ 5.2). The orchestrator's cache behaviour is out of scope for this document — we rely on it being present in any orchestrated deployment without specifying its implementation.
 
 ---
 
@@ -501,6 +521,7 @@ Every DR shall trace back to at least one SR. Every SR shall be covered by at le
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.10.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #8 (caching strategy) in § 3.8: the application has **no application-level cache**. Cost of repeated calls is not a driver (free API key); cross-run deduplication is the external orchestrator's job at task granularity; transient-error retries are the Anthropic SDK's job; reproducibility of tests is handled by mocking at the Gateway seam. Consequences: hermetic tasks stay hermetic (no hidden I/O to a cache directory), audit bundles describe *everything* a run did (no "we did not run this step because of a cache hit" complexity), and orchestrator cache behaviour is unopposed. Cleanups in the same change: removed the *Content cache* module from § 2.1; dropped the cache reference from § 2.3's *one door to the API* bullet; removed `cache_dir` from the illustrative `Settings` class in § 3.7 and dropped its forward reference. Decisions #9–#11 still pending. |
 | 0.9.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #7 (configuration mechanism and secret handling) in § 3.7: single typed `Settings` class built on `pydantic-settings`; process environment variables as the only runtime source; gitignored `.env` for dev convenience loaded automatically when present; committed `.env.example` as the single source of truth for *which* variables exist; secrets held as `SecretStr` so they cannot land in logs, stack traces, or the audit bundle. The same code runs unchanged under an external orchestrator (e.g. Validance): the registered workflow declares the *names* of required secrets, not their values; the orchestrator's secret store injects them into the container's environment at task launch; the task boots the same `Settings` class. Committed artefacts — repo, image, workflow definition — are secret-free by construction. Decisions #8–#11 still pending. |
 | 0.8.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #6 (schema language for the *Explained rubric file*) in § 3.6: the Pydantic class is the single source of truth; a `make schemas` build step emits a versioned `schemas/explained_rubric_file.vMAJOR.MINOR.schema.json` file that is checked into the repo as the language-agnostic inspection artefact for reviewers; the front-end derives TypeScript types (`json-schema-to-typescript`) and runtime zod validators (`json-schema-to-zod`) from the same JSON Schema file; the deliverable JSON carries its `schema_version` in a top-level field and the schema is versioned independently of the application. Decisions #7–#11 still pending. |
 | 0.7.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #5 (OCR for handwritten student copies) in § 3.5: Claude Sonnet 4.6 multimodal input as the primary OCR backend, invoked through the same `gateway.measure()` entry point as every other model call (same caching, same audit logging, same retry-once validation). The `InputParser` delegates to a `StudentCopyReader` interface whose contract is specified in § 5.7 *DR-IO*; a dedicated-OCR backend (Azure Document Intelligence, Textract, Cloud Vision, TrOCR, etc.) can replace the primary implementation without touching any other module. Avoids adding a second cloud dependency beyond Anthropic. Decisions #6–#11 still pending. |
