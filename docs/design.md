@@ -1,8 +1,8 @@
 # Grading Rubric Studio — Design
 
-**Version**: 0.1.0
+**Version**: 0.2.0
 **Date**: 2026-04-11
-**Status**: Skeleton — content to be filled iteratively
+**Status**: Architectural overview filled; technology stack, data models, and DR groups still to be filled
 **Author**: Wiktor Lisowski
 
 ---
@@ -48,15 +48,111 @@ The Design Requirements (DR) here are the layer at which **technology choices, d
 
 ## 2. Architectural overview
 
-*To be filled in step 2.*
+This section frames the system at a level above any specific technology choice. It establishes the modules and how they interact, and it states the four guiding principles that shape every choice made later in the document.
 
-This section will contain:
+### 2.1 System diagram
 
-- A system diagram showing the major modules and their interactions.
-- The **hermetic-task philosophy**: each pipeline stage is self-contained, takes structured inputs, produces structured outputs, and is runnable both standalone and via an orchestration layer such as Validance. No stage owns global state.
-- The **measurement-instrument philosophy** for LLMs (locked architectural commitment #2): structured prompts, JSON-validated outputs, multiple samples for reliability estimates, classical NLP and statistics inserted wherever they are strictly better.
-- The **data-aware** principle (locked commitment #6): the system reports its own confidence based on the *evidence profile* of each run.
-- The **human-in-the-loop** principle (locked commitment #7): the application proposes; the teacher decides.
+```
++----------------------------------------------------------+
+|                          Teacher                          |
++--------------------------+-------------------------------+
+                           |
+                  +--------v----------+
+                  |     UI Layer       |
+                  |   (web browser,    |
+                  |   local machine)   |
+                  +--------+----------+
+                           |
+                  +--------v----------+
+                  |   Orchestrator     |
+                  | (one run, hermetic |
+                  |   stage chain)     |
+                  +--+----+----+---+--+
+                     |    |    |   |
+        +------------+    |    |   +--------------+
+        |                 |    |                  |
+   +----v-----+    +------v--+-+----+      +------v-----+
+   |  Input   |    |   Assessment    |     | Improvement |
+   |  Parser  +--->+     Engine      +---->+  Generator  |
+   +----------+    | (Ambiguity /    |     +------+------+
+                   |  Applicability /|            |
+                   |  Discrimination)|            |
+                   +-----------------+            |
+                                                  v
+                                        +-------------------+
+                                        |   Output Writer    |
+                                        +---------+---------+
+                                                  |
+                                                  v
+                                        Explained rubric file
+                                              (JSON)
+
+  Cross-cutting modules
+  ---------------------
+  - LLM Gateway       Pluggable backend; Anthropic by default.
+                      Single point through which every model call passes.
+  - Audit Recorder    Captures the per-run trace -> audit bundle.
+                      Subscribes to events from every other module.
+  - Scorer interface  Abstraction for the train-button capability.
+                      Has a stub train_scorer task; no model trained
+                      for this delivery (commitment #5).
+  - Content cache     Content-hashed memoization of expensive calls
+                      (LLM, OCR, parsing) keyed by input fingerprint.
+  - Data models       Rubric, Assessment finding, Proposed change,
+                      Evidence profile, Audit bundle, Explained rubric
+                      file. The contract layer the modules pass between
+                      each other.
+```
+
+The diagram is intentionally module-level, not implementation-level. Module decomposition into packages and dependency rules are the subject of § 5.1 *DR-ARC*. Schemas of the contract objects are the subject of § 4.
+
+### 2.2 Hermetic-task philosophy
+
+Each stage in the pipeline (input parsing, assessment, improvement, output writing) is built as a **hermetic task**: it takes structured inputs, produces structured outputs, holds no global state, performs no hidden I/O outside its declared inputs and outputs, and can be invoked from three different execution surfaces using the same code:
+
+1. **Standalone** — a single function call or CLI invocation, useful in tests and during development.
+2. **In-process from the orchestrator** — the default mode of the application, where the orchestrator chains the stages.
+3. **External orchestrator** — a workflow engine such as Validance, Snakemake, or Airflow, which schedules each task in its own container and persists its outputs to a shared location.
+
+The cost of this discipline is real: no shortcuts via shared mutable state, no global singletons, no implicit caches. The benefit is also real: every stage is independently testable, every run is replayable from its inputs, and the system is **orchestration-agnostic**. Validance is *one* possible execution layer for this application; the deliverable runs perfectly well without it (per locked architectural commitment #4). The same property is what makes the train-button capability (§ 5.10 *DR-SCR*) cleanly bolt-on rather than woven through the codebase.
+
+### 2.3 LLMs as measurement instruments
+
+The dominant pattern in AI applications today is to treat LLMs as **oracles**: ask the model a question, trust the answer, ship it. This system explicitly does not. The reason is structural: the system's job is *assessing the quality of an assessment artifact* (a rubric used to grade students). An oracle-style LLM call would make the system's output exactly as defensible as the model's last best guess — which is not defensible enough to hand to a teacher who is accountable to their students.
+
+Instead, every LLM interaction in this system is a **measurement task** with the following properties:
+
+- **Structured prompt with a defined purpose** — one task per prompt, prompt identifiers logged in the audit bundle (§ 5.8 *DR-OBS*).
+- **Structured output validated against a schema** — JSON conforming to a schema declared at the call site, rejected and retried on validation failure (§ 5.2 *DR-LLM*).
+- **Multiple samples where reliability matters** — for measurements that drive the *confidence indicator* on findings, the gateway draws several samples and reports both the central tendency and the spread.
+- **Classical NLP and statistics inserted wherever they are strictly better** — inter-rater reliability via Krippendorff's α, deterministic span matching for the side-by-side rubric diff, content-hashed caching of identical calls. The LLM is used where its semantic flexibility is the right tool, not as the default for everything.
+
+This is the design-layer realization of locked architectural commitment #2.
+
+### 2.4 The system is data-aware
+
+The application is designed to be useful across a wide range of evidence conditions. A teacher arriving with no teaching material, no starting rubric, and no student copies — only the exam question — should still get a result. A teacher arriving with the full course corpus, a polished draft rubric, and a hundred sample copies should get a much more confident result. **The system does not pretend the two situations are the same.**
+
+The mechanism is the *evidence profile* (defined in [`requirements.md`](requirements.md) § 2 and recorded per SR-IN-09). It is computed at the start of every run and drives:
+
+- which assessment paths can fire (SR-AS-04, SR-AS-05, SR-AS-06);
+- which evidence is real and which is synthetic (SR-AS-06);
+- the *confidence indicator* on every assessment finding (SR-AS-08);
+- the warnings shown to the teacher in the UI when evidence is thin.
+
+This is the design-layer realization of locked architectural commitment #6. The quantitative rules for translating an evidence profile into a confidence indicator are specified in § 5.4 *DR-AS*.
+
+### 2.5 Human in the loop
+
+The application proposes; the teacher decides. The system is never the final authority on what the rubric should say — its outputs are *suggestions accompanied by evidence*, not commands. The teacher is the domain expert and is accountable to their students and their grading team.
+
+Concretely, this principle constrains the design in three ways:
+
+- **Every proposed change carries a rationale** (SR-IM-03, SR-UI-08). No silent edits.
+- **Per-change accept/reject controls are first-class** (UR-07, SR-UI-09), even though they are only *Could* in the MoSCoW. The architecture supports them; the build prioritization decides whether they ship in this delivery.
+- **Re-assessment after teacher edits** (UR-08, SR-UI-10) is supported by the same hermetic-task structure that supports standalone runs — a re-assessment is just another run with a different starting rubric.
+
+This is the design-layer realization of locked architectural commitment #7.
 
 ---
 
@@ -197,4 +293,5 @@ Every DR shall trace back to at least one SR. Every SR shall be covered by at le
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.2.0 | 2026-04-11 | Wiktor Lisowski | Filled § 2 *Architectural overview*: § 2.1 system diagram (eight modules — UI, Orchestrator, Input Parser, Assessment Engine, Improvement Generator, Output Writer, plus the cross-cutting LLM Gateway / Audit Recorder / Scorer interface / Content cache / Data models), and § 2.2–2.5 stating the four guiding principles (hermetic tasks, LLMs as measurement instruments, data-aware system, human in the loop) as the design-layer realizations of locked architectural commitments #2, #4, #5, #6, and #7. No DRs added. No technology decisions made yet. |
 | 0.1.0 | 2026-04-11 | Wiktor Lisowski | Initial skeleton. Section 1 (intro, scope, references) drafted. Sections 2 (architectural overview), 3 (technology stack and decision register — 11 pending decisions listed), 4 (data models), 5 (eleven DR groups DR-ARC through DR-DEP, each with an intent paragraph), 6 (traceability), and 7 (modlog) created as placeholders to be filled iteratively. No DRs and no technology decisions made yet. |
