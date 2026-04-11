@@ -1,8 +1,8 @@
 # Grading Rubric Studio — Design
 
-**Version**: 0.5.0
+**Version**: 0.6.0
 **Date**: 2026-04-11
-**Status**: Architectural overview filled; technology-stack decisions #1, #2, and #3 locked; data models and DR groups still to be filled
+**Status**: Architectural overview filled; technology-stack decisions #1–#4 locked; data models and DR groups still to be filled
 **Author**: Wiktor Lisowski
 
 ---
@@ -167,7 +167,7 @@ Each technology decision deferred from the SR layer is tracked in the register b
 | 1 | LLM provider, SDK, and default model | **decided** | Anthropic via `anthropic` Python SDK (≥ 0.40); default model `claude-sonnet-4-6`; per-call override supported by the LLM Gateway | § 3.1 |
 | 2 | Prompting and structured-output approach | **decided** | Anthropic tool use for structured output; prompts as content-hashed markdown files with YAML front-matter; Pydantic schemas; retry-once on validation failure; single `gateway.measure()` entry point | § 3.2 |
 | 3 | UI framework | **decided** | Vite + React 18 + TypeScript front-end with shadcn/ui (Radix + Tailwind), React Router, TanStack Query, react-hook-form + zod, Recharts, Sonner; Vitest + Testing Library for unit, Playwright for E2E; talks to the Python back-end over HTTP/JSON | § 3.3 |
-| 4 | File and document parsing libraries | pending | — | § 3.4 |
+| 4 | File and document parsing libraries | **decided** | `pypdf` for simple PDF text extraction, `pdfplumber` when layout matters, stdlib for `.txt`, `markdown-it-py` for `.md`, `python-docx` for `.docx`; a single `InputParser` module returns a uniform `ParsedDocument` regardless of source format | § 3.4 |
 | 5 | OCR for handwritten student copies | pending | — | § 3.5 |
 | 6 | Schema language for the *Explained rubric file* | pending | — | § 3.6 |
 | 7 | Configuration mechanism and secret handling | pending | — | § 3.7 |
@@ -257,6 +257,30 @@ The specific Python HTTP server that exposes the back-end is the subject of deci
 - **Why Vitest + Testing Library + Playwright.** Vitest shares Vite's config and runs unit/component tests against jsdom at native speed. Testing Library enforces the *"test behaviour, not implementation"* discipline that matches the V-model's acceptance-tests-at-the-top of this project. Playwright covers the SR-UI requirements end-to-end in a real browser — the level at which those requirements actually mean something.
 - **Why the HTTP/JSON boundary.** Keeping the UI and the Python back-end as two deployables matches the hermetic-task philosophy (§ 2.2): each side is testable standalone, and the same back-end can be driven from the SPA, from the CLI, or from an external orchestrator without any front-end concerns leaking into the Python modules. It also matches the architecture of the adjacent projects in this repository group, so the deployment story in § 5.11 *DR-DEP* will be a short step from the pattern already in use.
 - **What this decision does not commit.** The Python HTTP server (FastAPI, Flask, Starlette, etc.) is deferred to decision **#10**. Authentication is not in scope — the application is a single-user local tool per [`requirements.md`](requirements.md) § 1.2 *out of scope*. Multi-page vs. multi-route navigation inside the SPA is a DR-UI concern, not a technology-stack concern, and is deferred to § 5.6.
+
+### 3.4 File and document parsing libraries
+
+**Decision.** A single `InputParser` module is the only component that reads teacher-provided files from disk. It exposes one entry point per supported format, each of which returns the same data structure — a `ParsedDocument` containing the extracted text, per-page or per-section metadata, and a provenance record (source filename, content hash, parser name, parser version). The Assessment stage never branches on file format.
+
+The per-format implementations are:
+
+| Format | Library | Used for |
+|---|---|---|
+| `.txt` | Python stdlib (`pathlib` + encoding detection via `charset-normalizer`) | Exam question, starting rubric text, plain-text teaching material |
+| `.md` | `markdown-it-py` | Rubric drafts written in markdown, teaching material in markdown |
+| `.pdf` (text layer) | `pypdf` (default), `pdfplumber` (when layout matters) | Exam question, teaching material, starting rubric, student copies that are typed |
+| `.docx` | `python-docx` | Rubric drafts exported from Word |
+| Image / handwritten PDF | *Delegated to OCR, decision § 3.5* | Scanned student copies |
+
+**Rationale.**
+
+- **Why a single `InputParser` module with a uniform output.** The Assessment Engine, the Improvement Generator, and the Audit Recorder all consume *text plus provenance*; they should be unaware of whether that text came from a `.pdf`, a `.docx`, or a `.txt`. Putting format handling anywhere else leaks file-format branching into modules that have nothing to do with file formats. This realisation of the dispatch pattern also matches SR-IN-08 (partial-failure reporting): the one place that needs to know which files failed to parse is the parser itself.
+- **Why `pypdf` as the default PDF library.** It is pure-Python, dependency-light, actively maintained, and handles the majority of text-layer PDF extractions correctly. It is the right default for teaching material and rubric drafts, which are almost always text-layer PDFs exported from Word or LaTeX.
+- **Why `pdfplumber` as the fallback.** PDFs that carry layout (two-column exam sheets, tables of rubric criteria, boxed answer regions) need layout-aware extraction. `pdfplumber` provides page-level geometry, table extraction, and bounding boxes — the primitives needed when `pypdf`'s flat-text output scrambles the reading order. The `InputParser` tries `pypdf` first and falls back to `pdfplumber` when the extracted text looks degenerate (very short, no sentence punctuation, or otherwise below a defensive threshold); the specific fallback rule is a DR-IO concern (§ 5.7) rather than a technology decision.
+- **Why `markdown-it-py` rather than stripping markdown with a regex.** Teachers who write in markdown use headers, bullet lists, and bold emphasis deliberately — those structures carry meaning for the Assessment Engine (a criterion named in a heading is structurally different from a criterion named in a bullet). `markdown-it-py` gives an AST that the parser collapses to clean text while preserving structural tags in the `ParsedDocument` metadata. A regex would discard that signal.
+- **Why `python-docx` rather than converting `.docx` to `.pdf` first.** Round-tripping through PDF loses the document's native structure (styles, headings, numbered lists) that `python-docx` exposes directly. The dependency is small and the output is higher-fidelity than any conversion chain.
+- **Why stdlib + `charset-normalizer` for `.txt`.** Plain text is a trap: the file is almost always ASCII or UTF-8, but the one time it is not, a silent decoding error corrupts the exam question. `charset-normalizer` is a tiny, pure-Python encoding detector that fails loudly when the input is unreadable rather than returning garbage.
+- **What this decision does not commit.** OCR for handwritten student copies is decision **#5** (§ 3.5). The content-cache strategy that keys on the content hash of parsed documents is decision **#8** (§ 3.8). The shape of the `ParsedDocument` data class itself is a DR-IO concern and is specified in § 5.7.
 
 ---
 
@@ -373,6 +397,7 @@ Every DR shall trace back to at least one SR. Every SR shall be covered by at le
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.6.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #4 (file and document parsing libraries) in § 3.4: a single `InputParser` module with one entry point per format, returning a uniform `ParsedDocument` (text + metadata + provenance). Libraries: `pypdf` as the default PDF extractor with `pdfplumber` as a layout-aware fallback; stdlib + `charset-normalizer` for `.txt`; `markdown-it-py` for `.md`; `python-docx` for `.docx`. OCR for handwritten copies remains decision #5. Decisions #5–#11 still pending. |
 | 0.5.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #3 (UI framework) in § 3.3: single-page application built with Vite + React 18 + TypeScript, shadcn/ui (Radix + Tailwind), React Router, TanStack Query, react-hook-form + zod, Recharts, Sonner, Framer Motion, lucide-react; Vitest + Testing Library for unit/component tests, Playwright for E2E. The SPA is a separate deployable from the Python back-end and talks to it over HTTP/JSON with the base URL configurable via `VITE_API_BASE`. Choice of the specific Python HTTP server deferred to decision #10. Decisions #4–#11 still pending. |
 | 0.4.0 | 2026-04-11 | Wiktor Lisowski | Added § 1.4 *Design glossary* anchoring the design-internal term *Sample (LLM)*. Locked decision #2 (prompting and structured-output approach) in § 3.2: single `gateway.measure(prompt_id, inputs, schema, samples, model)` entry point; Anthropic tool use for structured output (no `instructor` / `langchain` / `dspy`); prompts as markdown files with YAML front-matter; content-hashed prompt + schema identity recorded in the audit bundle; Pydantic validation with retry-once on failure; sampling as a parameter; aggregation left to callers. Decisions #3–#11 still pending. |
 | 0.3.0 | 2026-04-11 | Wiktor Lisowski | Started filling § 3 *Technology stack and decision register*. Decision #1 (LLM provider, SDK, and default model) locked in § 3.1: Anthropic via the `anthropic` Python SDK (≥ 0.40), default model `claude-sonnet-4-6`, single default with per-call override supported by the LLM Gateway. Per-task model routing deferred as a future refinement. Decisions #2–#11 still pending. |
