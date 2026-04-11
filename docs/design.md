@@ -1,6 +1,6 @@
 # Grading Rubric Studio — Design
 
-**Version**: 0.2.2
+**Version**: 0.3.0
 **Date**: 2026-04-11
 **Status**: Architectural overview filled; technology stack, data models, and DR groups still to be filled
 **Author**: Wiktor Lisowski
@@ -152,13 +152,11 @@ Concretely, this principle constrains the design in three ways:
 
 ## 3. Technology stack and decision register
 
-*To be filled in step 3.*
-
-This section will list each technology decision deferred from the SR layer, the current state of the decision (`pending` / `decided` / `deferred`), the chosen option (when decided), and a brief rationale paragraph. Decisions are tracked in the table below as a register; the discussion lives in the per-decision sub-sections.
+Each technology decision deferred from the SR layer is tracked in the register below. State is one of `pending` / `decided` / `deferred`. Decisions are filled iteratively; each `decided` row points to a sub-section that holds the chosen option and the rationale.
 
 | # | Decision | State | Choice | Rationale ref. |
 |---|---|---|---|---|
-| 1 | LLM provider and SDK | pending | — | § 3.1 |
+| 1 | LLM provider, SDK, and default model | **decided** | Anthropic via `anthropic` Python SDK (≥ 0.40); default model `claude-sonnet-4-6`; per-call override supported by the LLM Gateway | § 3.1 |
 | 2 | Prompting and structured-output approach | pending | — | § 3.2 |
 | 3 | UI framework | pending | — | § 3.3 |
 | 4 | File and document parsing libraries | pending | — | § 3.4 |
@@ -171,6 +169,17 @@ This section will list each technology decision deferred from the SR layer, the 
 | 11 | Orchestration layer | pending | — | § 3.11 |
 
 Locked architectural commitments from `CLAUDE.md` § 6 (not re-litigated here): Anthropic as the default LLM provider; pluggable backend; Validance as one possible execution layer (not embedded in the deliverable).
+
+### 3.1 LLM provider, SDK, and default model
+
+**Decision.** Anthropic, accessed via the official `anthropic` Python SDK (≥ 0.40). Default model: **Claude Sonnet 4.6** (`claude-sonnet-4-6`). Every LLM call in this delivery uses the default; the LLM Gateway supports per-call model override so future cost-aware routing is a local change.
+
+**Rationale.**
+
+- **Provider** — Locked in CLAUDE.md commitment #3. The Gateway abstraction makes the provider swappable without touching application code, which matters for the anticipated EPFL on-prem path (RCP / local LLMs).
+- **SDK** — No realistic alternative for a Python application calling Claude.
+- **Default model** — Sonnet 4.6 is the workhorse: strong reasoning at moderate cost. Haiku would underperform on the methodology-dense assessment and improvement tasks; Opus would add marginal capability at substantially higher cost without meaningfully changing what a reviewer sees.
+- **Single default vs. per-task routing** — Routing is more efficient but adds complexity at every call site. It is a refinement that lands cleanly later (the Gateway already supports per-call override), and over-engineering it on day one contradicts the anti-patterns in `CLAUDE.md` § 7.4.
 
 ---
 
@@ -287,6 +296,7 @@ Every DR shall trace back to at least one SR. Every SR shall be covered by at le
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.3.0 | 2026-04-11 | Wiktor Lisowski | Started filling § 3 *Technology stack and decision register*. Decision #1 (LLM provider, SDK, and default model) locked in § 3.1: Anthropic via the `anthropic` Python SDK (≥ 0.40), default model `claude-sonnet-4-6`, single default with per-call override supported by the LLM Gateway. Per-task model routing deferred as a future refinement. Decisions #2–#11 still pending. |
 | 0.2.2 | 2026-04-11 | Wiktor Lisowski | § 2.2: dropped the *"cost of this discipline is real"* framing and the enumeration of forbidden shortcuts (shared state, singletons, implicit caches — implied by *hermetic*). Sentence now states only what the discipline yields. |
 | 0.2.1 | 2026-04-11 | Wiktor Lisowski | § 2 trim pass: removed redundant repetitions of *"Validance is one possible execution layer"*, *"orchestration-agnostic"*, *"pluggable backend"*, and the mechanical *"design-layer realization of locked architectural commitment #X"* footers from § 2.3 / § 2.4 / § 2.5. Tightened § 2.3 opening paragraph. No content lost; the same points are now made once each. |
 | 0.2.0 | 2026-04-11 | Wiktor Lisowski | Filled § 2 *Architectural overview*: § 2.1 system diagram (eight modules — UI, Orchestrator, Input Parser, Assessment Engine, Improvement Generator, Output Writer, plus the cross-cutting LLM Gateway / Audit Recorder / Scorer interface / Content cache / Data models), and § 2.2–2.5 stating the four guiding principles (hermetic tasks, LLMs as measurement instruments, data-aware system, human in the loop) as the design-layer realizations of locked architectural commitments #2, #4, #5, #6, and #7. No DRs added. No technology decisions made yet. |
