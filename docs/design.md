@@ -1,8 +1,8 @@
 # Grading Rubric Studio — Design
 
-**Version**: 0.10.1
+**Version**: 0.11.0
 **Date**: 2026-04-11
-**Status**: Architectural overview filled; technology-stack decisions #1–#8 locked; data models and DR groups still to be filled
+**Status**: Architectural overview filled; **all 11 technology-stack decisions locked**; data models and DR groups still to be filled
 **Author**: Wiktor Lisowski
 
 ---
@@ -170,9 +170,9 @@ Each technology decision deferred from the SR layer is tracked in the register b
 | 6 | Schema language for the *Explained rubric file* | **decided** | Pydantic is the single source of truth; a `make schemas` step emits a versioned JSON Schema file that ships alongside the deliverable; the front-end derives its TypeScript types and zod validators from the same JSON Schema | § 3.6 |
 | 7 | Configuration mechanism and secret handling | **decided** | `pydantic-settings` `Settings` class as the typed loader; environment variables as the only runtime source; gitignored `.env` for dev convenience; secrets held as `SecretStr`; workflows registered with an external orchestrator declare required secret *names*, not values | § 3.7 |
 | 8 | Caching strategy | **decided** | No application-level cache. Cost is not a concern; cross-run deduplication is the external orchestrator's job at the task granularity; transient-error retries are the Anthropic SDK's job; test reproducibility is handled by mocking at the Gateway seam. | § 3.8 |
-| 9 | Deterministic execution policy | pending | — | § 3.9 |
-| 10 | Deployment topology, packaging | pending | — | § 3.10 |
-| 11 | Orchestration layer | pending | — | § 3.11 |
+| 9 | Deterministic execution policy | **decided** | Temperature 0 for single-sample extraction/classification calls, temperature > 0 for `samples > 1` reliability measurements, model pinned to a snapshot version when the provider publishes one; bit-identity explicitly *not* claimed — the guarantee is measurement-level stability plus audit-level reconstructability | § 3.9 |
+| 10 | Deployment topology, packaging | **decided** | FastAPI back-end; pip-installable Python project via `pyproject.toml` with console-script entry points for the API server and the CLI; Vite static build for the front-end; a top-level `Makefile` is the single entry-point surface (`install` / `dev` / `build` / `test` / `schemas`) | § 3.10 |
+| 11 | Orchestration layer | **decided** | None embedded in the deliverable — default mode is a single Python process plus a static SPA; the hermetic-task structure of § 2.2 makes the same code wrappable by any external engine, with one concrete reference example in § 5.11 *DR-DEP* | § 3.11 |
 
 Locked architectural commitments from `CLAUDE.md` § 6 (not re-litigated here): Anthropic as the default LLM provider; pluggable backend; Validance as one possible execution layer (not embedded in the deliverable).
 
@@ -404,7 +404,95 @@ The positive consequences of **not** building a cache are:
 - **One source of truth per run.** With no cache, an audit bundle describes *everything* the run did. With a cache, part of the story is *"we did not run this step because a previous run had the same key"*, which the audit bundle would have to reconstruct after the fact. Removing the cache removes this whole category of audit-log complexity.
 - **Orchestrator compatibility is clean.** Under Validance (or any other external engine), the engine's task-level cache works exactly as designed. The application does not fight it, does not shadow it, and does not need to know it exists.
 
-- **What this decision does not commit.** Deterministic execution (temperature, seed, sampling discipline) is decision **#9** (§ 3.9). The test fixture strategy for mocking `gateway.measure()` is a DR-LLM concern (§ 5.2). The orchestrator's cache behaviour is out of scope for this document — we rely on it being present in any orchestrated deployment without specifying its implementation.
+- **What this decision does not commit.** Deterministic execution (temperature, sampling discipline) is decision **#9** (§ 3.9). The test fixture strategy for mocking `gateway.measure()` is a DR-LLM concern (§ 5.2). The orchestrator's cache behaviour is out of scope for this document — we rely on it being present in any orchestrated deployment without specifying its implementation.
+
+### 3.9 Deterministic execution policy
+
+**Decision.** The application makes two separate claims about reproducibility:
+
+1. **Bit-identical reproducibility of LLM outputs is explicitly *not* claimed.** It is not achievable for hosted LLM inference in 2026, regardless of temperature settings, and claiming it would mislead a reviewer.
+2. **What is claimed is (a) *measurement-level stability* — the same structured finding is returned for the overwhelming majority of inputs across repeated runs — and (b) *audit-level reconstructability* — every call's prompt hash, schema hash, inputs, model identifier, temperature, and raw response are recorded, so a reviewer can reconstruct what happened on any past run.**
+
+The operational rules that flow from these claims:
+
+| Call class | Temperature | Samples | Why |
+|---|---|---|---|
+| Extraction, classification, "single correct answer" measurements | `0.0` | `1` | Token-level flips are rare at temperature 0; the tool-use structured output collapses any remaining surface variation to the same Pydantic value. |
+| Reliability measurements that drive the *confidence indicator* (grader panels, paraphrase agreement, span-level ambiguity) | `> 0.0` (default `0.7`) | `k > 1` (default `5`) | Spread across samples *is* the signal. Forcing temperature 0 here would defeat the purpose. |
+
+The default model pointer (`claude-sonnet-4-6` in § 3.1) is replaced by a specific snapshot version whenever the provider publishes one. The pinned snapshot is stored in the `default_model` field of the `Settings` class (§ 3.7) and recorded in every audit bundle entry.
+
+**Rationale.**
+
+- **Why not claim bit-identity.** Temperature 0 does not make hosted LLM inference deterministic. GPU floating-point non-associativity and server-side batching effects produce logits that differ in the last few bits between runs, and at a near-tie those bits decide the argmax token. The Anthropic Messages API does not currently expose a `seed` parameter (unlike OpenAI's *"mostly deterministic"* `seed` + `system_fingerprint` pair), so there is no knob to ask the provider for stronger guarantees. Claiming bit-identity in a design document is factually wrong and a red flag to any reviewer who has run production LLM workloads.
+- **Why temperature 0 for single-sample calls anyway.** It is still the right choice for measurements that have one correct answer — extraction, classification, JSON field population. At temperature 0, token-level flips are rare enough that the *structured* output (the Pydantic object returned by the tool call) is empirically stable across runs for the overwhelming majority of inputs. The tool-use schema from § 3.2 acts as a projection that collapses surface-level variation to the same measurement value, which further stabilises the result.
+- **Why temperature > 0 for sampling calls.** Determinism here is explicitly *unwanted*. The grader panel, the paraphrase agreement measurement, and the span-level ambiguity measurement all draw `k` samples *because* they want to observe disagreement. Forcing temperature 0 would flatten the spread to near-zero, hide genuine ambiguity, and produce an inflated *confidence indicator*. The statistical signal depends on the temperature being non-zero; `0.7` is the default unless a specific measurement has calibrated a different value.
+- **Why pin the model to a snapshot version.** `claude-sonnet-4-6` is a provider-maintained pointer that can be silently updated. A reviewer running the same deliverable a month later against an updated snapshot is running a subtly different measurement instrument. Pinning to a published snapshot tag turns *"we used Sonnet"* into *"we used Sonnet at this specific weights version"* — a meaningfully stronger claim, at no cost.
+- **Why audit-level reconstructability is the honest guarantee.** The audit bundle (§ 5.8 *DR-OBS*) records the prompt hash, the schema hash, the inputs hash, the pinned model identifier, the temperature, the number of samples, and the raw response of every LLM call. This does not let a reviewer **reproduce** a past run (that requires a time machine for the inference server's internal state), but it lets them **reconstruct** exactly what the system did, examine the inputs and outputs, and decide whether the measurement was reasonable. For an engineering-rigor deliverable, *reconstructability* is the meaningful property; *reproducibility* is a marketing word.
+
+- **What this decision does not commit.** The numerical default of `k` (number of samples for reliability measurements) and the per-measurement temperature calibration are DR-LLM concerns (§ 5.2). The exact format of audit bundle entries is a DR-OBS concern (§ 5.8). The fallback behaviour when the provider deprecates a pinned snapshot is an operational concern, not a design one, and is noted in § 5.11 *DR-DEP*.
+
+### 3.10 Deployment topology, packaging
+
+**Decision.** The application ships as **two artefacts that together form one deliverable**:
+
+1. **A Python package** for the back-end (Orchestrator, Input Parser, Assessment Engine, Improvement Generator, Output Writer, LLM Gateway, Audit Recorder). Packaging uses `pyproject.toml` (PEP 621). Two console-script entry points are exposed:
+   - `grading-rubric-api` — runs the FastAPI HTTP server that the front-end talks to.
+   - `grading-rubric-cli` — runs a single assessment end-to-end from the command line without the front-end, driving the same Orchestrator over the same hermetic tasks.
+2. **A Vite static build** for the front-end (SPA from § 3.3). Output is a directory of static files (`index.html`, JS bundles, CSS, assets) that any static file server can serve.
+
+The HTTP server is **FastAPI** (locking the deferred "specific Python HTTP server" question from § 3.3 and § 3.7):
+
+- **FastAPI is Pydantic-native.** The same Pydantic classes that define the LLM structured-output schemas (§ 3.2), the `ExplainedRubricFile` contract (§ 3.6), and the `Settings` loader (§ 3.7) become the API response and request bodies with no second mapping layer. Contract drift between the internal models and the API is structurally impossible.
+- **FastAPI generates an OpenAPI document from the route signatures at runtime**, which is the natural transport contract for the SPA's `fetch` layer and an inspectable artefact for a reviewer.
+- **Async is native**, which matches the streaming-progress requirement SR-UI-04 and the polling model TanStack Query uses on the front-end.
+
+A top-level `Makefile` is the single entry-point surface a reviewer actually touches:
+
+| Target | What it does |
+|---|---|
+| `make install` | Creates a Python virtualenv, installs the back-end package in editable mode, runs `npm install` / `bun install` in the front-end. |
+| `make dev` | Starts the FastAPI back-end on `127.0.0.1:8765` and the Vite dev server on `127.0.0.1:5173` with HMR. |
+| `make build` | Runs the Vite production build; outputs the static SPA to `frontend/dist/`. |
+| `make test` | Runs `pytest` for the back-end, `vitest` for the front-end unit tests, and `playwright test` for the front-end E2E tests. |
+| `make schemas` | Regenerates `schemas/explained_rubric_file.v*.schema.json` from the Pydantic source of truth (§ 3.6), plus the generated TypeScript types and zod validators. |
+| `make run` | Convenience target that runs `make build` and then starts the back-end in a single process that also serves the built SPA as static files — the "reviewer clones and runs the deliverable" path. |
+
+The repository layout is two top-level directories (`backend/` for the Python package, `frontend/` for the Vite project) plus the top-level `Makefile`, `README.md`, `.env.example`, and `schemas/` directory. DR-ARC (§ 5.1) and DR-DEP (§ 5.11) specify the internal package layout of each.
+
+**Rationale.**
+
+- **Why FastAPI and not Flask / Starlette / Django.** Starlette alone is too low-level for the automatic Pydantic ↔ API-body integration we actually want. Flask is battle-tested but has no native Pydantic story, and pairing it with one of several Pydantic-for-Flask adapters adds a layer whose only job is to replicate what FastAPI does natively. Django is over-scoped for a single-user local tool with no database, no ORM, and no admin interface. FastAPI is the shape-matched choice, and it is also the lingua franca of modern Python AI back-ends, which minimises the reviewer's surprise.
+- **Why ship a CLI entry point alongside the API server.** The CLI is the direct proof that the back-end is hermetic: a reviewer who does not want to touch the SPA can run `grading-rubric-cli --exam exam.pdf --rubric draft.md` and get an `ExplainedRubricFile` on disk. It is also the entry point that any external orchestrator calls. The same code path, driven from two entry points, is the concrete realisation of the hermetic-task philosophy from § 2.2 on the *invocation* axis.
+- **Why a `Makefile` as the single entry-point surface.** A reviewer should not need to learn the repository's internals to run it. `make install && make run` must work after a fresh clone. A Makefile is the universally-understood "here are the verbs" document; a `README.md` table of commands would drift; a shell script would hide the steps. The Makefile targets are the verbs; their bodies are the documentation.
+- **Why a `make run` target that serves the built SPA from the FastAPI process.** In development the Vite dev server is the right answer (HMR, source maps). For the "clone and demo" path we want one command and one process, no nginx, no separate static server. FastAPI can serve the static SPA from the same process by mounting `frontend/dist/` as a `StaticFiles` route. This keeps the deliverable to one port and one process in demo mode, and the dual-process mode in development.
+- **Why two top-level directories (`backend/` and `frontend/`) rather than a single package.** The two sides are two build systems and two language ecosystems. Physically separating them in the repository tree is the honest representation; a single monolithic tree would obscure which files belong to which build. It also matches the adjacent projects' layout in this repository group, so a reviewer familiar with any one of them knows where to look.
+- **Why not ship a Docker image as the primary deliverable.** Docker is a valid secondary target (a `Dockerfile` in `backend/` is trivial once the Python package exists), but the primary path must be `git clone && make install && make run` on a developer machine, because that is the path the reviewer will actually take. Anchoring the deliverable to a Docker image would force the reviewer to have Docker running and would add a build step between their clone and their first output; that is friction with no corresponding benefit for a single-user local tool.
+
+- **What this decision does not commit.** The exact set of API routes, request/response shapes, and status codes is a DR-DEP concern (§ 5.11) and will be filled alongside DR-UI (§ 5.6). The internal package layout of `backend/` (modules, dependency direction, import rules) is DR-ARC (§ 5.1). The Docker image, if we ship one, and the CI pipeline, if we ship one, are packaging refinements that do not change the core decision.
+
+### 3.11 Orchestration layer
+
+**Decision.** The deliverable embeds **no orchestration layer**. The default mode of the application is a single Python process (started by `make run` or `grading-rubric-api`) plus a static SPA, and one run of one assessment is driven by the in-process Orchestrator module from § 2.1. Nothing more is built, required, or shipped.
+
+This satisfies the locked architectural commitment #4 from `CLAUDE.md` § 6 directly: *the deliverable runs standalone with no Validance dependency*.
+
+The hermetic-task structure of § 2.2 nonetheless makes the same code **trivially wrappable** by any external orchestration engine. The conditions for the wrap to work are already locked by earlier decisions:
+
+- Each pipeline stage has structured inputs and structured outputs (§ 2.2).
+- The Settings class reads secrets from the environment and never from files committed to the repo (§ 3.7), so a registered workflow is secret-free by construction.
+- The application has no on-disk cache (§ 3.8), so there is no hidden state competing with the orchestrator's task-level cache.
+- Every LLM call is auditable and routed through one Gateway (§ 3.2), so a task restart produces a complete audit trail.
+
+§ 5.11 *DR-DEP* will include a **single concrete reference example** of wrapping the deliverable as a Validance task (catalog entry, task parameters, declared environment variables, expected outputs), as documentation of the orchestrator-ready property — not as a shipping requirement.
+
+**Rationale.**
+
+- **Why no embedded orchestration layer.** Embedding a workflow engine in a single-user local tool adds a dependency that the reviewer has to install, configure, and understand, to solve a problem the reviewer does not have (scheduling, retries across task boundaries, multi-run coordination). The cost is real and the benefit is zero for the default use case. Anything more than *"start the server, open the browser, upload files"* would be a negative feature.
+- **Why keep the architecture orchestrator-ready.** Orchestrator-readiness is free because we already paid for it — the hermetic-task philosophy was locked back in § 2.2, the configuration story in § 3.7, and the no-cache decision in § 3.8. The readiness is a consequence of choices that stand on their own merits.
+- **Why show one concrete Validance wrap in DR-DEP.** A reviewer who reads the design document will see many claims about orchestrator-compatibility; one worked example is what turns those claims into something they can point at. It also makes the boundary between *deliverable* and *orchestration concern* explicit: everything in the main code path is in the deliverable; the Validance wrap is a reference artefact.
+
+- **What this decision does not commit.** The Validance catalog entry itself, the exact task parameters, and the output file registration strategy are DR-DEP concerns (§ 5.11). This decision commits only that *there is no orchestration layer inside the deliverable*.
 
 ---
 
@@ -521,6 +609,7 @@ Every DR shall trace back to at least one SR. Every SR shall be covered by at le
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.11.0 | 2026-04-11 | Wiktor Lisowski | Locked the final three technology decisions. **#9 Deterministic execution (§ 3.9)**: temperature 0 for single-sample extraction/classification, temperature > 0 for `samples > 1` reliability measurements (default `k = 5`, temperature `0.7`), model pinned to a snapshot version when the provider publishes one; bit-identical LLM reproducibility explicitly *not* claimed (GPU floating-point non-determinism, server-side batching, no `seed` parameter on the Anthropic Messages API) — the honest guarantee is measurement-level stability plus audit-level reconstructability via the audit bundle. **#10 Deployment topology and packaging (§ 3.10)**: two artefacts forming one deliverable — a Python package with `pyproject.toml` and two console-script entry points (`grading-rubric-api`, `grading-rubric-cli`) plus a Vite static build for the front-end; FastAPI as the HTTP server (Pydantic-native, no second mapping layer); a top-level `Makefile` (`install` / `dev` / `build` / `test` / `schemas` / `run`) as the single entry-point surface; `make run` serves the built SPA from the FastAPI process for the one-command demo path; repository layout is `backend/` + `frontend/` + `schemas/` + top-level meta files; Docker is a possible secondary target, not the primary path. **#11 Orchestration layer (§ 3.11)**: none embedded in the deliverable — default mode is a single Python process plus a static SPA; the hermetic-task structure of § 2.2 makes the same code trivially wrappable by any external engine (the conditions are already paid for by § 3.7 env-only secrets and § 3.8 no-cache); § 5.11 *DR-DEP* will include one concrete Validance wrap as a reference example, not as a shipping requirement. All 11 technology decisions now locked; § 4 *Data models* and § 5 *Design Requirements* are next. |
 | 0.10.1 | 2026-04-11 | Wiktor Lisowski | § 3.8 wording fix: re-cast the *cost of repeated external calls* row to argue from engineering cost and scale rather than from API-key provenance. No change to the decision itself. |
 | 0.10.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #8 (caching strategy) in § 3.8: the application has **no application-level cache**. Cost at this scale is not a decision driver; cross-run deduplication is the external orchestrator's job at task granularity; transient-error retries are the Anthropic SDK's job; reproducibility of tests is handled by mocking at the Gateway seam. Consequences: hermetic tasks stay hermetic (no hidden I/O to a cache directory), audit bundles describe *everything* a run did (no "we did not run this step because of a cache hit" complexity), and orchestrator cache behaviour is unopposed. Cleanups in the same change: removed the *Content cache* module from § 2.1; dropped the cache reference from § 2.3's *one door to the API* bullet; removed `cache_dir` from the illustrative `Settings` class in § 3.7 and dropped its forward reference. Decisions #9–#11 still pending. |
 | 0.9.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #7 (configuration mechanism and secret handling) in § 3.7: single typed `Settings` class built on `pydantic-settings`; process environment variables as the only runtime source; gitignored `.env` for dev convenience loaded automatically when present; committed `.env.example` as the single source of truth for *which* variables exist; secrets held as `SecretStr` so they cannot land in logs, stack traces, or the audit bundle. The same code runs unchanged under an external orchestrator (e.g. Validance): the registered workflow declares the *names* of required secrets, not their values; the orchestrator's secret store injects them into the container's environment at task launch; the task boots the same `Settings` class. Committed artefacts — repo, image, workflow definition — are secret-free by construction. Decisions #8–#11 still pending. |
