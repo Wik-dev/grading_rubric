@@ -1,8 +1,8 @@
 # Grading Rubric Studio — Design
 
-**Version**: 0.4.0
+**Version**: 0.5.0
 **Date**: 2026-04-11
-**Status**: Architectural overview filled; technology-stack decisions #1 and #2 locked; data models and DR groups still to be filled
+**Status**: Architectural overview filled; technology-stack decisions #1, #2, and #3 locked; data models and DR groups still to be filled
 **Author**: Wiktor Lisowski
 
 ---
@@ -166,7 +166,7 @@ Each technology decision deferred from the SR layer is tracked in the register b
 |---|---|---|---|---|
 | 1 | LLM provider, SDK, and default model | **decided** | Anthropic via `anthropic` Python SDK (≥ 0.40); default model `claude-sonnet-4-6`; per-call override supported by the LLM Gateway | § 3.1 |
 | 2 | Prompting and structured-output approach | **decided** | Anthropic tool use for structured output; prompts as content-hashed markdown files with YAML front-matter; Pydantic schemas; retry-once on validation failure; single `gateway.measure()` entry point | § 3.2 |
-| 3 | UI framework | pending | — | § 3.3 |
+| 3 | UI framework | **decided** | Vite + React 18 + TypeScript front-end with shadcn/ui (Radix + Tailwind), React Router, TanStack Query, react-hook-form + zod, Recharts, Sonner; Vitest + Testing Library for unit, Playwright for E2E; talks to the Python back-end over HTTP/JSON | § 3.3 |
 | 4 | File and document parsing libraries | pending | — | § 3.4 |
 | 5 | OCR for handwritten student copies | pending | — | § 3.5 |
 | 6 | Schema language for the *Explained rubric file* | pending | — | § 3.6 |
@@ -220,6 +220,43 @@ The implementation choices behind this signature are:
 - **Why content hashing.** The brief asks for engineering rigor. A reviewer reading an audit bundle should be able to point at any historical run and answer *which prompt was used, in which version, with which schema*. SHA-256 over the rendered prompt and schema is the smallest mechanism that gives a precise answer to that question.
 - **Why retry-once and not retry-N.** Retry-once handles the realistic failure mode (transient validation slip the model can fix when shown the error). Retry-N hides systematic prompt-schema mismatches that should be fixed in the prompt, not papered over with brute force.
 - **Why aggregation lives outside the Gateway.** Different measurements aggregate differently — Krippendorff's α for grader-panel agreement, simple majority vote for classification, mean ± stdev for numeric scores. Putting aggregation in the Gateway would force one shape on all measurements; putting it in the caller keeps the Gateway thin and the measurement logic where it can be unit-tested.
+
+### 3.3 UI framework
+
+**Decision.** The user interface is a **single-page application** built with the following stack:
+
+| Concern | Choice |
+|---|---|
+| Build tool | **Vite** (`@vitejs/plugin-react-swc`) |
+| Language | **TypeScript** (strict) |
+| Framework | **React 18** |
+| Component primitives | **shadcn/ui** (Radix UI primitives + Tailwind variants) |
+| Styling | **Tailwind CSS** with `tailwindcss-animate` and `@tailwindcss/typography` |
+| Routing | **React Router** (`react-router-dom`) |
+| Server state | **TanStack Query** (`@tanstack/react-query`) |
+| Forms and validation | **react-hook-form** + **zod** via `@hookform/resolvers` |
+| Charts | **Recharts** |
+| Notifications | **Sonner** (toasts) |
+| Animation | **Framer Motion** (sparingly) |
+| Icons | **lucide-react** |
+| Unit / component tests | **Vitest** + **@testing-library/react** + **jsdom** |
+| End-to-end tests | **Playwright** |
+
+The SPA is a **separate deployable** from the Python back-end. The two communicate over **HTTP with JSON bodies**. The front-end reads the back-end base URL from a Vite environment variable (`VITE_API_BASE`) so the same build runs against a local dev server, a packaged local application, and any future hosted deployment without code changes.
+
+The specific Python HTTP server that exposes the back-end is the subject of decision **#10 (deployment topology, packaging)** — this decision locks only the boundary (HTTP/JSON) and the front-end stack.
+
+**Rationale.**
+
+- **Why a React SPA rather than Streamlit / Gradio / a Python-native UI.** The user interface described in [`requirements.md`](requirements.md) § 5.1.4 (SR-UI) and sketched in [`ui-draft.md`](ui-draft.md) is not a notebook-style demo. It is a three-screen flow with a side-by-side diff component, per-change accept/reject controls, progress feedback, and re-assessment iteration. Streamlit and Gradio are strong for the *"show a model on a page"* case and weak for the *"custom component with state"* case. A proper front-end framework is the right shape for these screens, and the additional complexity is modest because the stack below is opinionated and production-proven.
+- **Why Vite + React + TypeScript.** This is the de-facto modern React starter. Vite gives fast HMR and a tiny config surface; React 18 is the long-term target for the ecosystem; TypeScript catches interface drift between the front-end and the back-end API contract at build time, which matters specifically because both ends of that contract are under active design in this deliverable.
+- **Why shadcn/ui + Tailwind.** shadcn provides unstyled, accessible Radix primitives with a Tailwind styling layer. Crucially, components are vendored into `src/components/ui/` rather than imported from a runtime dependency — the project owns the source of every primitive it uses, which keeps the dependency surface small and the components trivially customizable. Tailwind avoids the CSS-in-JS vs. stylesheets debate entirely; it matches the "less glue, more leverage" preference expressed in CLAUDE.md § 7.4.
+- **Why TanStack Query.** The front-end's job is to start a run, poll its progress, and render the result — a near-textbook *server state* problem. TanStack Query handles the polling, caching, stale-while-revalidate, and retry concerns that would otherwise be reimplemented by hand in `useEffect` hooks. It is also the clean insertion point for the progress-feedback requirement SR-UI-04.
+- **Why react-hook-form + zod.** The Inputs screen ([`ui-draft.md`](ui-draft.md) § 3.1) has one required field, three optional ones, and non-trivial upload semantics. react-hook-form avoids re-render storms; zod gives the validation schema a single source of truth that *also* generates TypeScript types for the same form. The `@hookform/resolvers` package bridges the two.
+- **Why Recharts.** The *confidence indicator*, the per-criterion score bars, and any reliability/spread visualisations ([`requirements.md`](requirements.md) § 5.2 SR-UI-07) need a charting library. Recharts is composable, accessible, and works inside React's rendering model without imperative canvas code.
+- **Why Vitest + Testing Library + Playwright.** Vitest shares Vite's config and runs unit/component tests against jsdom at native speed. Testing Library enforces the *"test behaviour, not implementation"* discipline that matches the V-model's acceptance-tests-at-the-top of this project. Playwright covers the SR-UI requirements end-to-end in a real browser — the level at which those requirements actually mean something.
+- **Why the HTTP/JSON boundary.** Keeping the UI and the Python back-end as two deployables matches the hermetic-task philosophy (§ 2.2): each side is testable standalone, and the same back-end can be driven from the SPA, from the CLI, or from an external orchestrator without any front-end concerns leaking into the Python modules. It also matches the architecture of the adjacent projects in this repository group, so the deployment story in § 5.11 *DR-DEP* will be a short step from the pattern already in use.
+- **What this decision does not commit.** The Python HTTP server (FastAPI, Flask, Starlette, etc.) is deferred to decision **#10**. Authentication is not in scope — the application is a single-user local tool per [`requirements.md`](requirements.md) § 1.2 *out of scope*. Multi-page vs. multi-route navigation inside the SPA is a DR-UI concern, not a technology-stack concern, and is deferred to § 5.6.
 
 ---
 
@@ -336,6 +373,7 @@ Every DR shall trace back to at least one SR. Every SR shall be covered by at le
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.5.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #3 (UI framework) in § 3.3: single-page application built with Vite + React 18 + TypeScript, shadcn/ui (Radix + Tailwind), React Router, TanStack Query, react-hook-form + zod, Recharts, Sonner, Framer Motion, lucide-react; Vitest + Testing Library for unit/component tests, Playwright for E2E. The SPA is a separate deployable from the Python back-end and talks to it over HTTP/JSON with the base URL configurable via `VITE_API_BASE`. Choice of the specific Python HTTP server deferred to decision #10. Decisions #4–#11 still pending. |
 | 0.4.0 | 2026-04-11 | Wiktor Lisowski | Added § 1.4 *Design glossary* anchoring the design-internal term *Sample (LLM)*. Locked decision #2 (prompting and structured-output approach) in § 3.2: single `gateway.measure(prompt_id, inputs, schema, samples, model)` entry point; Anthropic tool use for structured output (no `instructor` / `langchain` / `dspy`); prompts as markdown files with YAML front-matter; content-hashed prompt + schema identity recorded in the audit bundle; Pydantic validation with retry-once on failure; sampling as a parameter; aggregation left to callers. Decisions #3–#11 still pending. |
 | 0.3.0 | 2026-04-11 | Wiktor Lisowski | Started filling § 3 *Technology stack and decision register*. Decision #1 (LLM provider, SDK, and default model) locked in § 3.1: Anthropic via the `anthropic` Python SDK (≥ 0.40), default model `claude-sonnet-4-6`, single default with per-call override supported by the LLM Gateway. Per-task model routing deferred as a future refinement. Decisions #2–#11 still pending. |
 | 0.2.2 | 2026-04-11 | Wiktor Lisowski | § 2.2: dropped the *"cost of this discipline is real"* framing and the enumeration of forbidden shortcuts (shared state, singletons, implicit caches — implied by *hermetic*). Sentence now states only what the discipline yields. |
