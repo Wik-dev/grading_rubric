@@ -1,8 +1,8 @@
 # Grading Rubric Studio — Design
 
-**Version**: 0.3.0
+**Version**: 0.4.0
 **Date**: 2026-04-11
-**Status**: Architectural overview filled; technology stack, data models, and DR groups still to be filled
+**Status**: Architectural overview filled; technology-stack decisions #1 and #2 locked; data models and DR groups still to be filled
 **Author**: Wiktor Lisowski
 
 ---
@@ -43,6 +43,14 @@ The Design Requirements (DR) here are the layer at which **technology choices, d
 |---|---|
 | [`requirements.md`](requirements.md) | UN, UR, SR, glossary, and traceability. Every DR here traces to at least one SR there. |
 | [`ui-draft.md`](ui-draft.md) | Initial UI sketch. Superseded for design purposes by § 5.6 *DR-UI* once filled. |
+
+### 1.4 Design glossary
+
+This section anchors terms that appear in the design layer but not in [`requirements.md`](requirements.md) § 2. The user-facing glossary in `requirements.md` remains the canonical source for shared vocabulary; entries here are strictly design-internal.
+
+| Term | Definition |
+|---|---|
+| **Sample (LLM)** | One independent draw from the LLM for a given call. The same prompt with the same inputs and the same model can be drawn multiple times; because the model is stochastic, the resulting outputs differ. The system uses multiple samples per call where the *spread across samples* is itself the measurement — for example, when measuring how reliably independent graders agree on the interpretation of a rubric phrase. Tasks that need only a single answer (extraction, classification) draw one sample; tasks that drive an *assessment finding* and a *confidence indicator* draw several. |
 
 ---
 
@@ -157,7 +165,7 @@ Each technology decision deferred from the SR layer is tracked in the register b
 | # | Decision | State | Choice | Rationale ref. |
 |---|---|---|---|---|
 | 1 | LLM provider, SDK, and default model | **decided** | Anthropic via `anthropic` Python SDK (≥ 0.40); default model `claude-sonnet-4-6`; per-call override supported by the LLM Gateway | § 3.1 |
-| 2 | Prompting and structured-output approach | pending | — | § 3.2 |
+| 2 | Prompting and structured-output approach | **decided** | Anthropic tool use for structured output; prompts as content-hashed markdown files with YAML front-matter; Pydantic schemas; retry-once on validation failure; single `gateway.measure()` entry point | § 3.2 |
 | 3 | UI framework | pending | — | § 3.3 |
 | 4 | File and document parsing libraries | pending | — | § 3.4 |
 | 5 | OCR for handwritten student copies | pending | — | § 3.5 |
@@ -180,6 +188,38 @@ Locked architectural commitments from `CLAUDE.md` § 6 (not re-litigated here): 
 - **SDK** — No realistic alternative for a Python application calling Claude.
 - **Default model** — Sonnet 4.6 is the workhorse: strong reasoning at moderate cost. Haiku would underperform on the methodology-dense assessment and improvement tasks; Opus would add marginal capability at substantially higher cost without meaningfully changing what a reviewer sees.
 - **Single default vs. per-task routing** — Routing is more efficient but adds complexity at every call site. It is a refinement that lands cleanly later (the Gateway already supports per-call override), and over-engineering it on day one contradicts the anti-patterns in `CLAUDE.md` § 7.4.
+
+### 3.2 Prompting and structured-output approach
+
+**Decision.** Every LLM call in the system goes through a single function on the LLM Gateway:
+
+```python
+gateway.measure(
+    prompt_id: str,
+    inputs: dict,
+    schema: type[BaseModel],
+    samples: int = 1,
+    model: str | None = None,
+) -> list[BaseModel]
+```
+
+The implementation choices behind this signature are:
+
+- **Structured output via Anthropic *tool use*.** The schema is converted to an Anthropic tool definition; the model is forced to call the tool; the tool arguments are the structured response. No free-text JSON parsing, no `response_format` shims, no third-party wrapper layer (no `instructor`, no `langchain`, no `dspy`).
+- **Prompts as files, not strings in code.** Each `prompt_id` resolves to a file `prompts/{prompt_id}.md` with a YAML front-matter header (`id`, `version`, `description`, `expected_inputs`) followed by the prompt body. Templating uses plain `str.format` placeholders against the `inputs` dict — no Jinja, no second template language.
+- **Content-hashed prompt identity.** The Gateway computes a SHA-256 over the rendered prompt body and the schema definition. The hash is recorded in the *audit bundle* for every call, so the exact prompt and schema used for any past run are reconstructable from disk.
+- **Schemas are Pydantic models.** Each call site declares its expected output as a Pydantic class. Pydantic validates the model's tool arguments before the Gateway returns them.
+- **Retry-once on validation failure.** If validation fails, the Gateway re-issues the call once, appending the validation error message to the prompt context. A second failure raises and is recorded in the audit bundle as a measurement failure for that call. There is no infinite retry loop and no silent fallback to "best-effort" parsing.
+- **Sampling is a parameter, not a separate code path.** `samples=1` covers the extraction-style calls; `samples=k` covers reliability-style measurements where the *spread across samples* is the signal (see § 1.4 *Design glossary*). The Gateway parallelizes the `k` draws but otherwise treats them identically. Aggregation (mean, agreement coefficient, panel inter-rater reliability) is the caller's responsibility, not the Gateway's, because aggregation logic is measurement-specific.
+- **One door to the API.** No module other than the LLM Gateway holds an `anthropic.Anthropic` client. This is what makes the backend pluggable (swap the implementation behind `gateway.measure`), what makes the audit bundle complete (every call passes through one place), and what makes the Content cache effective (the cache key is `(prompt_hash, schema_hash, inputs_hash, model, sample_index)` and lives inside the Gateway).
+
+**Rationale.**
+
+- **Why tool use directly rather than `instructor` / `langchain` / `dspy`.** Each adds a dependency, an abstraction layer, and an opinionated control flow that the audit bundle would have to reverse-engineer. Anthropic tool use is the native mechanism for forcing structured output from Claude; using it directly is the shortest path between the schema and the validated object, and it keeps the dependency footprint to `anthropic` + `pydantic`.
+- **Why prompt files rather than f-strings in code.** Prompts are the most-edited surface of an LLM system. Keeping them in markdown files lets the reviewer read them without reading Python, lets `git diff` show prompt evolution clearly, and gives the audit bundle a stable filename + version + content hash to record. F-strings scattered across modules would scatter the same information across the codebase.
+- **Why content hashing.** The brief asks for engineering rigor. A reviewer reading an audit bundle should be able to point at any historical run and answer *which prompt was used, in which version, with which schema*. SHA-256 over the rendered prompt and schema is the smallest mechanism that gives a precise answer to that question.
+- **Why retry-once and not retry-N.** Retry-once handles the realistic failure mode (transient validation slip the model can fix when shown the error). Retry-N hides systematic prompt-schema mismatches that should be fixed in the prompt, not papered over with brute force.
+- **Why aggregation lives outside the Gateway.** Different measurements aggregate differently — Krippendorff's α for grader-panel agreement, simple majority vote for classification, mean ± stdev for numeric scores. Putting aggregation in the Gateway would force one shape on all measurements; putting it in the caller keeps the Gateway thin and the measurement logic where it can be unit-tested.
 
 ---
 
@@ -296,6 +336,7 @@ Every DR shall trace back to at least one SR. Every SR shall be covered by at le
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.4.0 | 2026-04-11 | Wiktor Lisowski | Added § 1.4 *Design glossary* anchoring the design-internal term *Sample (LLM)*. Locked decision #2 (prompting and structured-output approach) in § 3.2: single `gateway.measure(prompt_id, inputs, schema, samples, model)` entry point; Anthropic tool use for structured output (no `instructor` / `langchain` / `dspy`); prompts as markdown files with YAML front-matter; content-hashed prompt + schema identity recorded in the audit bundle; Pydantic validation with retry-once on failure; sampling as a parameter; aggregation left to callers. Decisions #3–#11 still pending. |
 | 0.3.0 | 2026-04-11 | Wiktor Lisowski | Started filling § 3 *Technology stack and decision register*. Decision #1 (LLM provider, SDK, and default model) locked in § 3.1: Anthropic via the `anthropic` Python SDK (≥ 0.40), default model `claude-sonnet-4-6`, single default with per-call override supported by the LLM Gateway. Per-task model routing deferred as a future refinement. Decisions #2–#11 still pending. |
 | 0.2.2 | 2026-04-11 | Wiktor Lisowski | § 2.2: dropped the *"cost of this discipline is real"* framing and the enumeration of forbidden shortcuts (shared state, singletons, implicit caches — implied by *hermetic*). Sentence now states only what the discipline yields. |
 | 0.2.1 | 2026-04-11 | Wiktor Lisowski | § 2 trim pass: removed redundant repetitions of *"Validance is one possible execution layer"*, *"orchestration-agnostic"*, *"pluggable backend"*, and the mechanical *"design-layer realization of locked architectural commitment #X"* footers from § 2.3 / § 2.4 / § 2.5. Tightened § 2.3 opening paragraph. No content lost; the same points are now made once each. |
