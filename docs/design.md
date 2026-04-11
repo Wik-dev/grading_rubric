@@ -1,8 +1,8 @@
 # Grading Rubric Studio — Design
 
-**Version**: 0.7.0
+**Version**: 0.8.0
 **Date**: 2026-04-11
-**Status**: Architectural overview filled; technology-stack decisions #1–#5 locked; data models and DR groups still to be filled
+**Status**: Architectural overview filled; technology-stack decisions #1–#6 locked; data models and DR groups still to be filled
 **Author**: Wiktor Lisowski
 
 ---
@@ -169,7 +169,7 @@ Each technology decision deferred from the SR layer is tracked in the register b
 | 3 | UI framework | **decided** | Vite + React 18 + TypeScript front-end with shadcn/ui (Radix + Tailwind), React Router, TanStack Query, react-hook-form + zod, Recharts, Sonner; Vitest + Testing Library for unit, Playwright for E2E; talks to the Python back-end over HTTP/JSON | § 3.3 |
 | 4 | File and document parsing libraries | **decided** | `pypdf` for simple PDF text extraction, `pdfplumber` when layout matters, stdlib for `.txt`, `markdown-it-py` for `.md`, `python-docx` for `.docx`; a single `InputParser` module returns a uniform `ParsedDocument` regardless of source format | § 3.4 |
 | 5 | OCR for handwritten student copies | **decided** | Claude Sonnet 4.6 multimodal input as the primary OCR path, invoked through the same LLM Gateway as every other model call; `StudentCopyReader` interface in DR-IO keeps the backend swappable for a dedicated OCR service | § 3.5 |
-| 6 | Schema language for the *Explained rubric file* | pending | — | § 3.6 |
+| 6 | Schema language for the *Explained rubric file* | **decided** | Pydantic is the single source of truth; a `make schemas` step emits a versioned JSON Schema file that ships alongside the deliverable; the front-end derives its TypeScript types and zod validators from the same JSON Schema | § 3.6 |
 | 7 | Configuration mechanism and secret handling | pending | — | § 3.7 |
 | 8 | Caching strategy | pending | — | § 3.8 |
 | 9 | Deterministic execution policy | pending | — | § 3.9 |
@@ -296,6 +296,39 @@ The `InputParser` module delegates to a `StudentCopyReader` interface for every 
 - **Why routing the call through `gateway.measure()` rather than a bespoke OCR code path.** Two concrete benefits: first, the audit bundle becomes complete — every model call, OCR or otherwise, has the same trace shape and the same content-hash identity. Second, the retry-once validation behaviour from § 3.2 applies to OCR failures for free: if the model returns a `TranscribedPage` that does not match the schema (for example, because the image was blank or corrupted), the Gateway retries once with the validation error in context before recording a measurement failure.
 - **What this decision does not commit.** The specific prompt text in `prompts/ocr_student_copy.md`, the exact shape of the `TranscribedPage` schema, the page-splitting strategy for multi-page scans, and the per-page confidence-indicator calibration are all DR-IO concerns and are specified in § 5.7. The decision to use OCR at all — as opposed to asking the teacher to type in transcriptions manually — is implicit in SR-IN-06 and is not revisited here.
 
+### 3.6 Schema language for the *Explained rubric file*
+
+**Decision.** The contract of the *Explained rubric file* (see [`requirements.md`](requirements.md) § 2 and SR-OUT-01 to SR-OUT-05) is expressed as a **Pydantic model** in the Python back-end. At build time, a `make schemas` step calls `model_json_schema()` on that model and writes the result to a versioned file on disk:
+
+```
+schemas/explained_rubric_file.v{MAJOR}.{MINOR}.schema.json
+```
+
+The JSON Schema file is **checked into the repository**. It is the inspectable artefact a reviewer can open without running any Python. The front-end derives two things from the same JSON Schema file:
+
+- **TypeScript types** via `json-schema-to-typescript` (build-time codegen into `src/types/explained-rubric-file.ts`).
+- **Runtime zod validators** via `json-schema-to-zod` (build-time codegen into `src/lib/schemas/explained-rubric-file.ts`).
+
+This means every layer of the system — Python back-end, JSON Schema file, TypeScript types, zod validators — has **one source of truth** and three derived artefacts, all traceable to a single Pydantic class.
+
+The Pydantic model and the JSON Schema file are versioned together following semver on the `ExplainedRubricFile` contract itself, independent of the application version:
+
+- **MAJOR** bump when a field is removed or its type changes incompatibly.
+- **MINOR** bump when a field is added.
+- **Patch** bumps are not used (schema changes are always tracked).
+
+The file itself carries its schema version in a top-level `schema_version` field (SR-OUT-02), so any consumer — the download button in the UI, a reviewer inspecting the JSON, a future graders' tool reading the rubric — can assert the contract it reads against.
+
+**Rationale.**
+
+- **Why Pydantic as the source of truth.** Pydantic is already locked in § 3.2 as the validation layer for LLM structured outputs. Reusing it for the deliverable file's contract means one validation library, one schema format, one mental model. A call to `gateway.measure(..., schema=ExplainedRubricFile)` and a call to `ExplainedRubricFile.model_validate_json(downloaded_file)` share the same class — there is no second definition to drift.
+- **Why also emit a standalone JSON Schema file.** The brief asks for a JSON file as the deliverable. The reviewer should be able to look at the shape of that file without running any Python. A standalone JSON Schema file is that inspection artefact: self-describing, language-agnostic, and directly consumable by any JSON-Schema-aware tool (`jq`, IDE plugins, API documentation generators).
+- **Why generated, not hand-written, JSON Schema.** Hand-writing the JSON Schema alongside the Pydantic class would immediately create a drift surface between two definitions of the same contract. Pydantic's `model_json_schema()` emits a JSON-Schema-draft-2020-12 document directly from the class — the Python class is the definition, and the file is its projection.
+- **Why generate TypeScript types and zod validators from the JSON Schema rather than writing them by hand.** Same argument at the front-end boundary: the TypeScript types and the zod validators are projections of the JSON Schema, not independent rewrites. The build pipeline fails if the generated TypeScript does not compile, which catches contract-drift at front-end build time rather than at runtime in the teacher's browser.
+- **Why a checked-in schema file rather than serving it from the back-end API.** The schema is not runtime data — it is a build-time artefact of the code that produced it. Checking it in makes the contract part of the codebase's version history, and it makes the reviewer's first question (*"what does the output file look like?"*) answerable by opening one file on GitHub. A runtime `GET /api/schema` endpoint adds nothing and creates a second path to the same information.
+- **Why an independent version on the schema itself.** The application might ship many releases without changing the contract shape; conversely, a contract change might happen on a mid-release refactor. Tying the schema version to the application version would either delay needed bumps or force spurious ones. A separate semver on `ExplainedRubricFile` lets the contract evolve at its own pace and lets consumers assert what they rely on.
+- **What this decision does not commit.** The *content* of the schema — the specific fields of `ExplainedRubricFile`, their types, their required/optional status — is § 4 *Data models* and § 5.3 *DR-DAT*. The versioning policy for the schemas of *non-deliverable* objects (Assessment finding, Proposed change, Audit bundle) is also a DR-DAT concern; this decision covers the deliverable file only.
+
 ---
 
 ## 4. Data models
@@ -411,6 +444,7 @@ Every DR shall trace back to at least one SR. Every SR shall be covered by at le
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.8.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #6 (schema language for the *Explained rubric file*) in § 3.6: the Pydantic class is the single source of truth; a `make schemas` build step emits a versioned `schemas/explained_rubric_file.vMAJOR.MINOR.schema.json` file that is checked into the repo as the language-agnostic inspection artefact for reviewers; the front-end derives TypeScript types (`json-schema-to-typescript`) and runtime zod validators (`json-schema-to-zod`) from the same JSON Schema file; the deliverable JSON carries its `schema_version` in a top-level field and the schema is versioned independently of the application. Decisions #7–#11 still pending. |
 | 0.7.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #5 (OCR for handwritten student copies) in § 3.5: Claude Sonnet 4.6 multimodal input as the primary OCR backend, invoked through the same `gateway.measure()` entry point as every other model call (same caching, same audit logging, same retry-once validation). The `InputParser` delegates to a `StudentCopyReader` interface whose contract is specified in § 5.7 *DR-IO*; a dedicated-OCR backend (Azure Document Intelligence, Textract, Cloud Vision, TrOCR, etc.) can replace the primary implementation without touching any other module. Avoids adding a second cloud dependency beyond Anthropic. Decisions #6–#11 still pending. |
 | 0.6.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #4 (file and document parsing libraries) in § 3.4: a single `InputParser` module with one entry point per format, returning a uniform `ParsedDocument` (text + metadata + provenance). Libraries: `pypdf` as the default PDF extractor with `pdfplumber` as a layout-aware fallback; stdlib + `charset-normalizer` for `.txt`; `markdown-it-py` for `.md`; `python-docx` for `.docx`. OCR for handwritten copies remains decision #5. Decisions #5–#11 still pending. |
 | 0.5.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #3 (UI framework) in § 3.3: single-page application built with Vite + React 18 + TypeScript, shadcn/ui (Radix + Tailwind), React Router, TanStack Query, react-hook-form + zod, Recharts, Sonner, Framer Motion, lucide-react; Vitest + Testing Library for unit/component tests, Playwright for E2E. The SPA is a separate deployable from the Python back-end and talks to it over HTTP/JSON with the base URL configurable via `VITE_API_BASE`. Choice of the specific Python HTTP server deferred to decision #10. Decisions #4–#11 still pending. |
