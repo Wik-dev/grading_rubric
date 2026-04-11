@@ -1,8 +1,8 @@
 # Grading Rubric Studio — Design
 
-**Version**: 0.6.0
+**Version**: 0.7.0
 **Date**: 2026-04-11
-**Status**: Architectural overview filled; technology-stack decisions #1–#4 locked; data models and DR groups still to be filled
+**Status**: Architectural overview filled; technology-stack decisions #1–#5 locked; data models and DR groups still to be filled
 **Author**: Wiktor Lisowski
 
 ---
@@ -168,7 +168,7 @@ Each technology decision deferred from the SR layer is tracked in the register b
 | 2 | Prompting and structured-output approach | **decided** | Anthropic tool use for structured output; prompts as content-hashed markdown files with YAML front-matter; Pydantic schemas; retry-once on validation failure; single `gateway.measure()` entry point | § 3.2 |
 | 3 | UI framework | **decided** | Vite + React 18 + TypeScript front-end with shadcn/ui (Radix + Tailwind), React Router, TanStack Query, react-hook-form + zod, Recharts, Sonner; Vitest + Testing Library for unit, Playwright for E2E; talks to the Python back-end over HTTP/JSON | § 3.3 |
 | 4 | File and document parsing libraries | **decided** | `pypdf` for simple PDF text extraction, `pdfplumber` when layout matters, stdlib for `.txt`, `markdown-it-py` for `.md`, `python-docx` for `.docx`; a single `InputParser` module returns a uniform `ParsedDocument` regardless of source format | § 3.4 |
-| 5 | OCR for handwritten student copies | pending | — | § 3.5 |
+| 5 | OCR for handwritten student copies | **decided** | Claude Sonnet 4.6 multimodal input as the primary OCR path, invoked through the same LLM Gateway as every other model call; `StudentCopyReader` interface in DR-IO keeps the backend swappable for a dedicated OCR service | § 3.5 |
 | 6 | Schema language for the *Explained rubric file* | pending | — | § 3.6 |
 | 7 | Configuration mechanism and secret handling | pending | — | § 3.7 |
 | 8 | Caching strategy | pending | — | § 3.8 |
@@ -281,6 +281,20 @@ The per-format implementations are:
 - **Why `python-docx` rather than converting `.docx` to `.pdf` first.** Round-tripping through PDF loses the document's native structure (styles, headings, numbered lists) that `python-docx` exposes directly. The dependency is small and the output is higher-fidelity than any conversion chain.
 - **Why stdlib + `charset-normalizer` for `.txt`.** Plain text is a trap: the file is almost always ASCII or UTF-8, but the one time it is not, a silent decoding error corrupts the exam question. `charset-normalizer` is a tiny, pure-Python encoding detector that fails loudly when the input is unreadable rather than returning garbage.
 - **What this decision does not commit.** OCR for handwritten student copies is decision **#5** (§ 3.5). The content-cache strategy that keys on the content hash of parsed documents is decision **#8** (§ 3.8). The shape of the `ParsedDocument` data class itself is a DR-IO concern and is specified in § 5.7.
+
+### 3.5 OCR for handwritten student copies
+
+**Decision.** Handwritten student copies are transcribed by sending each page as a multimodal image input to **Claude Sonnet 4.6** through the same `gateway.measure()` entry point locked in § 3.2. The OCR call is a normal structured-output measurement: the prompt is `prompts/ocr_student_copy.md`, the output schema is a `TranscribedPage` Pydantic model (per-page text, a confidence indicator, and any "unreadable region" markers), and the call is subject to the same content-hash caching, audit logging, and retry-once validation as every other model call in the system.
+
+The `InputParser` module delegates to a `StudentCopyReader` interface for every file it identifies as a handwritten student copy (either a scanned PDF with no text layer, or a raw image). The primary implementation of that interface is the Claude-backed reader; a dedicated-OCR backend (Azure Document Intelligence, AWS Textract, Google Cloud Vision, or a self-hosted TrOCR model) can replace it without touching any other module. The interface contract is specified in § 5.7 *DR-IO*.
+
+**Rationale.**
+
+- **Why Claude multimodal as the primary path rather than a dedicated OCR service.** The system already has exactly one external dependency for model calls (Anthropic, locked in § 3.1). Adding a dedicated OCR service would introduce a second cloud dependency, a second set of credentials, a second rate-limit regime, a second billing stream, and a second code path in the audit bundle — all to solve one corner of one input type. Claude Sonnet 4.6 accepts images natively through the existing SDK, so the OCR call uses the same Gateway, the same caching, the same logging, and the same failure semantics as the rest of the system.
+- **Why a multimodal LLM is competitive with dedicated OCR on this task.** Frontier multimodal models are now strong at handwritten-text transcription, particularly when the task is bounded (student answers to a known exam question, not arbitrary scanned archives). The accuracy loss against a specialised service is small, and the specialised service's advantage narrows further once the contextual anchoring of the exam question is added to the prompt — which is natural to do here because the exam question is already in hand.
+- **Why the `StudentCopyReader` interface matters even though there is only one implementation today.** The interface is a defensive seam. If a reviewer wants to see a different OCR backend, or if a future deployment target (EPFL on-prem RCP, local LLMs per CLAUDE.md § 6) rules out cloud multimodal calls, a second implementation slots in without any ripple. This realises the locked architectural commitment #3 (pluggable backend) for the OCR path specifically.
+- **Why routing the call through `gateway.measure()` rather than a bespoke OCR code path.** Two concrete benefits: first, the audit bundle becomes complete — every model call, OCR or otherwise, has the same trace shape and the same content-hash identity. Second, the retry-once validation behaviour from § 3.2 applies to OCR failures for free: if the model returns a `TranscribedPage` that does not match the schema (for example, because the image was blank or corrupted), the Gateway retries once with the validation error in context before recording a measurement failure.
+- **What this decision does not commit.** The specific prompt text in `prompts/ocr_student_copy.md`, the exact shape of the `TranscribedPage` schema, the page-splitting strategy for multi-page scans, and the per-page confidence-indicator calibration are all DR-IO concerns and are specified in § 5.7. The decision to use OCR at all — as opposed to asking the teacher to type in transcriptions manually — is implicit in SR-IN-06 and is not revisited here.
 
 ---
 
@@ -397,6 +411,7 @@ Every DR shall trace back to at least one SR. Every SR shall be covered by at le
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.7.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #5 (OCR for handwritten student copies) in § 3.5: Claude Sonnet 4.6 multimodal input as the primary OCR backend, invoked through the same `gateway.measure()` entry point as every other model call (same caching, same audit logging, same retry-once validation). The `InputParser` delegates to a `StudentCopyReader` interface whose contract is specified in § 5.7 *DR-IO*; a dedicated-OCR backend (Azure Document Intelligence, Textract, Cloud Vision, TrOCR, etc.) can replace the primary implementation without touching any other module. Avoids adding a second cloud dependency beyond Anthropic. Decisions #6–#11 still pending. |
 | 0.6.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #4 (file and document parsing libraries) in § 3.4: a single `InputParser` module with one entry point per format, returning a uniform `ParsedDocument` (text + metadata + provenance). Libraries: `pypdf` as the default PDF extractor with `pdfplumber` as a layout-aware fallback; stdlib + `charset-normalizer` for `.txt`; `markdown-it-py` for `.md`; `python-docx` for `.docx`. OCR for handwritten copies remains decision #5. Decisions #5–#11 still pending. |
 | 0.5.0 | 2026-04-11 | Wiktor Lisowski | Locked decision #3 (UI framework) in § 3.3: single-page application built with Vite + React 18 + TypeScript, shadcn/ui (Radix + Tailwind), React Router, TanStack Query, react-hook-form + zod, Recharts, Sonner, Framer Motion, lucide-react; Vitest + Testing Library for unit/component tests, Playwright for E2E. The SPA is a separate deployable from the Python back-end and talks to it over HTTP/JSON with the base URL configurable via `VITE_API_BASE`. Choice of the specific Python HTTP server deferred to decision #10. Decisions #4–#11 still pending. |
 | 0.4.0 | 2026-04-11 | Wiktor Lisowski | Added § 1.4 *Design glossary* anchoring the design-internal term *Sample (LLM)*. Locked decision #2 (prompting and structured-output approach) in § 3.2: single `gateway.measure(prompt_id, inputs, schema, samples, model)` entry point; Anthropic tool use for structured output (no `instructor` / `langchain` / `dspy`); prompts as markdown files with YAML front-matter; content-hashed prompt + schema identity recorded in the audit bundle; Pydantic validation with retry-once on failure; sampling as a parameter; aggregation left to callers. Decisions #3–#11 still pending. |
