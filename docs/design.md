@@ -1,6 +1,6 @@
 # Grading Rubric Studio — Design
 
-**Version**: 0.2.1
+**Version**: 0.2.2
 **Date**: 2026-04-11
 **Status**: Architectural overview filled; technology stack, data models, and DR groups still to be filled
 **Author**: Wiktor Lisowski
@@ -112,7 +112,7 @@ Each stage in the pipeline (input parsing, assessment, improvement, output writi
 2. **In-process from the orchestrator** — the default mode of the application, where the orchestrator chains the stages.
 3. **External orchestrator** — a workflow engine such as Validance, Snakemake, or Airflow, which schedules each task in its own container and persists its outputs to a shared location.
 
-The cost of this discipline is real: no shortcuts via shared mutable state, no global singletons, no implicit caches. The benefit is that every stage is independently testable, every run is replayable from its inputs, and the system is **orchestration-agnostic** by construction.
+This makes every stage independently testable, every run replayable from its inputs, and the system **orchestration-agnostic** by construction.
 
 ### 2.3 LLMs as measurement instruments
 
@@ -287,6 +287,7 @@ Every DR shall trace back to at least one SR. Every SR shall be covered by at le
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.2.2 | 2026-04-11 | Wiktor Lisowski | § 2.2: dropped the *"cost of this discipline is real"* framing and the enumeration of forbidden shortcuts (shared state, singletons, implicit caches — implied by *hermetic*). Sentence now states only what the discipline yields. |
 | 0.2.1 | 2026-04-11 | Wiktor Lisowski | § 2 trim pass: removed redundant repetitions of *"Validance is one possible execution layer"*, *"orchestration-agnostic"*, *"pluggable backend"*, and the mechanical *"design-layer realization of locked architectural commitment #X"* footers from § 2.3 / § 2.4 / § 2.5. Tightened § 2.3 opening paragraph. No content lost; the same points are now made once each. |
 | 0.2.0 | 2026-04-11 | Wiktor Lisowski | Filled § 2 *Architectural overview*: § 2.1 system diagram (eight modules — UI, Orchestrator, Input Parser, Assessment Engine, Improvement Generator, Output Writer, plus the cross-cutting LLM Gateway / Audit Recorder / Scorer interface / Content cache / Data models), and § 2.2–2.5 stating the four guiding principles (hermetic tasks, LLMs as measurement instruments, data-aware system, human in the loop) as the design-layer realizations of locked architectural commitments #2, #4, #5, #6, and #7. No DRs added. No technology decisions made yet. |
 | 0.1.0 | 2026-04-11 | Wiktor Lisowski | Initial skeleton. Section 1 (intro, scope, references) drafted. Sections 2 (architectural overview), 3 (technology stack and decision register — 11 pending decisions listed), 4 (data models), 5 (eleven DR groups DR-ARC through DR-DEP, each with an intent paragraph), 6 (traceability), and 7 (modlog) created as placeholders to be filled iteratively. No DRs and no technology decisions made yet. |
