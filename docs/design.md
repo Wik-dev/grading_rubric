@@ -1,6 +1,6 @@
 # Grading Rubric Studio — Design
 
-**Version**: 0.2.0
+**Version**: 0.2.1
 **Date**: 2026-04-11
 **Status**: Architectural overview filled; technology stack, data models, and DR groups still to be filled
 **Author**: Wiktor Lisowski
@@ -94,8 +94,6 @@ This section frames the system at a level above any specific technology choice. 
   - Audit Recorder    Captures the per-run trace -> audit bundle.
                       Subscribes to events from every other module.
   - Scorer interface  Abstraction for the train-button capability.
-                      Has a stub train_scorer task; no model trained
-                      for this delivery (commitment #5).
   - Content cache     Content-hashed memoization of expensive calls
                       (LLM, OCR, parsing) keyed by input fingerprint.
   - Data models       Rubric, Assessment finding, Proposed change,
@@ -114,20 +112,18 @@ Each stage in the pipeline (input parsing, assessment, improvement, output writi
 2. **In-process from the orchestrator** — the default mode of the application, where the orchestrator chains the stages.
 3. **External orchestrator** — a workflow engine such as Validance, Snakemake, or Airflow, which schedules each task in its own container and persists its outputs to a shared location.
 
-The cost of this discipline is real: no shortcuts via shared mutable state, no global singletons, no implicit caches. The benefit is also real: every stage is independently testable, every run is replayable from its inputs, and the system is **orchestration-agnostic**. Validance is *one* possible execution layer for this application; the deliverable runs perfectly well without it (per locked architectural commitment #4). The same property is what makes the train-button capability (§ 5.10 *DR-SCR*) cleanly bolt-on rather than woven through the codebase.
+The cost of this discipline is real: no shortcuts via shared mutable state, no global singletons, no implicit caches. The benefit is that every stage is independently testable, every run is replayable from its inputs, and the system is **orchestration-agnostic** by construction.
 
 ### 2.3 LLMs as measurement instruments
 
-The dominant pattern in AI applications today is to treat LLMs as **oracles**: ask the model a question, trust the answer, ship it. This system explicitly does not. The reason is structural: the system's job is *assessing the quality of an assessment artifact* (a rubric used to grade students). An oracle-style LLM call would make the system's output exactly as defensible as the model's last best guess — which is not defensible enough to hand to a teacher who is accountable to their students.
+The dominant pattern in AI applications today is to treat LLMs as **oracles**: ask the model, trust the answer. This system does not. Its job is to *assess the quality of a rubric used to grade students*; an oracle-style call would make its output exactly as defensible as the model's last best guess, which is not defensible enough to hand to a teacher accountable to their students.
 
-Instead, every LLM interaction in this system is a **measurement task** with the following properties:
+Every LLM interaction is therefore framed as a **measurement task** with the following properties:
 
 - **Structured prompt with a defined purpose** — one task per prompt, prompt identifiers logged in the audit bundle (§ 5.8 *DR-OBS*).
 - **Structured output validated against a schema** — JSON conforming to a schema declared at the call site, rejected and retried on validation failure (§ 5.2 *DR-LLM*).
 - **Multiple samples where reliability matters** — for measurements that drive the *confidence indicator* on findings, the gateway draws several samples and reports both the central tendency and the spread.
 - **Classical NLP and statistics inserted wherever they are strictly better** — inter-rater reliability via Krippendorff's α, deterministic span matching for the side-by-side rubric diff, content-hashed caching of identical calls. The LLM is used where its semantic flexibility is the right tool, not as the default for everything.
-
-This is the design-layer realization of locked architectural commitment #2.
 
 ### 2.4 The system is data-aware
 
@@ -140,7 +136,7 @@ The mechanism is the *evidence profile* (defined in [`requirements.md`](requirem
 - the *confidence indicator* on every assessment finding (SR-AS-08);
 - the warnings shown to the teacher in the UI when evidence is thin.
 
-This is the design-layer realization of locked architectural commitment #6. The quantitative rules for translating an evidence profile into a confidence indicator are specified in § 5.4 *DR-AS*.
+The quantitative rules for translating an evidence profile into a confidence indicator are specified in § 5.4 *DR-AS*.
 
 ### 2.5 Human in the loop
 
@@ -151,8 +147,6 @@ Concretely, this principle constrains the design in three ways:
 - **Every proposed change carries a rationale** (SR-IM-03, SR-UI-08). No silent edits.
 - **Per-change accept/reject controls are first-class** (UR-07, SR-UI-09), even though they are only *Could* in the MoSCoW. The architecture supports them; the build prioritization decides whether they ship in this delivery.
 - **Re-assessment after teacher edits** (UR-08, SR-UI-10) is supported by the same hermetic-task structure that supports standalone runs — a re-assessment is just another run with a different starting rubric.
-
-This is the design-layer realization of locked architectural commitment #7.
 
 ---
 
@@ -293,5 +287,6 @@ Every DR shall trace back to at least one SR. Every SR shall be covered by at le
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.2.1 | 2026-04-11 | Wiktor Lisowski | § 2 trim pass: removed redundant repetitions of *"Validance is one possible execution layer"*, *"orchestration-agnostic"*, *"pluggable backend"*, and the mechanical *"design-layer realization of locked architectural commitment #X"* footers from § 2.3 / § 2.4 / § 2.5. Tightened § 2.3 opening paragraph. No content lost; the same points are now made once each. |
 | 0.2.0 | 2026-04-11 | Wiktor Lisowski | Filled § 2 *Architectural overview*: § 2.1 system diagram (eight modules — UI, Orchestrator, Input Parser, Assessment Engine, Improvement Generator, Output Writer, plus the cross-cutting LLM Gateway / Audit Recorder / Scorer interface / Content cache / Data models), and § 2.2–2.5 stating the four guiding principles (hermetic tasks, LLMs as measurement instruments, data-aware system, human in the loop) as the design-layer realizations of locked architectural commitments #2, #4, #5, #6, and #7. No DRs added. No technology decisions made yet. |
 | 0.1.0 | 2026-04-11 | Wiktor Lisowski | Initial skeleton. Section 1 (intro, scope, references) drafted. Sections 2 (architectural overview), 3 (technology stack and decision register — 11 pending decisions listed), 4 (data models), 5 (eleven DR groups DR-ARC through DR-DEP, each with an intent paragraph), 6 (traceability), and 7 (modlog) created as placeholders to be filled iteratively. No DRs and no technology decisions made yet. |
