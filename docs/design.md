@@ -1,8 +1,8 @@
 # Grading Rubric Studio — Design
 
-**Version**: 0.12.1
+**Version**: 0.13.0
 **Date**: 2026-04-11
-**Status**: Architectural overview filled; all 11 technology-stack decisions locked; **§ 4 data models filled (review pass applied)**; DR groups still to be filled
+**Status**: Architectural overview filled; all 11 technology-stack decisions locked; § 4 data models filled (with the v0.13.0 audit-bundle index/detail split); **DR-ARC and DR-DAT filled (23 DRs)**; remaining DR groups still to be filled
 **Author**: Wiktor Lisowski
 
 ---
@@ -850,11 +850,26 @@ class StageRecord(BaseModel):
     operation_ids: list[OperationId] = []   # operations executed inside this stage
 ```
 
+#### Operation kind — closed enum
+
+```python
+class OperationKind(StrEnum):
+    LLM_CALL       = "llm_call"
+    OCR_CALL       = "ocr_call"
+    ML_INFERENCE   = "ml_inference"
+    TOOL_CALL      = "tool_call"
+    HUMAN_DECISION = "human_decision"
+    AGENT_STEP     = "agent_step"
+    DETERMINISTIC  = "deterministic"
+```
+
+`OperationKind` is the closed set of operation kinds the audit layer understands. It is the discriminator value used by `OperationDetails` (below) and the `details_kind` field of `OperationSummary` (the audit bundle's index entries — see *OperationSummary* below). Adding a new kind is a deliberate schema change, not a free-form string append.
+
 #### Operation details — discriminated union
 
 ```python
 class LlmCallDetails(BaseModel):
-    kind: Literal["llm_call"] = "llm_call"
+    kind: Literal[OperationKind.LLM_CALL] = OperationKind.LLM_CALL
     prompt_id: str
     prompt_version: str
     prompt_hash: str
@@ -869,41 +884,41 @@ class LlmCallDetails(BaseModel):
 
 
 class OcrCallDetails(BaseModel):
-    kind: Literal["ocr_call"] = "ocr_call"
+    kind: Literal[OperationKind.OCR_CALL] = OperationKind.OCR_CALL
     backend: str                         # "claude-multimodal","tesseract", ...
     pages: int
     underlying_operation_id: OperationId | None = None  # set when OCR runs through the LLM gateway
 
 
 class MlInferenceDetails(BaseModel):
-    kind: Literal["ml_inference"] = "ml_inference"
+    kind: Literal[OperationKind.ML_INFERENCE] = OperationKind.ML_INFERENCE
     model_id: str
     model_version: str
     confidence: float | None = None
 
 
 class ToolCallDetails(BaseModel):
-    kind: Literal["tool_call"] = "tool_call"
+    kind: Literal[OperationKind.TOOL_CALL] = OperationKind.TOOL_CALL
     tool_name: str
     arguments_digest: str
 
 
 class HumanDecisionDetails(BaseModel):
-    kind: Literal["human_decision"] = "human_decision"
+    kind: Literal[OperationKind.HUMAN_DECISION] = OperationKind.HUMAN_DECISION
     actor: str                           # "teacher","reviewer"
     prompt_shown: str
     decision: str
 
 
 class AgentStepDetails(BaseModel):
-    kind: Literal["agent_step"] = "agent_step"
+    kind: Literal[OperationKind.AGENT_STEP] = OperationKind.AGENT_STEP
     agent_id: str
     step_index: int
     action: str
 
 
 class DeterministicDetails(BaseModel):
-    kind: Literal["deterministic"] = "deterministic"
+    kind: Literal[OperationKind.DETERMINISTIC] = OperationKind.DETERMINISTIC
     function: str                        # e.g. "parse_pdf","compute_evidence_profile"
     library_version: str | None = None
 
@@ -915,7 +930,7 @@ OperationDetails = Annotated[
 ]
 ```
 
-#### OperationRecord, IterationSnapshot, AuditBundle
+#### OperationRecord, OperationSummary, IterationSnapshot, AuditBundle
 
 ```python
 class ErrorRecord(BaseModel):
@@ -936,6 +951,27 @@ class OperationRecord(BaseModel):
     inputs_digest: str
     outputs_digest: str | None           # None when status ∈ {FAILED, SKIPPED} or the operation produced no outputs
     details: OperationDetails
+    error: ErrorRecord | None = None
+
+
+class OperationSummary(BaseModel):
+    """
+    Index entry for an operation in the audit bundle. Carries the
+    cheap, queryable fields needed by the UI and by audit-bundle
+    consumers, plus a pointer to the per-operation detail file
+    that holds the full OperationRecord.
+    """
+    id: OperationId
+    stage_id: str
+    started_at: datetime
+    ended_at: datetime
+    status: OperationStatus
+    attempt: int = 1
+    retry_of: OperationId | None = None
+    inputs_digest: str
+    outputs_digest: str | None
+    details_kind: OperationKind          # closed enum, mirrors the embedded OperationRecord.details.kind
+    details_path: str                    # relative POSIX path from the directory containing audit_bundle.json
     error: ErrorRecord | None = None
 
 
@@ -969,7 +1005,7 @@ class AuditBundle(BaseModel):
     input_provenance: InputProvenance
     evidence_profile: EvidenceProfile
     stages: list[StageRecord]
-    operations: list[OperationRecord]
+    operations: list[OperationSummary]   # index; full OperationRecord per entry lives at operations[i].details_path
     findings: list[AssessmentFinding]
     proposed_changes: list[ProposedChange]
     iteration_history: list[IterationSnapshot] = []   # empty for single-pass runs (SR-AS-09)
@@ -978,6 +1014,8 @@ class AuditBundle(BaseModel):
 ```
 
 **Rationale.** `OperationRecord.details` is a discriminated union, so a future ML classifier path or a human-only path slots into the same audit shape without schema migration. Each retry is its own `OperationRecord` linked via `retry_of`, so the audit trail shows the full chain instead of collapsing it into a single ambiguous status. `validation_retry_count` from § 3.2 is therefore a *derived view* (count of retried operations following the chain), not a stored counter on `LlmCallDetails`. `iteration_history` is the complete trajectory of the SR-AS-09 re-measurement loop and is empty for single-pass runs.
+
+**Index / detail split.** `AuditBundle.operations` carries `OperationSummary` entries, not full `OperationRecord` objects. Each summary is the cheap, queryable view (timing, status, digests, kind) plus a `details_path` pointer to a per-operation JSON file holding the full `OperationRecord`. The on-disk realization is locked in § 5.3 *DR-DAT* — `runs/<run_id>/audit/audit_bundle.json` for the index and `runs/<run_id>/audit/operations/<operation_id>.json` for each detail file — with the index/detail invariant promoted to a `Must` (DR-DAT-07a). The split keeps `audit_bundle.json` small enough for the UI to load eagerly while every `LlmCallDetails.raw_responses` payload (which can be large and which is the privacy-sensitive surface) lives in its own file that is loaded only when a reviewer drills into a specific operation. `details_kind` on the summary is the closed `OperationKind` enum so the UI can filter and group by kind without loading any detail file.
 
 **Privacy note.** The deliverable (`ExplainedRubricFile`, § 4.9) **never contains raw student copy text**. The audit bundle may contain transcribed student text inside `LlmCallDetails.raw_responses` and inside operations linked from `OcrCallDetails.underlying_operation_id`, because faithful reconstruction of a measurement requires the exact input and output. The audit bundle is a local artefact under `runs/<run_id>/`; sharing it is the teacher's decision. The deliverable and the audit bundle are separate files for exactly this reason.
 
@@ -1050,9 +1088,22 @@ DRs are organized below into eleven groups by area. Each group has its own inten
 
 ### 5.1 Architecture and module decomposition (DR-ARC)
 
-*To be filled.*
+Defines the package layout, the module boundaries, the dependency direction, and how the hermetic-task structure allows each pipeline stage to run standalone or via an orchestration layer. Establishes the interface contracts between modules. The shape below realizes § 2's *eight modules + cross-cutting* picture in concrete Python packages and locks the dependency direction in code so a reviewer can verify the V-shape claim by running `pydeps` or reading `__init__.py` files directly.
 
-Defines the package layout, the module boundaries, the dependency direction, and how the hermetic-task structure allows each pipeline stage to run standalone or via an orchestration layer. Establishes the interface contracts between modules.
+| ID | Criticality | Statement | Trace |
+|---|---|---|---|
+| **DR-ARC-01** | Must | The application is a single Python package `grading_rubric` with the sub-packages `models`, `parsers`, `assess`, `improve`, `output`, `scorer`, `gateway`, `audit`, `orchestrator`, `api`, `cli`, `config`. Each sub-package is a proper Python package (has `__init__.py`) and is the *only* place where its concern lives. No other sub-package may import from a private module of another sub-package — only from its public surface (`__init__.py`). | § 2.1, SR-NF-04 |
+| **DR-ARC-02** | Must | Dependency direction is one-way: `api` and `cli` depend on `orchestrator`; `orchestrator` depends on the stage packages (`parsers`, `assess`, `improve`, `output`, `scorer`); stage packages depend on `models`, `gateway`, `audit`, and `config` but **never on each other and never on `orchestrator`, `api`, or `cli`**; `models`, `gateway`, `audit`, and `config` are leaves and depend only on the standard library and pinned third-party libraries. A static check (`pydeps` or equivalent) enforces this graph. | § 2.1 |
+| **DR-ARC-03** | Must | Every pipeline stage exposes a single callable entry point conforming to a `Stage` protocol: `(stage_inputs, settings, audit_emitter) -> stage_outputs`. Stage entry points are pure with respect to global state (no module-level mutable state, no implicit caches, no environment reads outside the injected `settings`), and any filesystem I/O is restricted to (a) reading paths declared on `stage_inputs`, including the `parsers` carve-out for reading the user-supplied input files at well-known locations, and (b) writing through the `audit_emitter`. This is the in-code realization of § 2.2 *hermetic-task philosophy*. | § 2.2, SR-NF-04 |
+| **DR-ARC-04** | Must | The `orchestrator` sub-package owns the stage chain for one run. It instantiates each stage with its dependencies, runs them in the order specified by the run plan, emits stage lifecycle events to `audit`, and enforces the *one run, one in-memory state, no cross-run state* contract. The orchestrator itself is also a stage-protocol-compatible callable so a future external engine can wrap it as a single hermetic task. | § 2.1, § 2.2 |
+| **DR-ARC-05** | Must | The `gateway` sub-package is the **only** module that imports an LLM SDK client (Anthropic by default per § 3.1, others pluggable). All LLM calls in every stage go through `gateway.measure(...)`. OCR for handwritten student copies is *not* a separate "model gateway"; the `parsers` sub-package exposes a `StudentCopyReader` interface (per § 3.5) whose Claude-multimodal implementation calls `gateway.measure(...)` and whose dedicated-OCR implementations (Azure Document Intelligence, Textract, etc.) talk directly to their respective SDKs without crossing the gateway. This keeps "the gateway is the LLM seam" and "OCR backends are pluggable" as two distinct, non-conflicting statements. | § 3.1, § 3.5, SR-NF-02 |
+| **DR-ARC-06** | Must | The `audit` sub-package is a passive subscriber: stages emit lifecycle and operation events through the `audit_emitter` injected by the orchestrator; `audit` aggregates them in memory during the run and is the **sole writer** to `runs/<run_id>/audit/`. No other module reads from or writes to that directory. Concrete on-disk layout is locked in DR-DAT-07. | § 5.8, SR-OBS-01, SR-OBS-02 |
+| **DR-ARC-07** | Must | The `api` sub-package is a thin FastAPI server. Route handlers do nothing beyond input validation against `models`, calling the orchestrator, and serializing the result. No business logic lives in the API layer. | § 3.10 |
+| **DR-ARC-08** | Must | The `cli` sub-package wraps the same orchestrator behind a console-script entry point (`grading-rubric-cli`). The CLI and the API exercise *exactly the same* orchestrator code path; the CLI is not a parallel implementation. | § 3.10 |
+| **DR-ARC-09** | Must | A single `Settings` object (per § 3.7) is built once at process boot from the environment, validated, and injected into the orchestrator. Stages receive `settings` as an argument and **must not mutate it**. There is no global `settings` singleton readable from arbitrary code. | § 3.7 |
+| **DR-ARC-10** | Must | The front-end SPA (per § 3.3) is a separate deployable. It depends on the back-end only through `api`'s HTTP/JSON contract — typed by JSON Schema generated from `models` (per § 3.6 and DR-DAT-03 below). It does **not** import any Python code, share a process, or read local files outside its build artefacts. | § 3.3, § 3.10 |
+| **DR-ARC-11** | Should | Each stage sub-package is testable in isolation by passing a stub `audit_emitter` and a stub `gateway`, with no orchestrator and no FastAPI process required. This is a structural property (it follows from DR-ARC-03 and DR-ARC-05) that the unit-test layer of the V-shape relies on. | § 2.2 |
+| **DR-ARC-12** | Should | The public Python surface of the package is exactly what `grading_rubric.__init__` re-exports — the orchestrator entry point, the public `models`, and the `Settings` class. Anything else is internal and may change without a schema-version bump. | DR-DAT-05 |
 
 ### 5.2 LLM usage (DR-LLM)
 
@@ -1062,9 +1113,21 @@ Defines prompt design (one prompt per measurement task, structured outputs), sam
 
 ### 5.3 Data models and persistence (DR-DAT)
 
-*To be filled.*
+Realizes the schemas defined in § 4 in code. Defines validation, serialization, schema versioning and codegen, the hashing rules used by every digest field, and the (intentionally minimal) on-disk persistence model — the application has no cross-session storage (per [`requirements.md`](requirements.md) § 1.2 *out of scope*) but does write the audit bundle and the explained rubric file to disk under `runs/<run_id>/`.
 
-Realizes the schemas defined in § 4 in code. Defines validation, serialization, and the (intentionally minimal) persistence model — the application has no cross-session storage (per [`requirements.md`](requirements.md) § 1.2 *out of scope*) but does write the audit bundle and the explained rubric file to disk.
+| ID | Criticality | Statement | Trace |
+|---|---|---|---|
+| **DR-DAT-01** | Must | All shapes from § 4 are realized as Pydantic v2 models in the `grading_rubric.models` sub-package. The Pydantic class is the single source of truth — no parallel hand-written dataclasses, no parallel JSON Schema files. | § 3.6, § 4.1 |
+| **DR-DAT-02** | Must | All contract models — `Rubric`, `AssessmentFinding`, `ProposedChange`, `Explanation`, `EvidenceProfile`, `AuditBundle`, `OperationSummary`, `OperationRecord`, `ExplainedRubricFile` and the discriminated unions they reach — are configured `model_config = ConfigDict(strict=True)`. Strict mode rejects type-coercion of inputs (no `"1"` → `1`, no `"true"` → `True`, no `"2025-01-01"` → `datetime` from a non-ISO string), so contract violations fail loudly at the boundary instead of silently degrading. Two carve-outs: (a) the `parsers` sub-package may apply controlled coercion when reading user-supplied files (text, PDF metadata, etc.) — its job is exactly to turn loose input into strict models — and (b) LLM tool-use responses arrive as JSON which is parsed by `json.loads` first and then validated against the strict model. The strictness is on the *Pydantic boundary*, not on the upstream byte-level format. | § 3.2, § 4.1, SR-NF-04 |
+| **DR-DAT-03** | Must | A `make schemas` target regenerates JSON Schema files for every top-level shape (`Rubric`, `AuditBundle`, `OperationRecord`, `OperationSummary`, `ExplainedRubricFile`) into `schemas/`. The regenerated files are checked into the repository so a reviewer can inspect the wire format without running Python. CI fails if the generated files drift from the committed ones. | § 3.6 |
+| **DR-DAT-04** | Should | The `make schemas` target also regenerates the front-end TypeScript types (via `json-schema-to-typescript`) and the runtime zod validators (via `json-schema-to-zod`) into `frontend/src/generated/`. The front-end never hand-writes types for any shape that crosses the API boundary. | § 3.3, § 3.6 |
+| **DR-DAT-05** | Must | Every top-level shape carries a `schema_version` string and is versioned independently of the application version, following semver. An incompatible field change bumps the shape's MAJOR version; an additive field change bumps MINOR; a clarification or doc-only change bumps PATCH. The `make schemas` target writes versioned files (`explained_rubric_file.v<MAJOR>.<MINOR>.schema.json`) so older deliverables remain readable against the matching schema. | § 3.6, § 4.10 |
+| **DR-DAT-06** | Must | All identifier fields typed as `RubricId`, `LevelId`, `RunId`, `OperationId`, `FindingId`, `ChangeId` are `uuid.UUID` instances at runtime (the type aliases of § 4.1 are real `uuid.UUID`, not `str`). All datetimes are timezone-aware UTC `datetime` instances; naive datetimes are rejected. All string-valued enums are realized as `StrEnum`. Hashing rule, applied uniformly to every digest field in § 4 (`prompt_hash`, `schema_hash`, `arguments_digest`, `inputs_digest`, `outputs_digest`, `*_hash` on `InputProvenance`, etc.): **(a)** *file* hashes are SHA-256 of the raw file bytes, **(b)** *text content* hashes are SHA-256 of the UTF-8 encoding of the text, **(c)** *structured-object* digests are SHA-256 of the canonical-JSON UTF-8 encoding (`sort_keys=True`, `separators=(",",":")`, `ensure_ascii=False`, ISO-8601 datetime strings, UUIDs as their canonical hyphenated string form). Each digest field's docstring states which of the three cases applies. | § 4.1, § 4.8 |
+| **DR-DAT-07** | Must | A run writes the following layout under `runs/<run_id>/` (and nothing else): `explained_rubric.json` (the deliverable, written by the `output` stage); `audit/audit_bundle.json` (the audit-bundle index, written by the `audit` sub-package); `audit/operations/<operation_id>.json` (one file per `OperationRecord`, written by the `audit` sub-package). The `audit` sub-package is the sole writer under `audit/` (per DR-ARC-06); the `output` stage is the sole writer of `explained_rubric.json`. No other module writes anywhere under `runs/<run_id>/`. The atomic-write temp files of DR-DAT-08 are an implementation-internal exception to "nothing else": they live next to the target file with a `.tmp-<uuid>` suffix and are renamed before any other process can observe them. | § 5.8, § 5.9, SR-OBS-01, SR-OBS-02 |
+| **DR-DAT-07a** | Must | Index/detail invariant on the audit bundle. Every entry in `audit_bundle.json`'s `operations` array references — via `details_path`, resolved relative to the directory containing `audit_bundle.json` — an existing per-operation file at `audit/operations/<operation_id>.json`, and conversely every per-operation file is referenced by exactly one summary entry. The `audit` sub-package is the sole writer of both sides and writes them as a single logical commit (all per-operation files first, then `audit_bundle.json` last) so a partial run on disk is still consistent. A startup self-check on load fails the run if the invariant is violated. | § 4.8, SR-OBS-01 |
+| **DR-DAT-08** | Should | Files under `runs/<run_id>/` are written atomically: write to a sibling temp file, `fsync`, then `os.rename` over the target. This protects a reviewer who reads the deliverable while a re-measurement iteration is still running. | § 5.9 |
+| **DR-DAT-09** | Must | The application has no database, no ORM, no cross-session state of any kind. `runs/` is a flat directory of independent run sub-directories; no run ever reads from another run's directory. Removing any `runs/<run_id>/` directory has no effect on any other run. | requirements.md § 1.2 |
+| **DR-DAT-10** | Should | The `runs/` root directory is configurable through `Settings.audit_bundle_dir` (per § 3.7) so the same code can write to a host bind-mount, a tmpfs in CI, or a Validance task work directory without code changes. The default is `./runs/` relative to the process working directory. | § 3.7, § 3.11 |
 
 ### 5.4 Assessment algorithms (DR-AS)
 
@@ -1138,6 +1201,7 @@ Every DR shall trace back to at least one SR. Every SR shall be covered by at le
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| 0.13.0 | 2026-04-11 | Wiktor Lisowski | **First DR fill: § 5.1 *DR-ARC* (12 DRs) and § 5.3 *DR-DAT* (11 DRs, including DR-DAT-07a) — 23 new Design Requirements.** Also a small surgical update to § 4.8 to support the new audit-bundle layout introduced by DR-DAT-07. **§ 4.8 changes.** Added a closed `OperationKind` `StrEnum` with the seven operation kinds (`LLM_CALL`, `OCR_CALL`, `ML_INFERENCE`, `TOOL_CALL`, `HUMAN_DECISION`, `AGENT_STEP`, `DETERMINISTIC`); updated each `*Details` variant class to use `kind: Literal[OperationKind.X] = OperationKind.X` instead of bare strings, so the discriminator value is now a closed enum and not a free-form append. Added a new `OperationSummary` model — the cheap, queryable index entry for an operation, carrying timing, status, digests, `details_kind: OperationKind`, and a `details_path: str` pointer (relative to the directory containing `audit_bundle.json`) to a per-operation JSON file holding the full `OperationRecord`. Changed `AuditBundle.operations: list[OperationRecord]` to `AuditBundle.operations: list[OperationSummary]`. The full `OperationRecord` shape is unchanged; what changed is *where it lives on disk* and *what the audit bundle's index entry looks like*. Added an *Index / detail split* paragraph to the § 4.8 rationale explaining the layout, the privacy motivation (`LlmCallDetails.raw_responses` payloads stay in their own per-operation files, loaded only on drill-in), and pointing to DR-DAT-07 / DR-DAT-07a for the on-disk realization. **§ 5.1 DR-ARC.** Twelve DRs locking the package layout (`grading_rubric` with sub-packages `models`, `parsers`, `assess`, `improve`, `output`, `scorer`, `gateway`, `audit`, `orchestrator`, `api`, `cli`, `config` — DR-ARC-01), the one-way dependency graph enforced by a static check (DR-ARC-02), the `Stage` protocol with hermetic-task discipline and a parsers carve-out for reading user-supplied input files (DR-ARC-03), the orchestrator as the stage chain owner and itself a stage-protocol-compatible callable wrappable as a single hermetic task (DR-ARC-04), the gateway as the only LLM-SDK-importing module with OCR backends pluggable via a `StudentCopyReader` interface (DR-ARC-05, narrowed from "all model calls" to keep "gateway is the LLM seam" and "OCR backends pluggable" non-conflicting), the audit sub-package as a passive subscriber and **sole writer** under `runs/<run_id>/audit/` (DR-ARC-06), thin FastAPI route handlers (DR-ARC-07), CLI sharing the same orchestrator code path as the API (DR-ARC-08), `Settings` injected once at boot and never mutated by stages (DR-ARC-09), the SPA as a separate deployable talking only over HTTP/JSON (DR-ARC-10), per-stage isolation testability (DR-ARC-11, Should), and the public Python surface defined by `grading_rubric.__init__` (DR-ARC-12, Should). **§ 5.3 DR-DAT.** Eleven DRs locking the data-model and persistence layer. DR-DAT-01: Pydantic v2 in `grading_rubric.models` as the single source of truth. DR-DAT-02: contract models configured `ConfigDict(strict=True)` so type-coercion is rejected at the boundary, with two carve-outs — the `parsers` sub-package (whose job is to turn loose input into strict models) and LLM tool-use responses (which arrive as JSON, are `json.loads`-parsed first, then strictly validated). DR-DAT-03: `make schemas` regenerates JSON Schema files for every top-level shape including the new `OperationSummary` and CI fails on drift. DR-DAT-04: TypeScript + zod codegen for the front-end (Should). DR-DAT-05: per-shape semver schema versioning, MAJOR for incompatible, MINOR for additive, PATCH for clarifications. DR-DAT-06: ID type aliases are real `uuid.UUID`, datetimes are timezone-aware UTC, string enums are `StrEnum`, and the **three-case hash rule** — file hashes over raw bytes, text content hashes over UTF-8 encoded text, structured-object digests over canonical JSON UTF-8 (`sort_keys=True`, `separators=(",",":")`, `ensure_ascii=False`, ISO-8601 datetimes, hyphenated UUIDs) — applies uniformly to every digest field in § 4 with each field's docstring stating which case applies. DR-DAT-07: locks the `runs/<run_id>/` layout — `explained_rubric.json` written by the `output` stage, `audit/audit_bundle.json` (the index) and `audit/operations/<operation_id>.json` (the details) written by the `audit` sub-package as the sole writer under `audit/`; the atomic-write temp files of DR-DAT-08 are an explicit implementation-internal exception. DR-DAT-07a (**Must**, promoted from Should after review): every `audit_bundle.json` operation entry references — via `details_path` resolved relative to the directory containing `audit_bundle.json` — an existing per-operation file, and every per-operation file is referenced by exactly one entry; the audit sub-package writes both sides as a single logical commit (per-op files first, index last) and a startup self-check fails the run on violation. DR-DAT-08: atomic writes via temp + fsync + rename (Should). DR-DAT-09: no database, no ORM, no cross-session state; `runs/` is a flat directory of independent run sub-directories. DR-DAT-10: `runs/` root configurable via `Settings.audit_bundle_dir` so the same code runs against host disk, tmpfs, or a Validance task work directory (Should). § 6 traceability sweep deferred to the round that closes out all remaining DR groups. |
 | 0.12.1 | 2026-04-11 | Wiktor Lisowski | § 4 review pass after a second-round review of the v0.12.0 fill. Seven fixes, no new shapes introduced. **(1) EvidenceProfile + InputProvenance — teaching material instead of answer key.** The v0.12.0 fill carried `answer_key_present` / `answer_key_hash` as a slip; no SR calls for an answer key. Replaced with `teaching_material_present` / `teaching_material_count` / `teaching_material_hashes` (and the matching `teaching_material_paths` / `teaching_material_hashes` on `InputProvenance`), so the four EvidenceProfile categories now match UR-01..UR-04 and SR-IN-01..SR-IN-04 one-for-one. **(2) AssessmentFinding.target is now `RubricTarget \| None`.** SR-AS-02 *Applicability* findings of the form "no criterion covers a valid response type X" are absence findings — the missing node is the finding — and have no existing target to point at. SR-AS-03 *Discrimination Power* findings about overall scoring distribution are rubric-wide. The previous required `target` could not represent either; the new field is `None` for these cases and behaves exactly as before when set. Added an explicit *Optional `target`* paragraph. **(3) `RemoveNodeChange` now addresses levels unambiguously.** The previous `node_path: list[CriterionId]` could not identify *which* level under a criterion to remove. Split into `criterion_path: list[CriterionId]` plus `level_id: LevelId \| None` (required when `node_kind == LEVEL`, `None` otherwise). Rationale paragraph updated. **(4) Removed before/after duplication on `CriterionScore`.** v0.12.0 carried `score_after`, `score_before`, and `delta` on `CriterionScore` *and* `previous_quality_scores: list[CriterionScore]` on `ExplainedRubricFile` — two encodings of the same data, a drift surface. Collapsed to a single `score: float` per `CriterionScore`; the before/after pair is expressed at the file level by `quality_scores` + `previous_quality_scores`; `delta` is computed by the front-end at presentation time. Invariants updated to require `previous_quality_scores` whenever a starting rubric existed and re-measurement ran. **(5) Tightened `Rubric.points` invariants for parents.** v0.12.0 said "leaf has `points` set" but left parents underspecified, conflicting with `total_points == sum(root.points)`. The validator now requires `points` on every criterion that participates in a total (which is every criterion in current rubric shapes); the additive sum invariant is unchanged; non-additive parents take their declared `points` as authoritative. **(6) DR-PER placeholder no longer contradicts § 3.8.** § 5.9 used to say "likely a content-hashed cache borrowed from patterns proven in adjacent repositories", which directly contradicts the locked § 3.8 *no application-level cache* decision. Rewritten to say DR-PER does not introduce a cache and instead specifies concurrency, parallelism boundaries, and back-pressure / timeout policy. **(7) `OperationRecord.outputs_digest` is now `str \| None`.** Failed and skipped operations may produce no outputs; the previous required `str` would have forced sentinel values. Comment notes the `None` is permitted for `FAILED` / `SKIPPED` status or for operations that produced no outputs. No traceability impact — § 4.11 trace summary is unchanged. |
 | 0.12.0 | 2026-04-11 | Wiktor Lisowski | Filled § 4 *Data models* end-to-end. Three layers documented: domain models (`Rubric`, `EvidenceProfile`, `AssessmentFinding`, `ProposedChange`, `Explanation`, `ExplainedRubricFile`), provenance models (`AuditBundle`, `StageRecord`, `OperationRecord`, `OperationDetails` discriminated union, `IterationSnapshot`), and shared primitives (`RubricTarget`, `ConfidenceIndicator`, `QualityCriterion`, `QualityMethod`, ID type aliases). Key design choices. **Rubric**: recursive `RubricCriterion` with `sub_criteria` covers SR-IM-02 in a single shape; locked `points` / `weight` invariants (`points` is the only authoritative allocation, `weight` is display-only metadata) and an explicit `additive` flag for non-additive parent aggregation. **RubricTarget**: path-of-UUIDs with a closed `RubricFieldName` enum — rename-stable, no string parsing, no overloaded `"structure"` value. **AssessmentFinding**: single `criterion` (preserving SR-AS-07), staleness-aware via `measured_against_rubric_id` + `iteration` (SR-AS-09), SR-AS-10 dual signal expressed by `linked_finding_ids` between two single-criterion findings. **ConfidenceIndicator**: structured as `score` + `level` + `rationale` with locked thresholds; replaces the bare-float regression flagged in review. **Measurement** + **`QualityMethod`** closed enum (`LLM_PANEL_AGREEMENT`, `PAIRWISE_CONSISTENCY`, `SYNTHETIC_COVERAGE`, `SCORE_DISTRIBUTION_SEPARATION`) shared with `CriterionScore.method` to prevent drift between assessment engine and explanation generator. **ProposedChange**: discriminated union over `REPLACE_FIELD` / `UPDATE_POINTS` / `ADD_NODE` / `REMOVE_NODE` / `REORDER_NODES` covering both improvement and from-scratch generation; `primary_criterion` as the display bucket; `application_status` (system) and `teacher_decision` (human) split. **Explanation**: `by_criterion` mandatory three-section structure makes SR-OUT-03 a hard contract; `CrossCuttingGroup` is a grouping over already-tagged items, never a fourth category; SR-IM-06 empty case is the canonical shape of an empty `CriterionSection` with a narrative. **AuditBundle**: provenance generic over `OperationDetails` (`llm_call` / `ocr_call` / `ml_inference` / `tool_call` / `human_decision` / `agent_step` / `deterministic`) so the audit shape supports any pipeline kind; retries are separate `OperationRecord`s linked by `retry_of` (no `RETRIED` final status); `iteration_history: list[IterationSnapshot]` carries the full SR-AS-09 re-measurement trajectory and is empty for single-pass runs. **ExplainedRubricFile**: deliverable stays single-file and self-contained; gains `previous_quality_scores` so the front-end can render before/after evidence without needing the audit bundle. **Privacy claim recast**: deliverable never contains raw student text; audit bundle may contain transcribed text in `LlmCallDetails.raw_responses` because faithful reconstruction requires it; deliverable and audit bundle are separate files for exactly this reason. § 4.11 *Trace summary* maps each data model to the SRs it backs (cross-checked against `requirements.md` v0.5.0). § 5 DR groups are next; § 6 traceability will be regenerated as DRs are added. |
 | 0.11.0 | 2026-04-11 | Wiktor Lisowski | Locked the final three technology decisions. **#9 Deterministic execution (§ 3.9)**: temperature 0 for single-sample extraction/classification, temperature > 0 for `samples > 1` reliability measurements (default `k = 5`, temperature `0.7`), model pinned to a snapshot version when the provider publishes one; bit-identical LLM reproducibility explicitly *not* claimed (GPU floating-point non-determinism, server-side batching, no `seed` parameter on the Anthropic Messages API) — the honest guarantee is measurement-level stability plus audit-level reconstructability via the audit bundle. **#10 Deployment topology and packaging (§ 3.10)**: two artefacts forming one deliverable — a Python package with `pyproject.toml` and two console-script entry points (`grading-rubric-api`, `grading-rubric-cli`) plus a Vite static build for the front-end; FastAPI as the HTTP server (Pydantic-native, no second mapping layer); a top-level `Makefile` (`install` / `dev` / `build` / `test` / `schemas` / `run`) as the single entry-point surface; `make run` serves the built SPA from the FastAPI process for the one-command demo path; repository layout is `backend/` + `frontend/` + `schemas/` + top-level meta files; Docker is a possible secondary target, not the primary path. **#11 Orchestration layer (§ 3.11)**: none embedded in the deliverable — default mode is a single Python process plus a static SPA; the hermetic-task structure of § 2.2 makes the same code trivially wrappable by any external engine (the conditions are already paid for by § 3.7 env-only secrets and § 3.8 no-cache); § 5.11 *DR-DEP* will include one concrete Validance wrap as a reference example, not as a shipping requirement. All 11 technology decisions now locked; § 4 *Data models* and § 5 *Design Requirements* are next. |
