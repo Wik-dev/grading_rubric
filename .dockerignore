@@ -1,0 +1,37 @@
+# Build context hygiene for the L2 image (DR-DEP-03).
+# Keep only what `docker/grading-rubric/Dockerfile` actually COPYs.
+
+# VCS / IDE
+.git
+.gitignore
+.cursor
+.idea
+.vscode
+
+# Working / generated artefacts
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.pytest_cache
+.ruff_cache
+.mypy_cache
+build
+dist
+htmlcov
+.coverage*
+
+# Out-of-scope artefact roots — none of these belong in the L1 image.
+docs
+notes
+schemas
+tests
+frontend
+validance
+docker
+
+# Local / personal
+CLAUDE.md
+.env
+.env.*
+!.env.example
