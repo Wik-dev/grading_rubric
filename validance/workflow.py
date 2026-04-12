@@ -1,0 +1,241 @@
+"""DR-INT-02 — Validance workflow definitions for the grading rubric pipeline.
+
+Defines two workflows registered against a Validance instance:
+
+  ``grading_rubric.assess_and_improve``
+      The full assessment pipeline as one Validance task per L1 stage:
+
+          ingest → parse_inputs → assess → propose → approve → score → render
+
+      Where ``approve`` is an ``ApprovalGate`` (gate="human-confirm" on the
+      preceding ``propose`` task per DR-INT-06) that pauses the run until the
+      teacher accepts or rejects each ``ProposedChange`` in the L4 SPA. Each
+      task wraps the L2 image's CLI: ``docker run grading-rubric:latest
+      <subcommand> --input … --output …``.
+
+  ``grading_rubric.train_scorer``
+      The standalone train-button capability per DR-SCR-06 / DR-DEP-06. One
+      task wrapping ``grading-rubric-cli train-scorer``. Explicitly **not**
+      chained into ``assess_and_improve`` because training has a different
+      input contract (``TrainingEvidence``).
+
+Per DR-INT-02 the Validance workflow definitions never call any L1 Python
+function in-process. The only contact surface between L1 and L3 is:
+
+  1. The CLI subcommand exit code.
+  2. The structured ``--output`` file (a Pydantic model dumped to JSON).
+  3. The structured stderr operation events (DR-OBS-01) which the harvester
+     of DR-INT-05 consumes to build the typed ``AuditBundle`` view.
+"""
+
+from __future__ import annotations
+
+from validance.sdk import Task, Workflow
+
+# ── L2 image registry ──────────────────────────────────────────────────────
+#
+# The image must be built and pushed (or made locally available to the
+# Validance worker) before ``register.py`` is run. See DR-DEP-03 + the
+# Makefile ``images`` target. The tag is intentionally a single constant so
+# that bumping the image is a one-line change.
+
+TASK_IMAGE = "grading-rubric:latest"
+
+# ── Filename conventions inside each task's working directory ──────────────
+#
+# Validance mounts a fresh per-task work dir at ``/work``. Each task reads
+# its inputs from ``/work/<filename>`` and writes its outputs there. The
+# names are stable across the workflow so that ``inputs={...}`` declarations
+# can use ``@previous_task:varname`` references symmetrically.
+
+INGEST_INPUTS_FILE = "ingest_inputs.json"
+INGEST_OUTPUTS_FILE = "ingest_outputs.json"
+PARSED_INPUTS_FILE = "parsed_inputs.json"
+ASSESS_OUTPUTS_FILE = "assess_outputs.json"
+PROPOSE_OUTPUTS_FILE = "propose_outputs.json"
+SCORE_OUTPUTS_FILE = "score_outputs.json"
+EXPLAINED_RUBRIC_FILE = "explained_rubric.json"
+
+TRAINING_EVIDENCE_FILE = "training_evidence.json"
+TRAINED_ARTEFACT_FILE = "trained_scorer.json"
+
+
+# ── grading_rubric.assess_and_improve ──────────────────────────────────────
+
+
+def create_assess_and_improve_workflow() -> Workflow:
+    """Build the seven-task assessment + improvement workflow.
+
+    Task graph (linear, single critical path):
+
+        ingest → parse_inputs → assess → propose → score → render
+
+    The ``propose`` task carries ``gate="human-confirm"`` per DR-INT-06: the
+    Validance engine pauses the run after ``propose`` succeeds, surfaces the
+    list of ``ProposedChange`` items to the L4 SPA via the polling endpoint
+    of DR-INT-06, and only resumes ``score`` once the teacher has resolved
+    every change. The teacher's accept/reject decisions are written back
+    onto the ``ProposedChange.teacher_decision`` field by ``proposals.py``
+    so the downstream ``render`` stage can reflect them in the explanation.
+
+    The ``${ingest_inputs_path}`` workflow parameter is the only required
+    runtime input — it points at a JSON file matching the L1
+    ``IngestInputs`` Pydantic shape (§ 4.4) which itself carries the role-
+    tagged ``InputSource`` records produced by the SPA from its four input
+    fields (DR-UI-04).
+    """
+
+    wf = Workflow("grading_rubric.assess_and_improve")
+
+    ingest = Task(
+        name="ingest",
+        docker_image=TASK_IMAGE,
+        command=(
+            f"grading-rubric-cli ingest "
+            f"--input {INGEST_INPUTS_FILE} "
+            f"--output {INGEST_OUTPUTS_FILE}"
+        ),
+        inputs={INGEST_INPUTS_FILE: "${ingest_inputs_path}"},
+        output_files={"ingest_outputs": INGEST_OUTPUTS_FILE},
+        timeout=300,
+    )
+
+    parse_inputs = Task(
+        name="parse_inputs",
+        docker_image=TASK_IMAGE,
+        command=(
+            f"grading-rubric-cli parse-inputs "
+            f"--input {INGEST_OUTPUTS_FILE} "
+            f"--output {PARSED_INPUTS_FILE}"
+        ),
+        inputs={INGEST_OUTPUTS_FILE: "@ingest:ingest_outputs"},
+        output_files={"parsed_inputs": PARSED_INPUTS_FILE},
+        depends_on=["ingest"],
+        timeout=900,
+    )
+
+    assess = Task(
+        name="assess",
+        docker_image=TASK_IMAGE,
+        command=(
+            f"grading-rubric-cli assess "
+            f"--input {PARSED_INPUTS_FILE} "
+            f"--output {ASSESS_OUTPUTS_FILE}"
+        ),
+        inputs={PARSED_INPUTS_FILE: "@parse_inputs:parsed_inputs"},
+        output_files={"assess_outputs": ASSESS_OUTPUTS_FILE},
+        depends_on=["parse_inputs"],
+        timeout=1800,
+        secret_refs=["ANTHROPIC_API_KEY"],
+    )
+
+    # DR-INT-06: ``gate="human-confirm"`` puts the Validance ApprovalGate
+    # primitive **after** this task so the run pauses on the proposed
+    # changes for teacher review. The proposal payload visible in the SPA is
+    # built by ``proposals.proposed_changes_to_payload`` (DR-INT-04) and the
+    # teacher's resolution flows back through the same module.
+    propose = Task(
+        name="propose",
+        docker_image=TASK_IMAGE,
+        command=(
+            f"grading-rubric-cli propose "
+            f"--input {ASSESS_OUTPUTS_FILE} "
+            f"--output {PROPOSE_OUTPUTS_FILE}"
+        ),
+        inputs={ASSESS_OUTPUTS_FILE: "@assess:assess_outputs"},
+        output_files={"propose_outputs": PROPOSE_OUTPUTS_FILE},
+        depends_on=["assess"],
+        timeout=1800,
+        gate="human-confirm",
+        secret_refs=["ANTHROPIC_API_KEY"],
+    )
+
+    score = Task(
+        name="score",
+        docker_image=TASK_IMAGE,
+        command=(
+            f"grading-rubric-cli score "
+            f"--input {PROPOSE_OUTPUTS_FILE} "
+            f"--output {SCORE_OUTPUTS_FILE}"
+        ),
+        inputs={PROPOSE_OUTPUTS_FILE: "@propose:propose_outputs"},
+        output_files={"score_outputs": SCORE_OUTPUTS_FILE},
+        depends_on=["propose"],
+        timeout=1800,
+        secret_refs=["ANTHROPIC_API_KEY"],
+    )
+
+    render = Task(
+        name="render",
+        docker_image=TASK_IMAGE,
+        command=(
+            f"grading-rubric-cli render "
+            f"--input {SCORE_OUTPUTS_FILE} "
+            f"--output {EXPLAINED_RUBRIC_FILE}"
+        ),
+        inputs={SCORE_OUTPUTS_FILE: "@score:score_outputs"},
+        output_files={"explained_rubric": EXPLAINED_RUBRIC_FILE},
+        depends_on=["score"],
+        timeout=300,
+    )
+
+    for task in (ingest, parse_inputs, assess, propose, score, render):
+        wf.add_task(task)
+
+    return wf
+
+
+# ── grading_rubric.train_scorer ────────────────────────────────────────────
+
+
+def create_train_scorer_workflow() -> Workflow:
+    """Build the standalone train-button workflow.
+
+    A single task wrapping ``grading-rubric-cli train-scorer``. The L1 stub
+    of DR-SCR-05 emits one ``ml_inference`` operation event with
+    ``error.code = STUB_NOT_TRAINED`` and writes a placeholder
+    ``TrainedScorerArtefact`` JSON. Wired as a separate workflow so the main
+    demo path (DR-DEP-06) is unaffected.
+    """
+
+    wf = Workflow("grading_rubric.train_scorer")
+
+    train = Task(
+        name="train_scorer",
+        docker_image=TASK_IMAGE,
+        command=(
+            f"grading-rubric-cli train-scorer "
+            f"--input {TRAINING_EVIDENCE_FILE} "
+            f"--output {TRAINED_ARTEFACT_FILE}"
+        ),
+        inputs={TRAINING_EVIDENCE_FILE: "${training_evidence_path}"},
+        output_files={"trained_artefact": TRAINED_ARTEFACT_FILE},
+        timeout=3600,
+    )
+
+    wf.add_task(train)
+    return wf
+
+
+# ── Registry ───────────────────────────────────────────────────────────────
+#
+# The registration script in ``register.py`` consumes this dict; keep it in
+# sync when adding/removing workflows.
+
+WORKFLOWS: dict[str, callable] = {
+    "assess_and_improve": create_assess_and_improve_workflow,
+    "train_scorer": create_train_scorer_workflow,
+}
+
+
+WORKFLOW_DESCRIPTIONS: dict[str, str] = {
+    "assess_and_improve": (
+        "Six-stage rubric assessment + improvement pipeline with a human-"
+        "confirm approval gate after the propose stage (DR-INT-02 / DR-INT-06)."
+    ),
+    "train_scorer": (
+        "Standalone train-button capability — DR-SCR-06 stub (does not call "
+        "the LLM gateway; emits STUB_NOT_TRAINED and writes a placeholder "
+        "TrainedScorerArtefact)."
+    ),
+}
