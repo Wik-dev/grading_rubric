@@ -1,0 +1,313 @@
+"""DR-ARC-08 — `grading-rubric-cli` console-script entry point.
+
+Eight subcommands realising the per-stage CLI surface of § 3.10:
+
+  ingest          IngestInputs  JSON → IngestOutputs   JSON
+  parse-inputs    IngestOutputs JSON → ParsedInputs    JSON
+  assess          ParsedInputs  JSON → AssessOutputs   JSON
+  propose         AssessOutputs JSON → ProposeOutputs  JSON
+  score           ProposeOutputs JSON → ScoreOutputs   JSON
+  render          ScoreOutputs   JSON → ExplainedRubricFile JSON
+  run-pipeline    IngestInputs JSON OR --exam-question/--starting-rubric/...
+                                    → ExplainedRubricFile JSON
+  train-scorer    TrainingEvidence JSON → TrainedScorerArtefact placeholder
+
+Each per-stage subcommand is a thin shell: read the input JSON, call the
+stage callable through the `Stage` protocol, write the output JSON. Per
+DR-ARC-09 a single `Settings` is built once at process boot from the
+environment and injected into the stage call.
+"""
+
+from __future__ import annotations
+
+import sys
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import TypeVar
+from uuid import uuid4
+
+import click
+from pydantic import BaseModel
+
+from grading_rubric.assess.models import AssessOutputs
+from grading_rubric.assess.stage import assess_stage
+from grading_rubric.audit.emitter import AuditEmitter, JsonLineEmitter
+from grading_rubric.config.settings import Settings
+from grading_rubric.improve.models import ProposeOutputs
+from grading_rubric.improve.stage import propose_stage
+from grading_rubric.orchestrator.pipeline import PipelineInputs, run_pipeline
+from grading_rubric.output.render_stage import render_stage
+from grading_rubric.parsers.ingest_stage import ingest_stage
+from grading_rubric.parsers.models import IngestInputs, IngestOutputs, ParsedInputs
+from grading_rubric.parsers.parse_stage import parse_inputs_stage
+from grading_rubric.scorer.models import ScoreOutputs, TrainingEvidence
+from grading_rubric.scorer.score_stage import score_stage
+from grading_rubric.scorer.train_scorer import train_scorer
+
+
+# ── Helpers ──────────────────────────────────────────────────────────────
+
+
+_M = TypeVar("_M", bound=BaseModel)
+
+
+def _read_model(path: Path, model_cls: type[_M]) -> _M:
+    """Load a Pydantic model from a JSON file using JSON-mode validation.
+
+    JSON-mode validation (`model_validate_json`) accepts the JSON-native
+    coercions Pydantic v2 ships (e.g. string → `Path`, ISO-8601 string →
+    `datetime`) even under `ConfigDict(strict=True)`, while the Python-mode
+    validator on a `dict` would reject them.
+    """
+
+    if not path.exists():
+        raise click.ClickException(f"input file not found: {path}")
+    try:
+        return model_cls.model_validate_json(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        raise click.ClickException(
+            f"failed to parse {model_cls.__name__} from {path}: {exc}"
+        )
+
+
+def _write_json(path: Path, model: BaseModel) -> None:
+    """Write a Pydantic model to disk as JSON (pretty-printed)."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        model.model_dump_json(indent=2, exclude_none=False), encoding="utf-8"
+    )
+
+
+def _make_emitter() -> AuditEmitter:
+    return JsonLineEmitter(sink=sys.stderr)
+
+
+def _settings() -> Settings:
+    return Settings.from_env()
+
+
+# ── CLI group ────────────────────────────────────────────────────────────
+
+
+@click.group()
+@click.version_option(package_name="grading-rubric")
+def main() -> None:
+    """Grading Rubric Studio — per-stage CLI (DR-ARC-08)."""
+
+
+# ── 1. ingest ────────────────────────────────────────────────────────────
+
+
+@main.command("ingest")
+@click.option("--input", "input_path", type=click.Path(path_type=Path), required=True)
+@click.option("--output", "output_path", type=click.Path(path_type=Path), required=True)
+def cmd_ingest(input_path: Path, output_path: Path) -> None:
+    """Read raw inputs, build InputProvenance + EvidenceProfile."""
+
+    inputs = _read_model(input_path, IngestInputs)
+    out = ingest_stage(inputs, settings=_settings(), audit_emitter=_make_emitter())
+    _write_json(output_path, out)
+    click.echo(str(output_path))
+
+
+# ── 2. parse-inputs ──────────────────────────────────────────────────────
+
+
+@main.command("parse-inputs")
+@click.option("--input", "input_path", type=click.Path(path_type=Path), required=True)
+@click.option("--output", "output_path", type=click.Path(path_type=Path), required=True)
+def cmd_parse_inputs(input_path: Path, output_path: Path) -> None:
+    """Extract text from ingested inputs; produce ParsedInputs."""
+
+    inputs = _read_model(input_path, IngestOutputs)
+    out = parse_inputs_stage(
+        inputs, settings=_settings(), audit_emitter=_make_emitter()
+    )
+    _write_json(output_path, out)
+    click.echo(str(output_path))
+
+
+# ── 3. assess ────────────────────────────────────────────────────────────
+
+
+@main.command("assess")
+@click.option("--input", "input_path", type=click.Path(path_type=Path), required=True)
+@click.option("--output", "output_path", type=click.Path(path_type=Path), required=True)
+def cmd_assess(input_path: Path, output_path: Path) -> None:
+    """Run the three measurement engines, produce AssessOutputs."""
+
+    inputs = _read_model(input_path, ParsedInputs)
+    out = assess_stage(inputs, settings=_settings(), audit_emitter=_make_emitter())
+    _write_json(output_path, out)
+    click.echo(str(output_path))
+
+
+# ── 4. propose ───────────────────────────────────────────────────────────
+
+
+@main.command("propose")
+@click.option("--input", "input_path", type=click.Path(path_type=Path), required=True)
+@click.option("--output", "output_path", type=click.Path(path_type=Path), required=True)
+def cmd_propose(input_path: Path, output_path: Path) -> None:
+    """Run the three-step DR-IM-07 pipeline, produce ProposeOutputs."""
+
+    inputs = _read_model(input_path, AssessOutputs)
+    out = propose_stage(inputs, settings=_settings(), audit_emitter=_make_emitter())
+    _write_json(output_path, out)
+    click.echo(str(output_path))
+
+
+# ── 5. score ─────────────────────────────────────────────────────────────
+
+
+@main.command("score")
+@click.option("--input", "input_path", type=click.Path(path_type=Path), required=True)
+@click.option("--output", "output_path", type=click.Path(path_type=Path), required=True)
+@click.option(
+    "--scorer-backend",
+    type=click.Choice(["llm_panel", "trained_model"]),
+    default=None,
+    help="Override Settings.scorer_backend (DR-SCR-04).",
+)
+def cmd_score(
+    input_path: Path, output_path: Path, scorer_backend: str | None
+) -> None:
+    """Score the improved rubric against the three quality criteria."""
+
+    inputs = _read_model(input_path, ProposeOutputs)
+    settings = _settings()
+    if scorer_backend is not None:
+        settings = settings.model_copy(update={"scorer_backend": scorer_backend})
+    out = score_stage(inputs, settings=settings, audit_emitter=_make_emitter())
+    _write_json(output_path, out)
+    click.echo(str(output_path))
+
+
+# ── 6. render ────────────────────────────────────────────────────────────
+
+
+@main.command("render")
+@click.option("--input", "input_path", type=click.Path(path_type=Path), required=True)
+@click.option("--output", "output_path", type=click.Path(path_type=Path), required=True)
+def cmd_render(input_path: Path, output_path: Path) -> None:
+    """Build the ExplainedRubricFile and write it atomically."""
+
+    inputs = _read_model(input_path, ScoreOutputs)
+    render_stage(
+        inputs,
+        output_path=output_path,
+        run_id=uuid4(),
+        started_at=datetime.now(UTC),
+        settings=_settings(),
+        audit_emitter=_make_emitter(),
+    )
+    click.echo(str(output_path))
+
+
+# ── 7. run-pipeline ──────────────────────────────────────────────────────
+
+
+@main.command("run-pipeline")
+@click.option(
+    "--input",
+    "input_path",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="JSON file matching IngestInputs (alternative to the path flags).",
+)
+@click.option("--exam-question", type=click.Path(path_type=Path), default=None)
+@click.option(
+    "--teaching-material",
+    "teaching_material",
+    type=click.Path(path_type=Path),
+    multiple=True,
+)
+@click.option("--starting-rubric", type=click.Path(path_type=Path), default=None)
+@click.option(
+    "--starting-rubric-inline",
+    type=str,
+    default=None,
+    help="Inline starting rubric (JSON or free text). SR-IN-05.",
+)
+@click.option(
+    "--student-copy",
+    "student_copy",
+    type=click.Path(path_type=Path),
+    multiple=True,
+)
+@click.option(
+    "--output",
+    "output_path",
+    type=click.Path(path_type=Path),
+    required=True,
+    help="Where the ExplainedRubricFile JSON will be written.",
+)
+def cmd_run_pipeline(
+    input_path: Path | None,
+    exam_question: Path | None,
+    teaching_material: tuple[Path, ...],
+    starting_rubric: Path | None,
+    starting_rubric_inline: str | None,
+    student_copy: tuple[Path, ...],
+    output_path: Path,
+) -> None:
+    """Chain the six stages in order via the in-process orchestrator (DR-ARC-04)."""
+
+    if input_path is not None:
+        pipeline_inputs = _read_model(input_path, PipelineInputs)
+    else:
+        if exam_question is None:
+            raise click.ClickException(
+                "either --input or --exam-question must be provided"
+            )
+        pipeline_inputs = PipelineInputs(
+            exam_question_path=exam_question,
+            teaching_material_paths=list(teaching_material),
+            starting_rubric_path=starting_rubric,
+            starting_rubric_inline=starting_rubric_inline,
+            student_copy_paths=list(student_copy),
+        )
+
+    result = run_pipeline(
+        pipeline_inputs=pipeline_inputs,
+        output_path=output_path,
+        settings=_settings(),
+        audit_emitter=_make_emitter(),
+    )
+    click.echo(str(result.explained_rubric_path))
+
+
+# ── 8. train-scorer ──────────────────────────────────────────────────────
+
+
+@main.command("train-scorer")
+@click.option(
+    "--input",
+    "input_path",
+    type=click.Path(path_type=Path),
+    required=True,
+    help="JSON file matching TrainingEvidence (DR-SCR-05).",
+)
+@click.option(
+    "--output",
+    "output_path",
+    type=click.Path(path_type=Path),
+    required=True,
+    help="Where the placeholder TrainedScorerArtefact file will be written.",
+)
+def cmd_train_scorer(input_path: Path, output_path: Path) -> None:
+    """Train-button stub: validates inputs, emits STUB_NOT_TRAINED, writes placeholder."""
+
+    evidence = _read_model(input_path, TrainingEvidence)
+    artefact = train_scorer(
+        evidence,
+        settings=_settings(),
+        audit_emitter=_make_emitter(),
+        artefact_path=output_path,
+    )
+    click.echo(str(artefact.artefact_path))
+
+
+if __name__ == "__main__":
+    main()
