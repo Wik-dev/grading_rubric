@@ -144,7 +144,7 @@ def render_stage(
         explanation=explanation,
         quality_scores=inputs.quality_scores,
         previous_quality_scores=None,
-        evidence_profile=parsed.ingest.evidence_profile,
+        evidence_profile=proposed.assessed.evidence_profile,
     )
 
     _atomic_write_json(output_path, explained.model_dump(mode="json"))

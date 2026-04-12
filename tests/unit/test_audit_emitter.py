@@ -99,3 +99,71 @@ class TestNullEmitter:
         emitter = NullEmitter()
         emitter.stage_start("test")
         # NullEmitter has no sink — the test is that it doesn't raise.
+
+
+# ── UT-AUD-03: LLM call event logging ────────────────────────────────────
+
+
+class TestLlmCallEventLogging:
+    """DR-LLM-08, DR-LLM-11: LLM call events record purpose, prompt ID, outcome."""
+
+    def test_llm_call_event_records_required_fields(self) -> None:
+        """UT-AUD-03: record_operation with an LLM call payload captures
+        purpose, prompt_id, and outcome."""
+        sink = io.StringIO()
+        emitter = JsonLineEmitter(sink=sink)
+        payload = {
+            "stage_id": "assess",
+            "kind": "llm_call",
+            "purpose": "ambiguity_panel_grading",
+            "prompt_id": "ambiguity.panel.v1",
+            "model": "claude-sonnet-4-20250514",
+            "outcome": "success",
+            "tokens_in": 1200,
+            "tokens_out": 350,
+        }
+        emitter.record_operation(payload)
+
+        assert len(emitter.events) == 1
+        event = emitter.events[0]
+        assert event.event_kind == "operation"
+        assert event.stage_id == "assess"
+        assert event.payload["kind"] == "llm_call"
+        assert event.payload["purpose"] == "ambiguity_panel_grading"
+        assert event.payload["prompt_id"] == "ambiguity.panel.v1"
+        assert event.payload["outcome"] == "success"
+        assert event.payload["tokens_in"] == 1200
+        assert event.payload["tokens_out"] == 350
+
+    def test_llm_call_event_serializes_to_jsonl(self) -> None:
+        """The LLM call event appears as a valid JSON line in the sink."""
+        sink = io.StringIO()
+        emitter = JsonLineEmitter(sink=sink)
+        emitter.record_operation({
+            "stage_id": "propose",
+            "kind": "llm_call",
+            "purpose": "planner",
+            "prompt_id": "propose.planner.v1",
+            "outcome": "success",
+        })
+        line = sink.getvalue().strip()
+        parsed = json.loads(line)
+        assert parsed["event_kind"] == "operation"
+        assert parsed["payload"]["purpose"] == "planner"
+        assert parsed["payload"]["prompt_id"] == "propose.planner.v1"
+
+    def test_llm_call_failure_outcome_recorded(self) -> None:
+        """A failed LLM call records the failure outcome."""
+        sink = io.StringIO()
+        emitter = JsonLineEmitter(sink=sink)
+        emitter.record_operation({
+            "stage_id": "assess",
+            "kind": "llm_call",
+            "purpose": "discrimination_panel_grading",
+            "prompt_id": "discrimination.panel.v1",
+            "outcome": "error",
+            "error": {"code": "RATE_LIMIT", "message": "429 Too Many Requests"},
+        })
+        event = emitter.events[0]
+        assert event.payload["outcome"] == "error"
+        assert event.payload["error"]["code"] == "RATE_LIMIT"

@@ -68,7 +68,7 @@ def _plan_drafts(
         # text matters less than that *some* draft is produced; the LLM
         # implementation can substitute a richer one.
         payload = {
-            "target": f.target.model_dump(mode="json"),
+            "target": f.target.model_dump(),
             "before": None,
             "after": (
                 f"[clarified] {f.observation} "

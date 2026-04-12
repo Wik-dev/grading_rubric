@@ -51,7 +51,9 @@ RUN mkdir -p /work && chown worker:worker /work
 USER worker
 WORKDIR /work
 
-# DR-DEP-03: the CLI is the entrypoint. `docker run … <stage> --input … --output …`
-# is the unit of single-stage invocation on Path A.
-ENTRYPOINT ["grading-rubric-cli"]
-CMD ["--help"]
+# DR-DEP-03: the CLI is installed as an executable.
+# In Validance's ephemeral mode the worker runs `sleep infinity` then exec's
+# `grading-rubric-cli <stage> …` via docker exec. Avoid ENTRYPOINT so the
+# worker's startup command is not prefixed by the CLI binary.
+# Direct invocation: `docker run grading-rubric:latest grading-rubric-cli <stage> …`
+CMD ["grading-rubric-cli", "--help"]

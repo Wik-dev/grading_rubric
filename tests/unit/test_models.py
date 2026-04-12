@@ -382,3 +382,106 @@ class TestExplanation:
                     # DISCRIMINATION_POWER intentionally missing
                 },
             )
+
+
+# ── UT-MOD-06: ExplainedRubricFile schema validation ────────────────────
+
+
+class TestExplainedRubricFileSchema:
+    """DR-DAT-03: ExplainedRubricFile has the documented shape (§ 4.9)."""
+
+    def test_all_documented_fields_present(self) -> None:
+        """UT-MOD-06: ExplainedRubricFile schema matches the documented shape."""
+        fields = ExplainedRubricFile.model_fields
+        expected_fields = {
+            "schema_version",
+            "generated_at",
+            "run_id",
+            "starting_rubric",
+            "improved_rubric",
+            "findings",
+            "proposed_changes",
+            "explanation",
+            "quality_scores",
+            "previous_quality_scores",
+            "evidence_profile",
+        }
+        assert set(fields.keys()) == expected_fields
+
+    def test_full_round_trip(self) -> None:
+        """ExplainedRubricFile survives JSON serialization round-trip."""
+        from datetime import UTC, datetime
+
+        rubric = Rubric(
+            id=RUBRIC_ID,
+            schema_version="1.0.0",
+            title="Test",
+            total_points=10.0,
+            criteria=[
+                RubricCriterion(
+                    id=CRIT_A_ID,
+                    name="A",
+                    description="desc",
+                    points=10.0,
+                    levels=[
+                        RubricLevel(id=LEVEL_A1_ID, label="Good", descriptor="d", points=10.0),
+                        RubricLevel(id=LEVEL_A2_ID, label="Poor", descriptor="d", points=0.0),
+                    ],
+                )
+            ],
+        )
+        erf = ExplainedRubricFile(
+            schema_version="1.0.0",
+            generated_at=datetime.now(UTC),
+            run_id=uuid4(),
+            starting_rubric=rubric,
+            improved_rubric=rubric,
+            findings=[],
+            proposed_changes=[],
+            explanation=Explanation(
+                summary="No issues found.",
+                by_criterion={
+                    QualityCriterion.AMBIGUITY: CriterionSection(
+                        criterion=QualityCriterion.AMBIGUITY, narrative="OK"
+                    ),
+                    QualityCriterion.APPLICABILITY: CriterionSection(
+                        criterion=QualityCriterion.APPLICABILITY, narrative="OK"
+                    ),
+                    QualityCriterion.DISCRIMINATION_POWER: CriterionSection(
+                        criterion=QualityCriterion.DISCRIMINATION_POWER, narrative="OK"
+                    ),
+                },
+            ),
+            quality_scores=[
+                CriterionScore(
+                    criterion=QualityCriterion.AMBIGUITY,
+                    score=0.95,
+                    confidence=ConfidenceIndicator.from_score(0.8, rationale="r"),
+                    method=QualityMethod.LLM_PANEL_AGREEMENT,
+                ),
+                CriterionScore(
+                    criterion=QualityCriterion.APPLICABILITY,
+                    score=0.90,
+                    confidence=ConfidenceIndicator.from_score(0.8, rationale="r"),
+                    method=QualityMethod.LLM_PANEL_AGREEMENT,
+                ),
+                CriterionScore(
+                    criterion=QualityCriterion.DISCRIMINATION_POWER,
+                    score=0.85,
+                    confidence=ConfidenceIndicator.from_score(0.8, rationale="r"),
+                    method=QualityMethod.LLM_PANEL_AGREEMENT,
+                ),
+            ],
+            evidence_profile=EvidenceProfile(
+                starting_rubric_present=True,
+                exam_question_present=True,
+                teaching_material_present=False,
+                student_copies_present=False,
+                synthetic_responses_used=True,
+            ),
+        )
+        json_str = erf.model_dump_json()
+        restored = ExplainedRubricFile.model_validate_json(json_str)
+        assert restored.schema_version == erf.schema_version
+        assert len(restored.quality_scores) == 3
+        assert restored.improved_rubric == erf.improved_rubric
