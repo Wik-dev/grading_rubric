@@ -43,7 +43,17 @@ export function RubricView({
 
   return (
     <div className={cn("space-y-3", className)}>
-      <h3 className="text-base font-semibold text-slate-900">{rubric.name}</h3>
+      <div className="flex items-baseline justify-between">
+        <h3 className="text-base font-semibold text-slate-900">{rubric.title}</h3>
+        {rubric.total_points != null && rubric.total_points > 0 && (
+          <span
+            className="text-sm font-medium text-slate-500"
+            title="Total points in the rubric (sum of all criteria)"
+          >
+            {rubric.total_points} pts
+          </span>
+        )}
+      </div>
       {rubric.criteria.map((criterion) => (
         <CriterionNode
           key={criterion.id}

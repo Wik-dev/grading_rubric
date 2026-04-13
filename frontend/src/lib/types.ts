@@ -28,8 +28,15 @@ export interface AssessmentFinding {
   id: string;
   criterion: QualityCriterion;
   severity: Severity;
-  description: string;
+  target: { criterion_id: string; field?: string } | null;
+  observation: string;
+  evidence: string;
+  measurement: { method: string; samples: number; agreement: number | null };
   confidence: ConfidenceIndicator;
+  measured_against_rubric_id: string;
+  iteration: number;
+  source_operations: string[];
+  linked_finding_ids: string[];
 }
 
 // ── § 4.6 ProposedChange (discriminated union) ────────────────────────────
@@ -82,7 +89,8 @@ export interface RubricCriterion {
 
 export interface Rubric {
   id: string;
-  name: string;
+  title: string;
+  total_points: number;
   criteria: RubricCriterion[];
 }
 
@@ -160,11 +168,12 @@ export interface ValidanceRunState {
   tasks: ValidanceTaskState[];
   pending_approval?: {
     task_name: string;
+    /** Null when the approval payload shape is not yet known to the SPA. */
     proposal_payload: {
       kind: string;
       version: string;
       count: number;
       changes: ProposedChange[];
-    };
+    } | null;
   } | null;
 }

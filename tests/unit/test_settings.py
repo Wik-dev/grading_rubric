@@ -18,7 +18,7 @@ class TestSettingsFromEnv:
     def test_defaults(self) -> None:
         s = Settings.from_env({})
         assert s.llm_backend == "anthropic"
-        assert s.llm_model_pinned == "claude-sonnet-4-6-20251001"
+        assert s.llm_model_pinned == "claude-sonnet-4-20250514"
         assert s.max_iterations == 3
         assert s.scorer_backend == "llm_panel"
         assert s.schema_version == "1.0.0"

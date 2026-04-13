@@ -21,7 +21,7 @@ class Settings(BaseModel):
 
     # ── LLM gateway ────────────────────────────────────────────────────────
     llm_backend: Literal["anthropic", "openai", "stub"] = "anthropic"
-    llm_model_pinned: str = "claude-sonnet-4-6-20251001"
+    llm_model_pinned: str = "claude-sonnet-4-20250514"
     llm_sampling_temperature: float = 0.7
     llm_call_timeout_seconds: int = 60
     llm_rate_limit_max_retries: int = 3
@@ -69,7 +69,7 @@ class Settings(BaseModel):
         e = env if env is not None else os.environ
         return cls(
             llm_backend=e.get("GR_LLM_BACKEND", "anthropic"),  # type: ignore[arg-type]
-            llm_model_pinned=e.get("GR_LLM_MODEL", "claude-sonnet-4-6-20251001"),
+            llm_model_pinned=e.get("GR_LLM_MODEL", "claude-sonnet-4-20250514"),
             llm_sampling_temperature=float(e.get("GR_LLM_TEMPERATURE", "0.7")),
             llm_call_timeout_seconds=int(e.get("GR_LLM_TIMEOUT", "60")),
             llm_rate_limit_max_retries=int(e.get("GR_LLM_RATE_LIMIT_RETRIES", "3")),

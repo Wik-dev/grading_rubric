@@ -12,8 +12,7 @@ export const CRITERION_LABEL: Record<QualityCriterion, string> = {
 
 /** Stage-name → teacher-facing step label (Running screen). */
 export const STAGE_LABEL: Record<string, string> = {
-  ingest: "Reading your exam question",
-  parse_inputs: "Reading teaching material",
+  ingest: "Reading and parsing your inputs",
   assess: "Checking the rubric against the three quality criteria",
   propose: "Building the improved rubric",
   score: "Scoring the improved rubric",
@@ -23,7 +22,6 @@ export const STAGE_LABEL: Record<string, string> = {
 /** The order in which the running screen displays the steps. */
 export const STAGE_ORDER: string[] = [
   "ingest",
-  "parse_inputs",
   "assess",
   "propose",
   "score",

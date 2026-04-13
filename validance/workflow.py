@@ -47,8 +47,11 @@ TASK_IMAGE = "grading-rubric:latest"
 # its inputs from ``/work/<filename>`` and writes its outputs there. The
 # names are stable across the workflow so that ``inputs={...}`` declarations
 # can use ``@previous_task:varname`` references symmetrically.
+#
+# The ingest task is special: it reads from ``inputs/`` (the ADR-007 staged
+# directory populated by Validance from trigger ``input_files``) rather than
+# a single JSON file.
 
-INGEST_INPUTS_FILE = "ingest_inputs.json"
 INGEST_OUTPUTS_FILE = "ingest_outputs.json"
 PARSED_INPUTS_FILE = "parsed_inputs.json"
 ASSESS_OUTPUTS_FILE = "assess_outputs.json"
@@ -68,7 +71,11 @@ def create_assess_and_improve_workflow() -> Workflow:
 
     Task graph (linear, single critical path):
 
-        ingest → parse_inputs → assess → propose → score → render
+        ingest → assess → propose → score → render
+
+    The ``ingest`` task chains two L1 CLI commands (``ingest`` + ``parse-inputs``)
+    in a single container so that ``parse-inputs`` can access the ADR-007 staged
+    files alongside the ``ingest_outputs.json`` produced by the first command.
 
     The ``propose`` task carries ``gate="human-confirm"`` per DR-INT-06: the
     Validance engine pauses the run after ``propose`` succeeds, surfaces the
@@ -78,39 +85,35 @@ def create_assess_and_improve_workflow() -> Workflow:
     onto the ``ProposedChange.teacher_decision`` field by ``proposals.py``
     so the downstream ``render`` stage can reflect them in the explanation.
 
-    The ``${ingest_inputs_path}`` workflow parameter is the only required
-    runtime input — it points at a JSON file matching the L1
-    ``IngestInputs`` Pydantic shape (§ 4.4) which itself carries the role-
-    tagged ``InputSource`` records produced by the SPA from its four input
-    fields (DR-UI-04).
+    Ingest files are provided through ADR-007 structured trigger
+    ``input_files`` and staged under ``inputs/`` by the Validance engine.
+    The ingest task uses ``--input-root inputs`` to scan the staged
+    directory layout (``inputs/exam_question/*``, ``inputs/student_copy/*``,
+    etc.) and build the L1 ``IngestInputs`` model internally. No workflow
+    parameters are required — the SPA (DR-UI-04) uploads files and passes
+    them as role-tagged ``input_files`` entries on the trigger payload.
     """
 
     wf = Workflow("grading_rubric.assess_and_improve")
 
+    # Ingest + parse-inputs run in one container so parse-inputs can read
+    # the ADR-007 staged files that ingest scanned.
     ingest = Task(
         name="ingest",
         docker_image=TASK_IMAGE,
         command=(
-            f"grading-rubric-cli ingest "
-            f"--input {INGEST_INPUTS_FILE} "
-            f"--output {INGEST_OUTPUTS_FILE}"
-        ),
-        inputs={INGEST_INPUTS_FILE: "${ingest_inputs_path}"},
-        output_files={"ingest_outputs": INGEST_OUTPUTS_FILE},
-        timeout=300,
-    )
-
-    parse_inputs = Task(
-        name="parse_inputs",
-        docker_image=TASK_IMAGE,
-        command=(
-            f"grading-rubric-cli parse-inputs "
+            "grading-rubric-cli ingest "
+            "--input-root inputs "
+            f"--output {INGEST_OUTPUTS_FILE} && "
+            "grading-rubric-cli parse-inputs "
             f"--input {INGEST_OUTPUTS_FILE} "
             f"--output {PARSED_INPUTS_FILE}"
         ),
-        inputs={INGEST_OUTPUTS_FILE: "@ingest:ingest_outputs"},
-        output_files={"parsed_inputs": PARSED_INPUTS_FILE},
-        depends_on=["ingest"],
+        inputs={},
+        output_files={
+            "ingest_outputs": INGEST_OUTPUTS_FILE,
+            "parsed_inputs": PARSED_INPUTS_FILE,
+        },
         timeout=900,
     )
 
@@ -122,9 +125,9 @@ def create_assess_and_improve_workflow() -> Workflow:
             f"--input {PARSED_INPUTS_FILE} "
             f"--output {ASSESS_OUTPUTS_FILE}"
         ),
-        inputs={PARSED_INPUTS_FILE: "@parse_inputs:parsed_inputs"},
+        inputs={PARSED_INPUTS_FILE: "@ingest:parsed_inputs"},
         output_files={"assess_outputs": ASSESS_OUTPUTS_FILE},
-        depends_on=["parse_inputs"],
+        depends_on=["ingest"],
         timeout=1800,
         secret_refs=["ANTHROPIC_API_KEY"],
     )
@@ -179,7 +182,7 @@ def create_assess_and_improve_workflow() -> Workflow:
         timeout=300,
     )
 
-    for task in (ingest, parse_inputs, assess, propose, score, render):
+    for task in (ingest, assess, propose, score, render):
         wf.add_task(task)
 
     return wf

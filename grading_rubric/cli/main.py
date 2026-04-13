@@ -99,13 +99,79 @@ def main() -> None:
 # ── 1. ingest ────────────────────────────────────────────────────────────
 
 
+def _build_inputs_from_root(root: Path) -> IngestInputs:
+    """Build ``IngestInputs`` from an ADR-007 directory layout.
+
+    Expected structure::
+
+        root/
+          exam_question/      — required, exactly one file
+          teaching_material/  — optional, zero or more files
+          student_copy/       — optional, zero or more files
+          starting_rubric/    — optional, zero or one file
+    """
+
+    def _files_in(role: str) -> list[Path]:
+        d = root / role
+        if not d.is_dir():
+            return []
+        return sorted(p for p in d.iterdir() if p.is_file())
+
+    # exam_question — required, exactly one
+    eq_files = _files_in("exam_question")
+    if len(eq_files) == 0:
+        raise click.ClickException(
+            f"exam_question role is required but {root / 'exam_question'} "
+            "contains no files"
+        )
+    if len(eq_files) > 1:
+        raise click.ClickException(
+            f"exam_question must contain exactly one file, "
+            f"found {len(eq_files)}: {[p.name for p in eq_files]}"
+        )
+
+    # starting_rubric — optional, at most one
+    sr_files = _files_in("starting_rubric")
+    if len(sr_files) > 1:
+        raise click.ClickException(
+            f"starting_rubric must contain at most one file, "
+            f"found {len(sr_files)}: {[p.name for p in sr_files]}"
+        )
+
+    return IngestInputs(
+        exam_question_path=eq_files[0],
+        teaching_material_paths=_files_in("teaching_material"),
+        student_copy_paths=_files_in("student_copy"),
+        starting_rubric_path=sr_files[0] if sr_files else None,
+    )
+
+
 @main.command("ingest")
-@click.option("--input", "input_path", type=click.Path(path_type=Path), required=True)
+@click.option("--input", "input_path", type=click.Path(path_type=Path), default=None)
+@click.option("--input-root", "input_root", type=click.Path(path_type=Path), default=None)
 @click.option("--output", "output_path", type=click.Path(path_type=Path), required=True)
-def cmd_ingest(input_path: Path, output_path: Path) -> None:
+def cmd_ingest(
+    input_path: Path | None,
+    input_root: Path | None,
+    output_path: Path,
+) -> None:
     """Read raw inputs, build InputProvenance + EvidenceProfile."""
 
-    inputs = _read_model(input_path, IngestInputs)
+    if input_path is not None and input_root is not None:
+        raise click.ClickException(
+            "--input and --input-root are mutually exclusive"
+        )
+    if input_path is None and input_root is None:
+        raise click.ClickException(
+            "either --input or --input-root must be provided"
+        )
+
+    if input_path is not None:
+        inputs = _read_model(input_path, IngestInputs)
+    else:
+        assert input_root is not None
+        inputs = _build_inputs_from_root(input_root)
+
     out = ingest_stage(inputs, settings=_settings(), audit_emitter=_make_emitter())
     _write_json(output_path, out)
     click.echo(str(output_path))

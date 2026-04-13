@@ -143,7 +143,7 @@ def render_stage(
         proposed_changes=proposed.proposed_changes,
         explanation=explanation,
         quality_scores=inputs.quality_scores,
-        previous_quality_scores=None,
+        previous_quality_scores=inputs.previous_quality_scores,
         evidence_profile=proposed.assessed.evidence_profile,
     )
 

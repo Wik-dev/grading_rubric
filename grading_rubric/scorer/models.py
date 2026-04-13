@@ -57,6 +57,7 @@ class ScoreOutputs(BaseModel):
 
     proposed: ProposeOutputs
     quality_scores: list[CriterionScore]
+    previous_quality_scores: list[CriterionScore] | None = None
     scorer_id: str
     scorer_version: str
 
@@ -93,3 +94,27 @@ class TrainedScorerArtefact(BaseModel):
 
 class ScorerArtefactMissingError(RuntimeError):
     """Raised by `TrainedModelScorer` when no artefact is on disk (DR-SCR-03)."""
+
+
+# ── LLM scorer schemas (gateway call shapes) ────────────────────────────
+
+
+class LlmScorerInput(BaseModel):
+    """Inputs for the score_criterion prompt."""
+
+    model_config = ConfigDict(strict=True)
+
+    rubric_json: str
+    criterion: str
+    findings_json: str
+    exam_question_text: str
+    teaching_material_text: str
+
+
+class LlmScorerOutput(BaseModel):
+    """Output from the score_criterion prompt."""
+
+    model_config = ConfigDict(strict=True)
+
+    score: int  # 0–100
+    justification: str

@@ -57,5 +57,6 @@ class ParsedInputs(BaseModel):
     exam_question_text: str
     teaching_material_text: str
     starting_rubric: Rubric | None
+    starting_rubric_raw_text: str | None = None
     synthetic_rubric_for_from_scratch: Rubric | None
     student_copies_text: list[str] = []

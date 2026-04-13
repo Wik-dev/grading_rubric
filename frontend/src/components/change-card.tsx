@@ -100,7 +100,7 @@ export function ChangeCard({
               {linkedFindings.length > 0 ? (
                 <ul className="list-disc space-y-1 pl-4">
                   {linkedFindings.map((f) => (
-                    <li key={f.id}>{f.description}</li>
+                    <li key={f.id}>{f.observation}</li>
                   ))}
                 </ul>
               ) : (

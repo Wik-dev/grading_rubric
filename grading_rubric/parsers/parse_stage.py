@@ -29,7 +29,10 @@ def _try_parse_rubric_json(text: str) -> Rubric | None:
     except (json.JSONDecodeError, ValueError):
         return None
     try:
-        return Rubric.model_validate(data)
+        # strict=False: JSON naturally represents UUIDs as strings, and the
+        # Rubric model uses ConfigDict(strict=True) for construction-time
+        # safety. Deserialization from wire JSON needs coercion.
+        return Rubric.model_validate(data, strict=False)
     except Exception:  # noqa: BLE001
         return None
 
@@ -41,6 +44,50 @@ def _empty_rubric(title: str) -> Rubric:
         title=title,
         total_points=0.0,
         criteria=[],
+    )
+
+
+def _extract_total_points(text: str) -> float:
+    """Best-effort extraction of total points from free-text rubric."""
+    import re
+
+    # Match patterns like "total = 3 points", "total: 10", "/20", "(X points)"
+    for pattern in [
+        r"total\s*[=:]\s*(\d+(?:\.\d+)?)\s*(?:points?|pts?)?",
+        r"(\d+(?:\.\d+)?)\s*points?\s*total",
+        r"/\s*(\d+(?:\.\d+)?)\s*$",
+        r"\((\d+(?:\.\d+)?)\s*points?\)",
+    ]:
+        m = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
+        if m:
+            return float(m.group(1))
+    return 0.0
+
+
+def _rubric_from_freetext(text: str) -> Rubric:
+    """Build a minimal structured Rubric from free-text guidance.
+
+    Places the entire teacher-provided text into a single criterion so the
+    assess engines have something concrete to measure.  The title signals
+    that the structure was inferred, not author-provided.
+    """
+    from grading_rubric.models.rubric import RubricCriterion
+
+    first_line = text.strip().split("\n", 1)[0][:80]
+    total = _extract_total_points(text)
+    return Rubric(
+        id=uuid4(),
+        schema_version="1.0.0",
+        title=f"teacher-provided rubric: {first_line}",
+        total_points=total,
+        criteria=[
+            RubricCriterion(
+                id=uuid4(),
+                name="Teacher rubric (free-text)",
+                description=text.strip(),
+                points=total,
+            )
+        ],
     )
 
 
@@ -60,15 +107,18 @@ def parse_inputs_stage(
     teaching_text = "\n\n---\n\n".join(t for t in teaching_text_parts if t)
 
     starting_rubric: Rubric | None = None
+    raw_text: str | None = None
     if inputs.inputs.starting_rubric_inline is not None:
         starting_rubric = _try_parse_rubric_json(inputs.inputs.starting_rubric_inline)
-        # If inline text is not valid JSON, leave the rubric as None and let
-        # the propose stage treat the inline text as free-text guidance via
-        # the from-scratch path. This is the SR-IN-05 inline form.
+        if starting_rubric is None and inputs.inputs.starting_rubric_inline.strip():
+            raw_text = inputs.inputs.starting_rubric_inline
+            starting_rubric = _rubric_from_freetext(raw_text)
     elif inputs.inputs.starting_rubric_path is not None:
         text = read_any_text(inputs.inputs.starting_rubric_path)
         starting_rubric = _try_parse_rubric_json(text)
-        # Same fallback for path-based rubrics that aren't structured JSON.
+        if starting_rubric is None and text.strip():
+            raw_text = text
+            starting_rubric = _rubric_from_freetext(raw_text)
 
     synthetic_rubric: Rubric | None = None
     if starting_rubric is None:
@@ -85,6 +135,7 @@ def parse_inputs_stage(
         exam_question_text=exam_text,
         teaching_material_text=teaching_text,
         starting_rubric=starting_rubric,
+        starting_rubric_raw_text=raw_text,
         synthetic_rubric_for_from_scratch=synthetic_rubric,
         student_copies_text=student_texts,
     )
