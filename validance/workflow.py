@@ -5,13 +5,16 @@ Defines two workflows registered against a Validance instance:
   ``grading_rubric.assess_and_improve``
       The full assessment pipeline as one Validance task per L1 stage:
 
-          ingest → parse_inputs → assess → propose → approve → score → render
+          ingest → parse_inputs → assess → propose → [gate] → score → render
 
-      Where ``approve`` is an ``ApprovalGate`` (gate="human-confirm" on the
+      Where ``[gate]`` is an ``ApprovalGate`` (gate="human-confirm" on the
       preceding ``propose`` task per DR-INT-06) that pauses the run until the
-      teacher accepts or rejects each ``ProposedChange`` in the L4 SPA. Each
-      task wraps the L2 image's CLI: ``docker run grading-rubric:latest
-      <subcommand> --input … --output …``.
+      teacher accepts or rejects each ``ProposedChange`` in the L4 SPA.
+      Each task wraps one L2 image CLI subcommand:
+      ``docker run grading-rubric:latest <subcommand> --input … --output …``.
+      The ``parse_inputs`` task uses ``trigger_inputs=True`` (ADR-007 § 9
+      amendment) so it receives the staged PDFs/images for OCR alongside
+      the structured ``ingest_outputs.json`` from the ``ingest`` task.
 
   ``grading_rubric.train_scorer``
       The standalone train-button capability per DR-SCR-06 / DR-DEP-06. One
@@ -40,12 +43,13 @@ from validance.sdk import Task, Workflow
 # that bumping the image is a one-line change.
 
 TASK_IMAGE = "grading-rubric:latest"
-LLM_ENV = {
-    "GR_LLM_BACKEND": "openai",
-    "GR_LLM_MODEL": "gpt-5.4",
-    "GR_LLM_MODEL_RUBRIC_DECOMPOSITION": "gpt-5.4",
-}
-LLM_SECRET_REFS = ["OPENAI_API_KEY"]
+
+# LLM backend is not hardcoded — Settings.from_env() defaults apply
+# (anthropic + claude-sonnet-4-20250514). Override via GR_LLM_BACKEND,
+# GR_LLM_MODEL, GR_LLM_MODEL_RUBRIC_DECOMPOSITION env vars on the
+# Validance instance for a different backend.
+LLM_ENV: dict[str, str] = {}
+LLM_SECRET_REFS = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]
 
 # ── Filename conventions inside each task's working directory ──────────────
 #
@@ -73,15 +77,15 @@ TRAINED_ARTEFACT_FILE = "trained_scorer.json"
 
 
 def create_assess_and_improve_workflow() -> Workflow:
-    """Build the seven-task assessment + improvement workflow.
+    """Build the six-stage pipeline as six Validance tasks.
 
     Task graph (linear, single critical path):
 
-        ingest → assess → propose → score → render
+        ingest → parse_inputs → assess → propose → score → render
 
-    The ``ingest`` task chains two L1 CLI commands (``ingest`` + ``parse-inputs``)
-    in a single container so that ``parse-inputs`` can access the ADR-007 staged
-    files alongside the ``ingest_outputs.json`` produced by the first command.
+    Each task wraps one L1 CLI subcommand. The ``parse_inputs`` task uses
+    ``trigger_inputs=True`` (ADR-007 § 9 amendment) so it receives the
+    staged PDFs/images alongside the ``ingest_outputs.json`` from ingest.
 
     The ``propose`` task carries ``gate="human-confirm"`` per DR-INT-06: the
     Validance engine pauses the run after ``propose`` succeeds, surfaces the
@@ -102,25 +106,36 @@ def create_assess_and_improve_workflow() -> Workflow:
 
     wf = Workflow("grading_rubric.assess_and_improve")
 
-    # Ingest + parse-inputs run in one container so parse-inputs can read
-    # the ADR-007 staged files that ingest scanned.
     ingest = Task(
         name="ingest",
         docker_image=TASK_IMAGE,
         command=(
             "grading-rubric-cli ingest "
             "--input-root inputs "
-            f"--output {INGEST_OUTPUTS_FILE} && "
+            f"--output {INGEST_OUTPUTS_FILE}"
+        ),
+        inputs={},
+        output_files={"ingest_outputs": INGEST_OUTPUTS_FILE},
+        timeout=900,
+    )
+
+    # ADR-007 § 9 amendment: trigger_inputs=True so parse_inputs receives
+    # the staged PDFs/images for OCR alongside the ingest_outputs.json.
+    parse_inputs = Task(
+        name="parse_inputs",
+        docker_image=TASK_IMAGE,
+        command=(
             "grading-rubric-cli parse-inputs "
             f"--input {INGEST_OUTPUTS_FILE} "
             f"--output {PARSED_INPUTS_FILE}"
         ),
-        inputs={},
-        output_files={
-            "ingest_outputs": INGEST_OUTPUTS_FILE,
-            "parsed_inputs": PARSED_INPUTS_FILE,
-        },
-        timeout=900,
+        inputs={INGEST_OUTPUTS_FILE: "@ingest:ingest_outputs"},
+        output_files={"parsed_inputs": PARSED_INPUTS_FILE},
+        depends_on=["ingest"],
+        trigger_inputs=True,
+        timeout=1800,
+        environment=LLM_ENV,
+        secret_refs=LLM_SECRET_REFS,
     )
 
     assess = Task(
@@ -131,9 +146,9 @@ def create_assess_and_improve_workflow() -> Workflow:
             f"--input {PARSED_INPUTS_FILE} "
             f"--output {ASSESS_OUTPUTS_FILE}"
         ),
-        inputs={PARSED_INPUTS_FILE: "@ingest:parsed_inputs"},
+        inputs={PARSED_INPUTS_FILE: "@parse_inputs:parsed_inputs"},
         output_files={"assess_outputs": ASSESS_OUTPUTS_FILE},
-        depends_on=["ingest"],
+        depends_on=["parse_inputs"],
         timeout=1800,
         environment=LLM_ENV,
         secret_refs=LLM_SECRET_REFS,
@@ -191,7 +206,7 @@ def create_assess_and_improve_workflow() -> Workflow:
         timeout=300,
     )
 
-    for task in (ingest, assess, propose, score, render):
+    for task in (ingest, parse_inputs, assess, propose, score, render):
         wf.add_task(task)
 
     return wf
@@ -220,7 +235,7 @@ def create_train_scorer_workflow() -> Workflow:
             f"--input {TRAINING_EVIDENCE_FILE} "
             f"--output {TRAINED_ARTEFACT_FILE}"
         ),
-        inputs={TRAINING_EVIDENCE_FILE: "${training_evidence_path}"},
+        inputs={},  # training evidence provided via trigger input_files
         output_files={"trained_artefact": TRAINED_ARTEFACT_FILE},
         timeout=3600,
     )
@@ -242,8 +257,9 @@ WORKFLOWS: dict[str, callable] = {
 
 WORKFLOW_DESCRIPTIONS: dict[str, str] = {
     "assess_and_improve": (
-        "Six-stage rubric assessment + improvement pipeline with a human-"
-        "confirm approval gate after the propose stage (DR-INT-02 / DR-INT-06)."
+        "Six-stage rubric assessment + improvement pipeline (6 Validance tasks) "
+        "with a human-confirm approval gate after the propose stage "
+        "(DR-INT-02 / DR-INT-06)."
     ),
     "train_scorer": (
         "Standalone train-button capability — DR-SCR-06 stub (does not call "

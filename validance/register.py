@@ -60,6 +60,8 @@ def _workflow_payload(wf, description: str) -> dict[str, Any]:
             entry["secret_refs"] = list(task.secret_refs)
         if getattr(task, "persistent", False):
             entry["persistent"] = True
+        if getattr(task, "trigger_inputs", False):
+            entry["trigger_inputs"] = True
         tasks.append(entry)
 
     return {

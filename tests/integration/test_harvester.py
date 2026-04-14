@@ -110,7 +110,7 @@ class TestHarvestAuditBundle:
 
     def test_custom_task_set(self) -> None:
         """Stages beyond the standard set are filtered gracefully."""
-        client = StubValidanceClient(task_names=["ingest", "parse_inputs"])
+        client = StubValidanceClient(task_names=["ingest", "assess"])
         bundle = harvest_audit_bundle("test-run-002", client)
         # Only the stages in _STAGE_TASK_NAMES that match should appear.
         assert len(bundle.stages) <= 6
