@@ -44,11 +44,18 @@ from validance.sdk import Task, Workflow
 
 TASK_IMAGE = "grading-rubric:latest"
 
-# LLM backend is not hardcoded — Settings.from_env() defaults apply
-# (anthropic + claude-sonnet-4-20250514). Override via GR_LLM_BACKEND,
-# GR_LLM_MODEL, GR_LLM_MODEL_RUBRIC_DECOMPOSITION env vars on the
-# Validance instance for a different backend.
-LLM_ENV: dict[str, str] = {}
+# Model split:
+#   Claude Sonnet 4 → OCR, planner (structured extraction at T=0.0)
+#   Claude Opus 4.6 → rubric decomposition (hardest parsing task)
+#   GPT-5.4 → grading simulation only (via GR_ASSESS_LLM_* override)
+#
+# Main defaults (anthropic + claude-sonnet-4-20250514 + claude-opus-4-6)
+# come from Settings.from_env() with no override needed. The assess stage
+# uses a separate backend/model so the measurement work runs on GPT-5.4.
+LLM_ENV: dict[str, str] = {
+    "GR_ASSESS_LLM_BACKEND": "openai",
+    "GR_ASSESS_LLM_MODEL": "gpt-5.4",
+}
 LLM_SECRET_REFS = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]
 
 # ── Filename conventions inside each task's working directory ──────────────
@@ -154,11 +161,6 @@ def create_assess_and_improve_workflow() -> Workflow:
         secret_refs=LLM_SECRET_REFS,
     )
 
-    # DR-INT-06: ``gate="human-confirm"`` puts the Validance ApprovalGate
-    # primitive **after** this task so the run pauses on the proposed
-    # changes for teacher review. The proposal payload visible in the SPA is
-    # built by ``proposals.proposed_changes_to_payload`` (DR-INT-04) and the
-    # teacher's resolution flows back through the same module.
     propose = Task(
         name="propose",
         docker_image=TASK_IMAGE,
@@ -171,11 +173,17 @@ def create_assess_and_improve_workflow() -> Workflow:
         output_files={"propose_outputs": PROPOSE_OUTPUTS_FILE},
         depends_on=["assess"],
         timeout=1800,
-        gate="human-confirm",
         environment=LLM_ENV,
         secret_refs=LLM_SECRET_REFS,
     )
 
+    # DR-INT-06: ``gate="human-confirm"`` on score (not propose) because
+    # the Validance engine fires the gate at task-start time, before the
+    # CLI runs. Placing the gate on score means propose has already
+    # completed and its output files are downloadable — the SPA can fetch
+    # ``propose_outputs.json`` to show the teacher the proposed changes
+    # during the approval phase. The teacher still reviews at the same
+    # pipeline point (after propose, before scoring).
     score = Task(
         name="score",
         docker_image=TASK_IMAGE,
@@ -188,6 +196,8 @@ def create_assess_and_improve_workflow() -> Workflow:
         output_files={"score_outputs": SCORE_OUTPUTS_FILE},
         depends_on=["propose"],
         timeout=1800,
+        gate="human-confirm",
+        gate_timeout=3600,
         environment=LLM_ENV,
         secret_refs=LLM_SECRET_REFS,
     )

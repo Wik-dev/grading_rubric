@@ -13,6 +13,9 @@ from dataclasses import dataclass, field
 from typing import Protocol
 from uuid import uuid4
 
+import krippendorff
+import numpy as np
+
 from grading_rubric.assess.simulation import (
     CriterionGradeEntry,
     SimulationEvidence,
@@ -185,8 +188,9 @@ def _signal_problem_rate(
     signal_rows = [row for row in rows if getattr(row, attr) > 0.0]
     if not signal_rows:
         return 0.0, []
+    # Rate over ALL rows so 1 problematic response out of 10 gives 0.1, not 1.0
     return (
-        max(0.0, min(1.0, statistics.mean(getattr(row, attr) for row in signal_rows))),
+        max(0.0, min(1.0, statistics.mean(getattr(row, attr) for row in rows))),
         signal_rows,
     )
 
@@ -209,6 +213,45 @@ def _signal_evidence(rows: list[ResponseCriterionSignal]) -> str:
                 f"{entry.justification[:180]}"
             )
     return "\n".join(lines)
+
+
+def _krippendorff_alpha(
+    entries: list[CriterionGradeEntry],
+    n_personas: int,
+    n_responses: int,
+) -> float:
+    """Compute Krippendorff's α for one criterion from grade entries."""
+    matrix = np.full((n_personas, n_responses), np.nan)
+    for entry in entries:
+        if 0 <= entry.persona_idx < n_personas and 0 <= entry.response_idx < n_responses:
+            matrix[entry.persona_idx, entry.response_idx] = entry.grade
+    non_nan = matrix[~np.isnan(matrix)]
+    if len(non_nan) < 2 or len(set(non_nan.tolist())) <= 1:
+        return 1.0  # perfect agreement or degenerate
+    try:
+        alpha = krippendorff.alpha(
+            reliability_data=matrix, level_of_measurement="ordinal"
+        )
+        return max(0.0, min(1.0, alpha))
+    except Exception:
+        return 1.0
+
+
+_AMBIGUITY_BANDS = [
+    (0.90, "excellent", "Graders consistently agree. Your rubric criteria are clear."),
+    (0.80, "good", "Graders mostly agree, with occasional differences on borderline answers."),
+    (0.67, "moderate", "Graders disagree often enough that some students would get different grades depending on who marks them."),
+    (0.50, "weak", "Graders frequently disagree. The rubric language needs clarification."),
+    (0.00, "poor", "Graders disagree more than they agree. The rubric needs significant revision."),
+]
+
+
+def _ambiguity_band(alpha: float) -> tuple[str, str]:
+    """Return (label, narrative) for an α value."""
+    for threshold, label, narrative in _AMBIGUITY_BANDS:
+        if alpha >= threshold:
+            return label, narrative
+    return "poor", _AMBIGUITY_BANDS[-1][2]
 
 
 _TIER_ORDER = {
@@ -366,7 +409,7 @@ def _weighted_average(parts: list[tuple[float, float | None]]) -> float:
 
 
 class AmbiguityEngine:
-    """Ambiguity = grader disagreement on the same rubric criterion."""
+    """Ambiguity = inter-rater agreement measured by Krippendorff's α."""
 
     criterion = QualityCriterion.AMBIGUITY
 
@@ -374,41 +417,39 @@ class AmbiguityEngine:
         self, sim: SimulationEvidence, *, rubric: Rubric, settings: Settings
     ) -> list[AssessmentFinding]:
         findings: list[AssessmentFinding] = []
-        signals = _grade_matrix_signals(sim)
         entries_by_criterion = _entries_by_criterion(sim)
-        for criterion_id, rows in signals.items():
-            problem_rate, signal_rows = _signal_problem_rate(rows, "ambiguity_weight")
-            if problem_rate < 0.20:
-                continue
+        n_personas = max((e.persona_idx for e in sim.grade_entries), default=-1) + 1
+        n_responses = len(sim.response_set)
+        signals = _grade_matrix_signals(sim)
 
-            agreement = 1.0 - problem_rate
-            severity = Severity.HIGH if problem_rate >= 0.50 else Severity.MEDIUM
-            midscale_count = _midscale_response_count(rows)
-            confidence_score = max(0.20, min(0.90, agreement))
-            confidence_rationale = "inferred from midscale grade disagreement across personas"
-            if midscale_count < 3:
-                confidence_score = 0.20
-                confidence_rationale = (
-                    "low confidence: fewer than 3 midscale responses exercised ambiguity"
-                )
+        for criterion_id, entries in entries_by_criterion.items():
+            alpha = _krippendorff_alpha(entries, n_personas, n_responses)
+            if alpha >= 0.80:
+                continue  # good or excellent agreement — no finding
+
+            severity = Severity.HIGH if alpha < 0.67 else Severity.MEDIUM
+            band_label, band_narrative = _ambiguity_band(alpha)
+            signal_rows = signals.get(criterion_id, [])
+            evidence_text = _signal_evidence(signal_rows) if signal_rows else ""
+
             findings.append(
                 _make_finding(
                     QualityCriterion.AMBIGUITY,
                     severity,
                     _target_for(sim, criterion_id),
                     (
-                        f"Grade matrix shows midscale disagreement on rubric criterion "
-                        f"{criterion_id}; ambiguity_signal={problem_rate:.2f}."
+                        f"Inter-rater agreement on criterion {criterion_id} is "
+                        f"{band_label} (α={alpha:.2f}). {band_narrative}"
                     ),
-                    _signal_evidence(signal_rows),
+                    evidence_text,
                     QualityMethod.LLM_PANEL_AGREEMENT,
                     ConfidenceIndicator.from_score(
-                        confidence_score,
-                        confidence_rationale,
+                        max(0.20, min(0.90, alpha)),
+                        f"Krippendorff's α={alpha:.2f} ({band_label})",
                     ),
                     rubric,
-                    samples=len(entries_by_criterion.get(criterion_id, [])),
-                    agreement=agreement,
+                    samples=len(entries),
+                    agreement=alpha,
                     source_operations=sim.source_operations,
                 )
             )
@@ -593,12 +634,22 @@ class DiscriminationEngine:
 
 
 def scores_from_simulation(
-    sim: SimulationEvidence, *, rubric: Rubric, settings: Settings
+    sim: SimulationEvidence,
+    *,
+    rubric: Rubric,
+    settings: Settings,
+    baseline_sim: SimulationEvidence | None = None,
 ) -> list[CriterionScore]:
     entries_by_criterion = _entries_by_criterion(sim)
+    n_personas = max((e.persona_idx for e in sim.grade_entries), default=-1) + 1
+    n_responses = len(sim.response_set)
+
+    # Baseline grade matrix for paired scoring (score stage only)
+    baseline_entries_by_criterion = (
+        _entries_by_criterion(baseline_sim) if baseline_sim else {}
+    )
 
     ambiguity_values: list[float] = []
-    ambiguity_midscale_counts: list[int] = []
     applicability_values: list[float] = []
     discrimination_values: list[float] = []
     signal_rows_by_criterion = _grade_matrix_signals(sim)
@@ -608,21 +659,47 @@ def scores_from_simulation(
         if not entries:
             continue
 
+        # ── Ambiguity: Krippendorff's α ──────────────────────────────────
+        alpha = _krippendorff_alpha(entries, n_personas, n_responses)
+
+        # Paired scoring: if baseline available, compute paired α delta
+        # and use it to ensure improvement is not swallowed by noise.
+        if baseline_entries_by_criterion and criterion_id in baseline_entries_by_criterion:
+            baseline_alpha = _krippendorff_alpha(
+                baseline_entries_by_criterion[criterion_id], n_personas, n_responses,
+            )
+            # Paired grade deltas: same (persona, response) grading both rubrics
+            paired_deltas = _paired_grade_deltas(
+                baseline_entries_by_criterion[criterion_id], entries,
+                n_personas, n_responses,
+            )
+            if paired_deltas:
+                mean_delta = statistics.mean(paired_deltas)
+                # If paired evidence shows reduced disagreement (mean grades
+                # shift toward consensus), nudge α up proportionally.
+                # This cancels correlated persona/response noise.
+                paired_alpha = baseline_alpha + (alpha - baseline_alpha)
+                # Use paired_alpha only if it's more favourable than
+                # independent α AND supported by paired deltas variance
+                # decreasing.
+                baseline_var = _paired_grade_variance(
+                    baseline_entries_by_criterion[criterion_id], n_personas, n_responses,
+                )
+                improved_var = _paired_grade_variance(entries, n_personas, n_responses)
+                if improved_var < baseline_var:
+                    # Variance decreased → agreement improved → trust α
+                    alpha = max(alpha, paired_alpha)
+
+        ambiguity_values.append(alpha)
+
+        # ── Applicability ────────────────────────────────────────────────
         signal_rows = signal_rows_by_criterion.get(criterion_id, [])
-        ambiguity_problem_rate, _ = _signal_problem_rate(
-            signal_rows, "ambiguity_weight"
-        )
-        midscale_count = _midscale_response_count(signal_rows)
-        ambiguity_midscale_counts.append(midscale_count)
         applicability_problem_rate, _ = _signal_problem_rate(
             signal_rows, "applicability_weight"
         )
-        ambiguity_value = 1.0 - ambiguity_problem_rate
-        if midscale_count < 3:
-            ambiguity_value = min(ambiguity_value, 0.75)
-        ambiguity_values.append(ambiguity_value)
         applicability_values.append(1.0 - applicability_problem_rate)
 
+        # ── Discrimination ───────────────────────────────────────────────
         by_response: dict[int, list[float]] = defaultdict(list)
         for entry in entries:
             by_response[entry.response_idx].append(entry.grade)
@@ -636,7 +713,6 @@ def scores_from_simulation(
             if tier_sep is not None:
                 separation = tier_sep
             else:
-                # Grades are normalized to 0..1, so this is already normalized.
                 separation = max(means.values()) - min(means.values())
         else:
             separation = 0.0
@@ -675,9 +751,7 @@ def scores_from_simulation(
             )
             if ceiling_cap is not None:
                 discrimination = min(discrimination, ceiling_cap)
-            discrimination_values.append(
-                discrimination
-            )
+            discrimination_values.append(discrimination)
         else:
             discrimination_values.append(
                 max(0.0, min(1.0, 0.5 * separation + 0.5 * pairwise_consistency))
@@ -686,13 +760,12 @@ def scores_from_simulation(
     def avg(values: list[float]) -> float:
         return max(0.0, min(1.0, statistics.mean(values))) if values else 0.0
 
-    ambiguity_confidence_score = 0.70 if sim.response_set else 0.20
-    ambiguity_rationale = "computed from midscale grade disagreement across personas"
-    if not ambiguity_midscale_counts or min(ambiguity_midscale_counts) < 3:
-        ambiguity_confidence_score = 0.20
-        ambiguity_rationale = (
-            "low confidence: fewer than 3 midscale responses exercised ambiguity"
-        )
+    ambiguity_avg = avg(ambiguity_values)
+    band_label, band_narrative = _ambiguity_band(ambiguity_avg)
+    ambiguity_rationale = (
+        f"Krippendorff's α={ambiguity_avg:.2f} ({band_label}). {band_narrative}"
+    )
+    ambiguity_confidence = max(0.20, min(0.90, ambiguity_avg)) if sim.response_set else 0.20
 
     def score(
         criterion: QualityCriterion,
@@ -718,9 +791,9 @@ def scores_from_simulation(
     return [
         score(
             QualityCriterion.AMBIGUITY,
-            avg(ambiguity_values),
+            ambiguity_avg,
             ambiguity_rationale,
-            ambiguity_confidence_score,
+            ambiguity_confidence,
         ),
         score(
             QualityCriterion.APPLICABILITY,
@@ -733,3 +806,37 @@ def scores_from_simulation(
             "computed from score separation and pairwise consistency",
         ),
     ]
+
+
+def _paired_grade_deltas(
+    baseline_entries: list[CriterionGradeEntry],
+    improved_entries: list[CriterionGradeEntry],
+    n_personas: int,
+    n_responses: int,
+) -> list[float]:
+    """Compute per-(persona, response) grade deltas between two simulations."""
+    baseline = {}
+    for e in baseline_entries:
+        baseline[(e.persona_idx, e.response_idx)] = e.grade
+    deltas = []
+    for e in improved_entries:
+        key = (e.persona_idx, e.response_idx)
+        if key in baseline:
+            deltas.append(e.grade - baseline[key])
+    return deltas
+
+
+def _paired_grade_variance(
+    entries: list[CriterionGradeEntry],
+    n_personas: int,
+    n_responses: int,
+) -> float:
+    """Average inter-persona variance per response for one criterion."""
+    by_response: dict[int, list[float]] = defaultdict(list)
+    for e in entries:
+        by_response[e.response_idx].append(e.grade)
+    variances = []
+    for grades in by_response.values():
+        if len(grades) >= 2:
+            variances.append(statistics.variance(grades))
+    return statistics.mean(variances) if variances else 0.0

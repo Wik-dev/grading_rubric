@@ -41,7 +41,10 @@ def score_stage(
         stage_id=STAGE_ID,
     )
     improved_scores = scores_from_simulation(
-        improved_simulation, rubric=inputs.improved_rubric, settings=settings
+        improved_simulation,
+        rubric=inputs.improved_rubric,
+        settings=settings,
+        baseline_sim=inputs.assessed.simulation_evidence,
     )
     previous_scores = inputs.assessed.quality_scores or None
 

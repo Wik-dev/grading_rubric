@@ -449,7 +449,7 @@ def run_grader_simulation(
             ),
             output_schema=GradingResult,
             samples=1,
-            temperature=settings.llm_sampling_temperature,
+            temperature=0.3,
             settings=simulation_settings,
             audit_emitter=audit_emitter,
             stage_id=stage_id,
