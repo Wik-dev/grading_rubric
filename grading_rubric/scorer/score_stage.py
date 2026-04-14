@@ -1,8 +1,7 @@
-"""DR-SCR-01..04 — `score` stage entry point.
+"""DR-SCR — `score` stage entry point.
 
-Wraps the `Scorer` Protocol selection (DR-SCR-04) and the
-`ScoringEvidence` → `ScoringResult` call (DR-SCR-01) into the standard
-stage shape so the orchestrator can chain it after `propose`.
+Re-runs the shared grader simulation against the improved rubric and converts
+the resulting grade matrix into headline quality scores.
 """
 
 from __future__ import annotations

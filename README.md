@@ -7,7 +7,8 @@ An AI-powered application that assesses and improves the quality of grading rubr
 ### Prerequisites
 
 - Python 3.11+
-- An Anthropic API key (Claude)
+- An Anthropic API key for OCR/rubric structuring and improvement
+- Optionally, an OpenAI API key for the assessment simulation backend
 
 ### Install
 
@@ -19,10 +20,14 @@ pip install .
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENAI_API_KEY="sk-proj-..."                  # optional
+export GR_ASSESS_LLM_BACKEND=openai                  # optional hybrid mode
+export GR_ASSESS_LLM_MODEL=gpt-5.4                   # optional hybrid mode
 
 grading-rubric-cli run-pipeline \
     --exam-question ExamQuestionAndRubric.pdf \
     --teaching-material TeachingResource-BAD_ACTORS_STRATEGY.pdf \
+    --starting-rubric ExamQuestionAndRubric.pdf \
     --student-copy StudentAnswer-Student1.pdf \
     --student-copy StudentAnswer-Student2.pdf \
     --student-copy StudentAnswer-Student3.pdf \
@@ -84,9 +89,13 @@ All settings are via environment variables (defaults are sensible):
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ANTHROPIC_API_KEY` | — | Anthropic API key (required) |
+| `OPENAI_API_KEY` | — | OpenAI API key, required only when an OpenAI backend is selected |
 | `GR_LLM_BACKEND` | `anthropic` | LLM backend (`anthropic`, `openai`, `stub`) |
-| `GR_LLM_MODEL` | `claude-sonnet-4-6-20251001` | Model identifier |
+| `GR_LLM_MODEL` | `claude-sonnet-4-20250514` | Main model identifier |
+| `GR_LLM_MODEL_RUBRIC_DECOMPOSITION` | `claude-opus-4-6` | Rubric-structuring model override |
 | `GR_LLM_TEMPERATURE` | `0.7` | Sampling temperature |
+| `GR_ASSESS_LLM_BACKEND` | — | Optional backend override for synthetic responses, grading, and pairwise comparison |
+| `GR_ASSESS_LLM_MODEL` | — | Optional model override for assessment simulation |
 | `GR_SCORER_BACKEND` | `llm_panel` | Scorer backend (`llm_panel`, `trained_model`) |
 
 ### Tests

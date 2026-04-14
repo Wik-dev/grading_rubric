@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import uuid4
+
 from grading_rubric.assess.engines import (
     AmbiguityEngine,
     ApplicabilityEngine,
@@ -46,7 +48,6 @@ def assess_stage(
             QualityMethod,
             Severity,
         )
-        from uuid import uuid4
 
         finding = AssessmentFinding(
             id=uuid4(),

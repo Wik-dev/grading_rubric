@@ -62,11 +62,11 @@ Deterministic functions with exact assertions. No LLM calls, no network, no rand
 |---|---|---|---|---|---|
 | UT-MET-01 | `_confidence_floor()` | `engines.py:93` | `EvidenceProfile` with `synthetic_responses_used=True`, base score 0.85 | Floor clamped to LOW range (≤ 0.40) | DR-AS-13 |
 | UT-MET-02 | `_confidence_floor()` | `engines.py:93` | `EvidenceProfile` with real copies, base score 0.85 | No clamping (returns base) | DR-AS-13 |
-| UT-MET-03 | `AmbiguityEngine.measure()` linguistic sweep | `engines.py:110–195` | Rubric with criteria containing `_VAGUE_TERMS` matches ("appropriate", "adequate") | Findings with `method=LINGUISTIC_SWEEP`, `severity=MEDIUM` | DR-AS-06 |
-| UT-MET-04 | `AmbiguityEngine.measure()` no matches | `engines.py:110–195` | Rubric with no vague terms | Empty findings list for linguistic sweep sub-method | DR-AS-06 |
-| UT-MET-05 | `AmbiguityEngine.measure()` duplicate labels | `engines.py:110–195` | Rubric with two criteria sharing a label | Finding with `severity=HIGH` | DR-AS-06 |
-| UT-MET-06 | `DiscriminationEngine.measure()` | `engines.py:255–305` | Score distribution with known variance, `assess_discrimination_variance_target` in settings | Finding with normalized ratio = variance / target | DR-AS-08 |
-| UT-MET-07 | `LlmPanelScorer.score_rubric()` | `scorer.py:59–80` | Findings: 2 MEDIUM (0.25 each), 1 HIGH (0.5) | `CriterionScore` = 1.0 − avg(severity_weights) | DR-SCR-01, DR-SCR-02 |
+| UT-MET-03 | `AmbiguityEngine.measure_from_simulation()` | `engines.py` | Grade matrix with midscale persona disagreement | Ambiguity finding with `method=LLM_PANEL_AGREEMENT` | DR-AS-06 |
+| UT-MET-04 | `ApplicabilityEngine.measure_from_simulation()` | `engines.py` | Grade matrix with edge polarization | Applicability finding with `method=SYNTHETIC_COVERAGE` | DR-AS-07 |
+| UT-MET-05 | `scores_from_simulation()` ambiguity guard | `engines.py` | Trivial ceiling/floor grades and too few midscale responses | Ambiguity score confidence forced LOW | DR-AS-06 |
+| UT-MET-06 | `DiscriminationEngine.measure_from_simulation()` | `engines.py` | Synthetic intended scores with ceiling effect and rank collapse | Discrimination finding from calibration / ceiling / rank checks | DR-AS-08 |
+| UT-MET-07 | `scores_from_simulation()` | `engines.py` | Complete `SimulationEvidence` grade matrix | Three `CriterionScore` records with `method=GRADER_SIMULATION` | DR-SCR-01, DR-SCR-02 |
 | UT-MET-08 | `_step2_canonical_order()` | `stage.py:117–132` | Drafts: `[REMOVE_NODE, ADD_NODE, REPLACE_FIELD]` | Sorted: `[REPLACE_FIELD, ADD_NODE, REMOVE_NODE]` | DR-IM-07 |
 | UT-MET-09 | `_step1_conflict_resolution()` | `stage.py:104–114` | Drafts: `[REMOVE_NODE(X), REPLACE_FIELD(X.desc)]` | `REPLACE_FIELD` superseded, `REMOVE_NODE` kept | DR-IM-07 |
 | UT-MET-10 | `_step3_apply_and_wrap()` | `stage.py:189–231` | Starting rubric + one `REPLACE_FIELD` draft | `application_status=APPLIED`, `teacher_decision=PENDING`, rubric updated | DR-IM-07 |

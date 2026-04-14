@@ -34,7 +34,6 @@ class Settings(BaseModel):
     assess_llm_model_pinned: str | None = None
     assess_min_real_copies: int = 3
     assess_pairwise_sample_size: int = 10
-    assess_discrimination_variance_target: float = 0.04
     assess_panel_size: int = 4
     assess_target_response_count: int = 10
     assess_llm_concurrency: int = 4
@@ -44,7 +43,6 @@ class Settings(BaseModel):
 
     # ── Score stage (DR-SCR) ───────────────────────────────────────────────
     scorer_backend: Literal["llm_panel", "trained_model"] = "llm_panel"
-    scorer_panel_size: int = 5
     trained_scorer_artefact_path: str | None = None
 
     # ── Pipeline ───────────────────────────────────────────────────────────
@@ -99,15 +97,11 @@ class Settings(BaseModel):
             assess_llm_model_pinned=e.get("GR_ASSESS_LLM_MODEL"),
             assess_min_real_copies=int(e.get("GR_ASSESS_MIN_REAL_COPIES", "3")),
             assess_pairwise_sample_size=int(e.get("GR_ASSESS_PAIRWISE_SAMPLE_SIZE", "10")),
-            assess_discrimination_variance_target=float(
-                e.get("GR_ASSESS_DISCRIMINATION_VARIANCE_TARGET", "0.04")
-            ),
             assess_panel_size=int(e.get("GR_ASSESS_PANEL_SIZE", "4")),
             assess_target_response_count=int(e.get("GR_ASSESS_TARGET_RESPONSE_COUNT", "10")),
             assess_llm_concurrency=int(e.get("GR_ASSESS_LLM_CONCURRENCY", "4")),
             max_iterations=int(e.get("GR_MAX_ITERATIONS", "3")),
             scorer_backend=e.get("GR_SCORER_BACKEND", "llm_panel"),  # type: ignore[arg-type]
-            scorer_panel_size=int(e.get("GR_SCORER_PANEL_SIZE", "5")),
             trained_scorer_artefact_path=e.get("GR_TRAINED_SCORER_ARTEFACT_PATH"),
             schema_version=e.get("GR_SCHEMA_VERSION", "1.0.0"),
             request_id=e.get("GR_REQUEST_ID"),

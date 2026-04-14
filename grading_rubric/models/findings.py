@@ -84,7 +84,6 @@ class QualityMethod(StrEnum):
     PAIRWISE_CONSISTENCY = "pairwise_consistency"
     SYNTHETIC_COVERAGE = "synthetic_coverage"
     SCORE_DISTRIBUTION_SEPARATION = "score_distribution_separation"
-    LINGUISTIC_SWEEP = "linguistic_sweep"
     GRADER_SIMULATION = "grader_simulation"
 
 
