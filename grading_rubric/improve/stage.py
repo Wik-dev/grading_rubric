@@ -302,6 +302,115 @@ def _replace_field_in_rubric(
     return new_rubric, True
 
 
+def _add_node_to_rubric(
+    rubric: Rubric, draft: ProposedChangeDraft
+) -> tuple[Rubric, bool]:
+    """Apply an ADD_NODE draft to a fresh deepcopy. Returns (new_rubric, applied).
+
+    Inserts a new RubricCriterion (or RubricLevel) into the rubric tree at the
+    parent identified by ``parent_path`` and position ``insert_index``.
+
+    For criterion nodes the parent's ``points`` is updated to include the new
+    child (additive invariant) unless the child's points are already accounted
+    for (i.e. the parent points already equal the sum of children after insert).
+    """
+
+    new_rubric = deepcopy(rubric)
+    parent_path = draft.payload.get("parent_path", [])
+    insert_index = draft.payload.get("insert_index", 0)
+    node_kind = draft.payload.get("node_kind", "criterion")
+    raw_node = draft.payload.get("node")
+    if raw_node is None:
+        return new_rubric, False
+
+    # Walk to parent criterion.
+    def find_criterion(criteria: list[RubricCriterion], remaining: list) -> RubricCriterion | None:
+        if not remaining:
+            return None
+        head = remaining[0]
+        for c in criteria:
+            if str(c.id) == str(head):
+                if len(remaining) == 1:
+                    return c
+                return find_criterion(c.sub_criteria, remaining[1:])
+        return None
+
+    parent = find_criterion(new_rubric.criteria, parent_path)
+    if parent is None:
+        return new_rubric, False
+
+    if node_kind == "criterion":
+        try:
+            # Ensure fresh UUID so there are no collisions.
+            if isinstance(raw_node, dict):
+                from uuid import uuid4 as _uuid4
+
+                if "id" not in raw_node or raw_node["id"] is None:
+                    raw_node["id"] = str(_uuid4())
+                # Recursively assign IDs to nested sub_criteria if missing.
+                def _ensure_ids(n: dict) -> None:
+                    if "id" not in n or n["id"] is None:
+                        n["id"] = str(_uuid4())
+                    for sub in n.get("sub_criteria", []):
+                        _ensure_ids(sub)
+                    for lv in n.get("levels", []):
+                        if "id" not in lv or lv["id"] is None:
+                            lv["id"] = str(_uuid4())
+                _ensure_ids(raw_node)
+                child = RubricCriterion.model_validate(raw_node, strict=False)
+            elif isinstance(raw_node, RubricCriterion):
+                child = raw_node
+            else:
+                return new_rubric, False
+        except Exception:  # noqa: BLE001
+            logger.warning("ADD_NODE: failed to validate node as RubricCriterion")
+            return new_rubric, False
+
+        idx = max(0, min(insert_index, len(parent.sub_criteria)))
+        parent.sub_criteria.insert(idx, child)
+
+        # Maintain additive points invariant: parent.points = sum(children).
+        # Only update if the parent is additive AND the child sum exceeds
+        # the current parent points (i.e. the LLM set child points that
+        # overflow). If the children fit within the existing allocation,
+        # leave the parent points unchanged.
+        if parent.additive and parent.sub_criteria:
+            child_sum = sum(c.points or 0.0 for c in parent.sub_criteria)
+            if abs(child_sum - (parent.points or 0.0)) > 1e-6:
+                parent.points = child_sum
+
+        # Propagate up: update the rubric's total_points if root-level sums
+        # changed. Walk root criteria and recompute.
+        new_root_sum = sum(c.points or 0.0 for c in new_rubric.criteria)
+        if abs(new_root_sum - new_rubric.total_points) > 1e-6:
+            new_rubric.total_points = new_root_sum
+
+        return new_rubric, True
+
+    # Level nodes are less common but supported.
+    if node_kind == "level":
+        try:
+            if isinstance(raw_node, dict):
+                from uuid import uuid4 as _uuid4
+
+                if "id" not in raw_node or raw_node["id"] is None:
+                    raw_node["id"] = str(_uuid4())
+                level = RubricLevel.model_validate(raw_node, strict=False)
+            elif isinstance(raw_node, RubricLevel):
+                level = raw_node
+            else:
+                return new_rubric, False
+        except Exception:  # noqa: BLE001
+            logger.warning("ADD_NODE: failed to validate node as RubricLevel")
+            return new_rubric, False
+
+        idx = max(0, min(insert_index, len(parent.levels)))
+        parent.levels.insert(idx, level)
+        return new_rubric, True
+
+    return new_rubric, False
+
+
 def _step3_apply_and_wrap(
     starting_rubric: Rubric,
     drafts: list[ProposedChangeDraft],
@@ -313,14 +422,20 @@ def _step3_apply_and_wrap(
     finals: list[ProposedChange] = []
     for idx, draft in enumerate(drafts):
         applied = False
-        if idx not in superseded and draft.operation == "REPLACE_FIELD":
-            new_rubric, applied = _replace_field_in_rubric(current, draft)
-            if applied:
-                current = new_rubric
+        if idx not in superseded:
+            if draft.operation == "REPLACE_FIELD":
+                new_rubric, applied = _replace_field_in_rubric(current, draft)
+                if applied:
+                    current = new_rubric
+            elif draft.operation == "ADD_NODE":
+                new_rubric, applied = _add_node_to_rubric(current, draft)
+                if applied:
+                    current = new_rubric
+
         # Wrap step (DR-IM-07): assign system-owned fields.
-        target = draft.payload.get("target", {})
         change_id = uuid4()
         if draft.operation == "REPLACE_FIELD":
+            target = draft.payload.get("target", {})
             from grading_rubric.models.rubric import RubricTarget
 
             try:
@@ -338,10 +453,51 @@ def _step3_apply_and_wrap(
                         ApplicationStatus.APPLIED if applied else ApplicationStatus.NOT_APPLIED
                     ),
                     teacher_decision=TeacherDecision.PENDING,
-                    source_operations=[],  # populated by gateway-driven planner
+                    source_operations=[],
                     target=rt,
                     before=draft.payload.get("before"),
                     after=draft.payload.get("after"),
+                )
+            )
+        elif draft.operation == "ADD_NODE":
+            parent_path_raw = draft.payload.get("parent_path", [])
+            from grading_rubric.models.types import CriterionId
+
+            try:
+                parent_ids = [CriterionId(str(p)) for p in parent_path_raw]
+            except Exception:  # noqa: BLE001
+                continue
+            raw_node = draft.payload.get("node")
+            node_kind_str = draft.payload.get("node_kind", "criterion")
+            try:
+                nk = NodeKind(node_kind_str)
+            except ValueError:
+                nk = NodeKind.CRITERION
+            # Build the typed node for the change record.
+            try:
+                if nk == NodeKind.CRITERION:
+                    typed_node = RubricCriterion.model_validate(raw_node, strict=False)
+                else:
+                    from grading_rubric.models.rubric import RubricLevel
+                    typed_node = RubricLevel.model_validate(raw_node, strict=False)
+            except Exception:  # noqa: BLE001
+                continue
+            finals.append(
+                AddNodeChange(
+                    id=change_id,
+                    primary_criterion=draft.primary_criterion,
+                    source_findings=draft.source_findings,
+                    rationale=draft.rationale,
+                    confidence=draft.confidence,
+                    application_status=(
+                        ApplicationStatus.APPLIED if applied else ApplicationStatus.NOT_APPLIED
+                    ),
+                    teacher_decision=TeacherDecision.PENDING,
+                    source_operations=[],
+                    parent_path=parent_ids,
+                    insert_index=draft.payload.get("insert_index", 0),
+                    node_kind=nk,
+                    node=typed_node,
                 )
             )
     return current, finals
