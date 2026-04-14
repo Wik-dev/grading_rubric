@@ -331,13 +331,12 @@ def _spearman_rank_score(calibrated: list[tuple[int, float, float, str]]) -> flo
 
 def _synthetic_calibration(
     means: dict[int, float], sim: SimulationEvidence
-) -> tuple[float | None, float | None, float | None, float | None, float, str]:
+) -> tuple[float | None, float | None, float | None, float | None, str]:
     """Score whether synthetic tiers received grades near their intended level.
 
-    Returns (calibration_score, ceiling_score, rank_score, ceiling_cap,
-    mean_error, detail).  ``mean_error`` is the raw mean absolute error
-    between intended and actual grades — the caller uses it to decide
-    whether calibration is trustworthy (guard threshold 0.25).
+    A coarse rubric can have a high max-min range while still collapsing most
+    responses into full credit. Intended synthetic scores let us detect that
+    ceiling effect without asking the LLM to judge rubric quality directly.
     """
 
     calibrated: list[tuple[int, float, float, str]] = []
@@ -357,7 +356,7 @@ def _synthetic_calibration(
         )
 
     if len(calibrated) < 2:
-        return None, None, None, None, 1.0, ""
+        return None, None, None, None, ""
 
     mean_error = statistics.mean(abs(actual - intended) for _, intended, actual, _ in calibrated)
     calibration_score = max(0.0, min(1.0, 1.0 - (2.0 * mean_error)))
@@ -395,7 +394,7 @@ def _synthetic_calibration(
         f"r{idx}:{tier or 'synthetic'} intended={intended:.2f} actual={actual:.2f}"
         for idx, intended, actual, tier in calibrated
     )
-    return calibration_score, ceiling_score, rank_score, ceiling_cap, mean_error, detail
+    return calibration_score, ceiling_score, rank_score, ceiling_cap, detail
 
 
 def _weighted_average(parts: list[tuple[float, float | None]]) -> float:
@@ -531,7 +530,6 @@ class DiscriminationEngine:
                 ceiling_score,
                 rank_score,
                 ceiling_cap,
-                _mean_cal_error,
                 calibration_detail,
             ) = _synthetic_calibration(means, sim)
 
@@ -718,21 +716,7 @@ def scores_from_simulation(
                 separation = max(means.values()) - min(means.values())
         else:
             separation = 0.0
-        calibration_score, ceiling_score, rank_score, ceiling_cap, mean_cal_error, _ = (
-            _synthetic_calibration(means, sim)
-        )
-
-        # Separation: actual_range / max_possible_range.  Measures how much
-        # of the rubric's scale the grading actually uses.
-        max_possible = sim.response_set[0].intended_score if sim.response_set else 1.0
-        for r in sim.response_set:
-            if r.intended_score is not None and r.intended_score > (max_possible or 0):
-                max_possible = r.intended_score
-        if max_possible and max_possible > 0 and len(means) >= 2:
-            actual_range = max(means.values()) - min(means.values())
-            separation_score = max(0.0, min(1.0, actual_range / max_possible))
-        else:
-            separation_score = separation  # fallback to raw tier separation
+        calibration_score, ceiling_score, rank_score, ceiling_cap, _ = _synthetic_calibration(means, sim)
 
         relevant_pairs = [
             p
@@ -756,21 +740,13 @@ def scores_from_simulation(
             elif winner in {"TIE", "EQUAL"} and abs(a_score - b_score) <= margin:
                 consistent += 1
         pairwise_consistency = consistent / total if total else 1.0
-
         if calibration_score is not None:
-            # Calibration guard: when mean calibration error > 0.25 the
-            # synthetic grading is too unreliable — drop calibration from
-            # the blend (its weight redistributes to the other components
-            # via _weighted_average's normalisation).
-            guarded_cal = calibration_score if mean_cal_error <= 0.25 else None
-
             discrimination = _weighted_average(
                 [
-                    (0.20, guarded_cal),
-                    (0.15, rank_score),
+                    (0.25, calibration_score),
+                    (0.20, rank_score),
                     (0.15, pairwise_consistency),
-                    (0.25, ceiling_score),
-                    (0.25, separation_score),
+                    (0.40, ceiling_score),
                 ]
             )
             if ceiling_cap is not None:
@@ -778,7 +754,7 @@ def scores_from_simulation(
             discrimination_values.append(discrimination)
         else:
             discrimination_values.append(
-                max(0.0, min(1.0, 0.5 * separation_score + 0.5 * pairwise_consistency))
+                max(0.0, min(1.0, 0.5 * separation + 0.5 * pairwise_consistency))
             )
 
     def avg(values: list[float]) -> float:
