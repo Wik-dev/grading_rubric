@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime
 from typing import Any, Generic, TypeVar
 from uuid import UUID, uuid4
@@ -11,7 +12,7 @@ from pydantic import BaseModel, ValidationError
 from grading_rubric.audit.emitter import AuditEmitter
 from grading_rubric.audit.hashing import canonical_json, hash_object, hash_text
 from grading_rubric.config.settings import Settings
-from grading_rubric.gateway.backends import LlmBackend, make_backend
+from grading_rubric.gateway.backends import LlmBackend, MessageAttachment, make_backend
 from grading_rubric.gateway.prompts import PromptRegistry
 
 T = TypeVar("T", bound=BaseModel)
@@ -58,9 +59,11 @@ class Gateway:
         output_schema: type[T],
         samples: int = 1,
         model: str | None = None,
+        temperature: float | None = None,
         settings: Settings,
         audit_emitter: AuditEmitter,
         stage_id: str = "unknown",
+        attachments: list[MessageAttachment] | None = None,
     ) -> MeasurementResult[T]:
         """DR-LLM-01 — the only public LLM seam."""
 
@@ -70,7 +73,13 @@ class Gateway:
         )
 
         # DR-LLM-06: temperature is 0.0 when samples == 1, else from settings.
-        temperature = 0.0 if samples == 1 else settings.llm_sampling_temperature
+        # Callers may override this for controlled simulations where single
+        # samples still need persona diversity.
+        temperature = (
+            temperature
+            if temperature is not None
+            else 0.0 if samples == 1 else settings.llm_sampling_temperature
+        )
         chosen_model = model or settings.llm_model_pinned
 
         tool_schema = output_schema.model_json_schema()
@@ -97,6 +106,7 @@ class Gateway:
                     temperature=temperature,
                     timeout_seconds=settings.llm_call_timeout_seconds,
                     max_rate_limit_retries=settings.llm_rate_limit_max_retries,
+                    attachments=attachments,
                 )
             except TimeoutError as e:
                 self._emit_failure(
@@ -117,6 +127,7 @@ class Gateway:
                     rate_limit_retries=rate_limit_retries_total,
                     error_code="TIMEOUT",
                     error_message=str(e),
+                    attachments=attachments or [],
                 )
                 raise GatewayTimeoutError(str(e)) from e
 
@@ -143,6 +154,7 @@ class Gateway:
                         temperature=temperature,
                         timeout_seconds=settings.llm_call_timeout_seconds,
                         max_rate_limit_retries=settings.llm_rate_limit_max_retries,
+                        attachments=attachments,
                     )
                     tokens_in_total += resp2.tokens_in
                     tokens_out_total += resp2.tokens_out
@@ -168,6 +180,7 @@ class Gateway:
                         rate_limit_retries=rate_limit_retries_total,
                         error_code="VALIDATION",
                         error_message=str(e),
+                        attachments=attachments or [],
                     )
                     raise GatewayValidationError(str(e)) from e
 
@@ -202,6 +215,9 @@ class Gateway:
                     "tokens_in": tokens_in_total,
                     "tokens_out": tokens_out_total,
                     "rate_limit_retries": rate_limit_retries_total,
+                    "inputs": inputs.model_dump(mode="json"),
+                    "attachments": self._attachment_metadata(attachments or []),
+                    "rendered_user_prompt": rendered_user,
                     "raw_responses": raw_responses,
                 },
                 "error": None,
@@ -234,6 +250,7 @@ class Gateway:
         rate_limit_retries: int,
         error_code: str,
         error_message: str,
+        attachments: list[MessageAttachment],
     ) -> None:
         audit_emitter.record_operation(
             {
@@ -259,6 +276,11 @@ class Gateway:
                     "tokens_in": tokens_in,
                     "tokens_out": tokens_out,
                     "rate_limit_retries": rate_limit_retries,
+                    "inputs": inputs.model_dump(mode="json"),
+                    "attachments": self._attachment_metadata(attachments or []),
+                    "rendered_user_prompt": self._prompts.render(
+                        prompt.prompt_id, inputs.model_dump(mode="json")
+                    )[1],
                     "raw_responses": raw_responses,
                 },
                 "error": {
@@ -269,3 +291,15 @@ class Gateway:
                 },
             }
         )
+
+    @staticmethod
+    def _attachment_metadata(attachments: list[MessageAttachment]) -> list[dict[str, Any]]:
+        return [
+            {
+                "path": str(attachment.path),
+                "media_type": attachment.media_type,
+                "size_bytes": attachment.path.stat().st_size,
+                "sha256": hashlib.sha256(attachment.path.read_bytes()).hexdigest(),
+            }
+            for attachment in attachments
+        ]

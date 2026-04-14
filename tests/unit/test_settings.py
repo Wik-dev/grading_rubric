@@ -22,6 +22,9 @@ class TestSettingsFromEnv:
         assert s.max_iterations == 3
         assert s.scorer_backend == "llm_panel"
         assert s.schema_version == "1.0.0"
+        assert s.assess_llm_concurrency == 4
+        assert s.assess_llm_backend is None
+        assert s.assess_llm_model_pinned is None
 
     def test_stub_backend(self) -> None:
         s = Settings.from_env({"GR_LLM_BACKEND": "stub"})
@@ -34,15 +37,22 @@ class TestSettingsFromEnv:
             "GR_LLM_TEMPERATURE": "0.3",
             "GR_LLM_TIMEOUT": "120",
             "GR_ASSESS_PANEL_SIZE": "6",
+            "GR_ASSESS_LLM_CONCURRENCY": "2",
+            "GR_ASSESS_LLM_BACKEND": "openai",
+            "GR_ASSESS_LLM_MODEL": "gpt-5.4",
             "GR_MAX_ITERATIONS": "5",
             "OPENAI_API_KEY": "sk-test",
         }
         s = Settings.from_env(env)
         assert s.llm_backend == "openai"
         assert s.llm_model_pinned == "gpt-4o"
+        assert s.llm_model_rubric_decomposition == "gpt-4o"
         assert s.llm_sampling_temperature == 0.3
         assert s.llm_call_timeout_seconds == 120
         assert s.assess_panel_size == 6
+        assert s.assess_llm_concurrency == 2
+        assert s.assess_llm_backend == "openai"
+        assert s.assess_llm_model_pinned == "gpt-5.4"
         assert s.max_iterations == 5
         assert s.openai_api_key == "sk-test"
 
@@ -79,3 +89,14 @@ class TestSettingsModelPinValidation:
     def test_empty_model_pinned_rejected(self) -> None:
         with pytest.raises(ValidationError, match="llm_model_pinned"):
             Settings(llm_backend="stub", llm_model_pinned="")
+
+    def test_anthropic_assess_override_requires_claude_prefix(self) -> None:
+        with pytest.raises(
+            ValidationError, match="claude-\\*.*model identifier"
+        ):
+            Settings(
+                llm_backend="openai",
+                llm_model_pinned="gpt-5.4",
+                assess_llm_backend="anthropic",
+                assess_llm_model_pinned="gpt-4o",
+            )

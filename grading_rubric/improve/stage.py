@@ -1,10 +1,8 @@
 """DR-IM-01..14 — `propose` (improve) stage.
 
-The stage is intentionally tolerant of an offline / stub-backend run: when no
-LLM is available it produces deterministic, finding-driven `REPLACE_FIELD`
-drafts that the three-step application pipeline (DR-IM-07) then commits to
-the improved rubric. This makes the full V-shape pipeline runnable without
-an API key while preserving the drafts-vs-final ownership boundary.
+The LLM planner proposes rubric edits from grounded findings and grader
+simulation summaries. The local pipeline validates, orders, applies, and wraps
+those drafts; it does not generate local heuristic edits.
 """
 
 from __future__ import annotations
@@ -17,7 +15,7 @@ from uuid import uuid4
 from grading_rubric.assess.models import AssessOutputs
 from grading_rubric.audit.emitter import AuditEmitter
 from grading_rubric.config.settings import Settings
-from grading_rubric.gateway.gateway import Gateway, GatewayError
+from grading_rubric.gateway.gateway import Gateway
 from grading_rubric.improve.llm_schemas import LlmDraftEntry, LlmPlannerInput, LlmPlannerOutput
 from grading_rubric.improve.models import (
     PlannerDecision,
@@ -51,187 +49,6 @@ _CANONICAL_ORDER = [
     "ADD_NODE",
     "REMOVE_NODE",
 ]
-
-
-def _find_criterion_text(rubric: Rubric, target: RubricTarget) -> str | None:
-    """Resolve the current text of the targeted field in the rubric."""
-    def find_crit(criteria: list[RubricCriterion], path: list) -> RubricCriterion | None:
-        if not path:
-            return None
-        for c in criteria:
-            if str(c.id) == str(path[0]):
-                if len(path) == 1:
-                    return c
-                return find_crit(c.sub_criteria, path[1:])
-        return None
-
-    crit = find_crit(rubric.criteria, target.criterion_path)
-    if crit is None:
-        return None
-    field = target.field
-    if field == RubricFieldName.DESCRIPTION:
-        return crit.description
-    if field == RubricFieldName.NAME:
-        return crit.name
-    if field == RubricFieldName.SCORING_GUIDANCE:
-        return crit.scoring_guidance
-    return None
-
-
-_REPLACEMENTS: dict[str, str] = {
-    "good": "high-quality (meeting all specified criteria)",
-    "bad": "harmful / malicious (as defined in the course framework)",
-    "well": "thoroughly and with specific examples",
-    "poorly": "insufficiently, lacking specific details",
-    "appropriate": "aligned with the stated learning objectives",
-    "adequate": "meeting the minimum threshold specified",
-    "sufficient": "meeting the minimum requirements stated above",
-    "clear": "unambiguous and verifiable by a second grader",
-    "unclear": "open to multiple reasonable interpretations",
-    "thorough": "covering all sub-points listed",
-    "complete": "addressing every required element",
-    "incomplete": "missing one or more required elements",
-    "some": "at least two",
-    "many": "three or more",
-    "few": "one or two",
-}
-
-
-def _plan_drafts(
-    findings: list[AssessmentFinding], rubric: Rubric
-) -> ProposedChangeDraftBatch:
-    """Deterministic offline planner.
-
-    For every finding with a non-None target on a field the engine knows how
-    to fix, emit a `REPLACE_FIELD` draft proposing a clearer surface form.
-    For findings whose target is `None` (rubric-wide), emit no draft (the
-    propose stage is a fixer; rubric-wide findings flow through to the
-    explanation as unaddressed observations per DR-IM-08).
-
-    Changes accumulate: each draft's `after` is computed against the text
-    that includes all previous drafts' edits, so no change overwrites another.
-    """
-    import re
-
-    # Track the current state of each (criterion_path, field) pair so edits
-    # accumulate instead of overwriting each other.
-    working_text: dict[tuple, str] = {}
-
-    def _target_key(target) -> tuple:
-        return (tuple(str(c) for c in target.criterion_path), target.field.value)
-
-    def _current_text(finding: AssessmentFinding) -> str:
-        key = _target_key(finding.target)
-        if key in working_text:
-            return working_text[key]
-        original = _find_criterion_text(rubric, finding.target) or ""
-        working_text[key] = original
-        return original
-
-    drafts: list[ProposedChangeDraft] = []
-    for f in findings:
-        if f.target is None:
-            continue
-
-        before = _current_text(f)
-
-        # Extract the vague term from the observation if this is a
-        # linguistic-sweep finding (pattern: "uses vague term 'X'.")
-        vague_match = re.search(r"uses vague term '(\w+)'", f.observation)
-        threshold_match = re.search(
-            r"undefined threshold \('.*?'\): '([^']+)'", f.observation
-        )
-        external_match = re.search(
-            r"external reference \('.*?'\): '([^']+)'", f.observation
-        )
-
-        if vague_match and before:
-            term = vague_match.group(1)
-            replacement = _REPLACEMENTS.get(term.lower())
-            if replacement:
-                after = re.sub(
-                    rf"\b{re.escape(term)}\b",
-                    replacement,
-                    before,
-                    count=1,
-                    flags=re.IGNORECASE,
-                )
-                # Fix article: "a <vowel>" → "an <vowel>"
-                after = re.sub(r"\ba ([aeiou])", r"an \1", after)
-            else:
-                after = re.sub(
-                    rf"\b({re.escape(term)})\b",
-                    rf"\1 [define precisely]",
-                    before,
-                    count=1,
-                    flags=re.IGNORECASE,
-                )
-        elif threshold_match and before:
-            # Replace the vague threshold with a concrete alternative.
-            term = threshold_match.group(1)
-            _THRESHOLD_FIX: dict[str, str] = {
-                "too similar": "sharing more than 80% of key characteristics",
-                "not sufficiently": "insufficiently (fewer than 3 specific details)",
-                "not enough": "fewer than the minimum required number of",
-                "similar enough": "sharing at least 50% of key elements",
-            }
-            replacement = _THRESHOLD_FIX.get(
-                term.lower(), f"{term} [define concrete threshold]"
-            )
-            after = re.sub(
-                re.escape(term),
-                replacement,
-                before,
-                count=1,
-                flags=re.IGNORECASE,
-            )
-        elif external_match and before:
-            # Flag the external reference — we can't embed content
-            # automatically, but we can make the dependency explicit.
-            ref_text = external_match.group(1)
-            after = re.sub(
-                re.escape(ref_text),
-                f"{ref_text} [embed referenced content here]",
-                before,
-                count=1,
-                flags=re.IGNORECASE,
-            )
-        else:
-            # Fallback: append an action note.
-            after = (
-                f"{before}\n\n"
-                f"[Action needed: {f.observation}]"
-            )
-
-        # Update working text so the next draft sees accumulated edits.
-        key = _target_key(f.target)
-        working_text[key] = after
-
-        payload = {
-            "target": f.target.model_dump(),
-            "before": before,
-            "after": after,
-        }
-        drafts.append(
-            ProposedChangeDraft(
-                operation="REPLACE_FIELD",
-                payload=payload,
-                primary_criterion=f.criterion,
-                source_findings=[f.id],
-                rationale=(
-                    f"Address finding: {f.observation} "
-                    f"({f.criterion.value}, severity={f.severity.value})"
-                ),
-                confidence=ConfidenceIndicator.from_score(
-                    max(0.30, f.confidence.score - 0.05),
-                    "deterministic offline planner; conservative confidence",
-                ),
-            )
-        )
-    decision = (
-        PlannerDecision.CHANGES_PROPOSED if drafts else PlannerDecision.NO_CHANGES_NEEDED
-    )
-    return ProposedChangeDraftBatch(decision=decision, drafts=drafts)
 
 
 # ── LLM planner ──────────────────────────────────────────────────────────
@@ -314,7 +131,7 @@ def _convert_and_ground(
         try:
             criterion = QualityCriterion(entry.primary_criterion)
         except ValueError:
-            criterion = QualityCriterion.AMBIGUITY  # safe fallback
+            criterion = QualityCriterion.AMBIGUITY
 
         # Convert source_finding_ids from strings to UUIDs.
         from uuid import UUID
@@ -345,11 +162,12 @@ def _plan_drafts_llm(
     rubric: Rubric,
     evidence_profile: EvidenceProfile,
     teaching_material_text: str,
+    simulation_summary: str,
     *,
     settings: Settings,
     audit_emitter: AuditEmitter,
 ) -> ProposedChangeDraftBatch | None:
-    """LLM-powered planner. Returns None on failure (caller falls back)."""
+    """LLM-powered planner."""
     gateway = Gateway()
     valid_paths = _collect_criterion_paths(rubric)
 
@@ -363,6 +181,7 @@ def _plan_drafts_llm(
             evidence_profile_json=evidence_profile.model_dump_json(indent=2),
             criterion_paths_json=json.dumps(valid_paths, indent=2, default=str),
             teaching_material_text=teaching_material_text or "",
+            simulation_summary=simulation_summary,
         ),
         output_schema=LlmPlannerOutput,
         samples=1,
@@ -386,7 +205,7 @@ def _plan_drafts_llm(
     return ProposedChangeDraftBatch(decision=decision, drafts=grounded_drafts)
 
 
-# ── Three-step deterministic application pipeline ─────────────────────────
+# ── Three-step application pipeline ───────────────────────────────────────
 
 
 def _step1_conflict_resolution(
@@ -542,39 +361,23 @@ def propose_stage(
     starting = inputs.parsed.starting_rubric
     base_rubric = starting or inputs.rubric_under_assessment
 
-    # Try LLM planner first, fall back to deterministic.
-    batch = None
-    if _llm_available(settings):
-        try:
-            # Extract teaching material text from parsed inputs.
-            teaching_text = ""
-            if hasattr(inputs.parsed, "teaching_material_text"):
-                teaching_text = inputs.parsed.teaching_material_text or ""
-
-            batch = _plan_drafts_llm(
-                inputs.findings, base_rubric,
-                inputs.evidence_profile,
-                teaching_text,
-                settings=settings,
-                audit_emitter=audit_emitter,
-            )
-        except (GatewayError, Exception) as exc:
-            # Audit the fallback event.
-            audit_emitter.record_operation({
-                "id": str(uuid4()),
-                "stage_id": STAGE_ID,
-                "status": "fallback",
-                "details": {
-                    "kind": "llm_fallback",
-                    "engine": "propose_planner",
-                    "error": str(exc),
-                },
-                "error": None,
-            })
-            batch = None
-
+    if not _llm_available(settings):
+        raise RuntimeError(
+            "propose stage requires an LLM backend; configure ANTHROPIC_API_KEY "
+            "or an equivalent provider key"
+        )
+    teaching_text = getattr(inputs.parsed, "teaching_material_text", "") or ""
+    batch = _plan_drafts_llm(
+        inputs.findings,
+        base_rubric,
+        inputs.evidence_profile,
+        teaching_text,
+        inputs.simulation_summary,
+        settings=settings,
+        audit_emitter=audit_emitter,
+    )
     if batch is None:
-        batch = _plan_drafts(inputs.findings, base_rubric)
+        raise RuntimeError("LLM planner did not return a valid planner output")
 
     # Three-step application pipeline runs identically on drafts from either source.
     surviving, superseded = _step1_conflict_resolution(batch.drafts)

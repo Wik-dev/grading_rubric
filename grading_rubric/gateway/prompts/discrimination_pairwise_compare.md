@@ -3,15 +3,20 @@ prompt_version: "1.0.0"
 description: "Head-to-head comparison of two student responses using the rubric."
 expected_inputs:
   - rubric_text
+  - teaching_material_text
   - response_a_text
   - response_b_text
 expected_output_schema_id: "PairwiseVerdict"
 ---
-You are an experienced grader comparing two student responses using the rubric below. Determine which response demonstrates stronger performance overall according to the rubric's criteria.
+You are an experienced grader comparing two student responses using the rubric below and the teaching material as reference context. Determine which response demonstrates stronger performance overall according to the rubric's criteria.
 
 ## Rubric
 
 {rubric_text}
+
+## Teaching material
+
+{teaching_material_text}
 
 ## Response A
 
@@ -27,6 +32,7 @@ You are an experienced grader comparing two student responses using the rubric b
 - If one response is clearly stronger according to the rubric, declare a winner.
 - If the responses are essentially equivalent in quality, declare "EQUAL".
 - Consider whether any difficulty in deciding is caused by **rubric ambiguity** rather than genuinely similar quality. If the rubric's vague language makes it hard to distinguish the responses, set `ambiguity_attributed` to true.
+- If one response is clearly better but the rubric would give equal or near-equal scores, identify the affected rubric criteria in `affected_criterion_ids`. Use the criterion IDs shown in the rubric. If you cannot identify specific criteria, return an empty list.
 
 ## Output
 
@@ -34,3 +40,4 @@ You are an experienced grader comparing two student responses using the rubric b
 - `confidence`: 0.0–1.0, how confident you are in this verdict.
 - `reason`: a brief explanation referencing specific rubric criteria.
 - `ambiguity_attributed`: true if the difficulty in distinguishing is primarily due to rubric ambiguity rather than similar quality.
+- `affected_criterion_ids`: list of criterion IDs involved in the conflict, or an empty list.

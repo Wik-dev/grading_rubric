@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
+from grading_rubric.assess.simulation import SimulationEvidence
 from grading_rubric.improve.models import ProposeOutputs
 from grading_rubric.models.deliverable import CriterionScore
 from grading_rubric.models.findings import AssessmentFinding
@@ -60,6 +61,7 @@ class ScoreOutputs(BaseModel):
     previous_quality_scores: list[CriterionScore] | None = None
     scorer_id: str
     scorer_version: str
+    simulation_evidence: SimulationEvidence | None = None
 
 
 # ── Train-button stub shapes (DR-SCR-05) ─────────────────────────────────
@@ -80,7 +82,7 @@ class TrainingEvidence(BaseModel):
     teaching_material_text: str
     student_copies_text: list[str]
     findings: list[AssessmentFinding]
-    ground_truth_grades: list[GroundTruthGrade] = []
+    ground_truth_grades: list[GroundTruthGrade] = Field(default_factory=list)
 
 
 class TrainedScorerArtefact(BaseModel):
@@ -89,32 +91,8 @@ class TrainedScorerArtefact(BaseModel):
     artefact_path: Path
     training_run_id: str
     scorer_id: str
-    metrics: dict[str, float] = {}
+    metrics: dict[str, float] = Field(default_factory=dict)
 
 
 class ScorerArtefactMissingError(RuntimeError):
     """Raised by `TrainedModelScorer` when no artefact is on disk (DR-SCR-03)."""
-
-
-# ── LLM scorer schemas (gateway call shapes) ────────────────────────────
-
-
-class LlmScorerInput(BaseModel):
-    """Inputs for the score_criterion prompt."""
-
-    model_config = ConfigDict(strict=True)
-
-    rubric_json: str
-    criterion: str
-    findings_json: str
-    exam_question_text: str
-    teaching_material_text: str
-
-
-class LlmScorerOutput(BaseModel):
-    """Output from the score_criterion prompt."""
-
-    model_config = ConfigDict(strict=True)
-
-    score: int  # 0–100
-    justification: str

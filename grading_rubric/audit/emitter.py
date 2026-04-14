@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 from datetime import UTC, datetime
 from typing import IO, Any, Protocol
 from uuid import UUID, uuid4
@@ -54,6 +55,7 @@ class JsonLineEmitter:
     def __init__(self, sink: IO[str] | None = None) -> None:
         self._sink: IO[str] = sink if sink is not None else sys.stderr
         self.events: list[AuditEvent] = []
+        self._lock = threading.RLock()
 
     # ── Public surface ─────────────────────────────────────────────────────
     def stage_start(self, stage_id: str) -> None:
@@ -93,13 +95,14 @@ class JsonLineEmitter:
 
     # ── Internal ───────────────────────────────────────────────────────────
     def _emit(self, event: AuditEvent) -> None:
-        self.events.append(event)
-        line = json.dumps(_canonical(event.model_dump()), ensure_ascii=False)
-        self._sink.write(line + "\n")
-        try:
-            self._sink.flush()
-        except (AttributeError, ValueError):
-            pass
+        with self._lock:
+            self.events.append(event)
+            line = json.dumps(_canonical(event.model_dump()), ensure_ascii=False)
+            self._sink.write(line + "\n")
+            try:
+                self._sink.flush()
+            except (AttributeError, ValueError):
+                pass
 
 
 class NullEmitter:
@@ -107,37 +110,41 @@ class NullEmitter:
 
     def __init__(self) -> None:
         self.events: list[AuditEvent] = []
+        self._lock = threading.RLock()
 
     def stage_start(self, stage_id: str) -> None:
-        self.events.append(
-            AuditEvent(
-                event_id=uuid4(),
-                event_kind="stage.start",
-                emitted_at=datetime.now(UTC),
-                stage_id=stage_id,
+        with self._lock:
+            self.events.append(
+                AuditEvent(
+                    event_id=uuid4(),
+                    event_kind="stage.start",
+                    emitted_at=datetime.now(UTC),
+                    stage_id=stage_id,
+                )
             )
-        )
 
     def stage_end(
         self, stage_id: str, status: str, error: dict[str, Any] | None = None
     ) -> None:
-        self.events.append(
-            AuditEvent(
-                event_id=uuid4(),
-                event_kind="stage.end",
-                emitted_at=datetime.now(UTC),
-                stage_id=stage_id,
-                payload={"status": status, "error": error},
+        with self._lock:
+            self.events.append(
+                AuditEvent(
+                    event_id=uuid4(),
+                    event_kind="stage.end",
+                    emitted_at=datetime.now(UTC),
+                    stage_id=stage_id,
+                    payload={"status": status, "error": error},
+                )
             )
-        )
 
     def record_operation(self, payload: dict[str, Any]) -> None:
-        self.events.append(
-            AuditEvent(
-                event_id=uuid4(),
-                event_kind="operation",
-                emitted_at=datetime.now(UTC),
-                stage_id=payload.get("stage_id"),
-                payload=payload,
+        with self._lock:
+            self.events.append(
+                AuditEvent(
+                    event_id=uuid4(),
+                    event_kind="operation",
+                    emitted_at=datetime.now(UTC),
+                    stage_id=payload.get("stage_id"),
+                    payload=payload,
+                )
             )
-        )

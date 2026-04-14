@@ -40,6 +40,12 @@ from validance.sdk import Task, Workflow
 # that bumping the image is a one-line change.
 
 TASK_IMAGE = "grading-rubric:latest"
+LLM_ENV = {
+    "GR_LLM_BACKEND": "openai",
+    "GR_LLM_MODEL": "gpt-5.4",
+    "GR_LLM_MODEL_RUBRIC_DECOMPOSITION": "gpt-5.4",
+}
+LLM_SECRET_REFS = ["OPENAI_API_KEY"]
 
 # ── Filename conventions inside each task's working directory ──────────────
 #
@@ -129,7 +135,8 @@ def create_assess_and_improve_workflow() -> Workflow:
         output_files={"assess_outputs": ASSESS_OUTPUTS_FILE},
         depends_on=["ingest"],
         timeout=1800,
-        secret_refs=["ANTHROPIC_API_KEY"],
+        environment=LLM_ENV,
+        secret_refs=LLM_SECRET_REFS,
     )
 
     # DR-INT-06: ``gate="human-confirm"`` puts the Validance ApprovalGate
@@ -150,7 +157,8 @@ def create_assess_and_improve_workflow() -> Workflow:
         depends_on=["assess"],
         timeout=1800,
         gate="human-confirm",
-        secret_refs=["ANTHROPIC_API_KEY"],
+        environment=LLM_ENV,
+        secret_refs=LLM_SECRET_REFS,
     )
 
     score = Task(
@@ -165,7 +173,8 @@ def create_assess_and_improve_workflow() -> Workflow:
         output_files={"score_outputs": SCORE_OUTPUTS_FILE},
         depends_on=["propose"],
         timeout=1800,
-        secret_refs=["ANTHROPIC_API_KEY"],
+        environment=LLM_ENV,
+        secret_refs=LLM_SECRET_REFS,
     )
 
     render = Task(

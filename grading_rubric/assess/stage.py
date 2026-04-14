@@ -6,8 +6,14 @@ from grading_rubric.assess.engines import (
     AmbiguityEngine,
     ApplicabilityEngine,
     DiscriminationEngine,
+    scores_from_simulation,
 )
 from grading_rubric.assess.models import AssessInputs, AssessOutputs
+from grading_rubric.assess.simulation import (
+    ResponseSource,
+    _format_simulation_summary,
+    run_grader_simulation,
+)
 from grading_rubric.audit.emitter import AuditEmitter
 from grading_rubric.config.settings import Settings
 from grading_rubric.parsers.models import ParsedInputs
@@ -60,7 +66,6 @@ def assess_stage(
             source_operations=[],
             linked_finding_ids=[],
         )
-        # `assess` flips synthetic_responses_used per DR-AS-13 if no real copies.
         evidence = parsed.ingest.evidence_profile.model_copy(
             update={"synthetic_responses_used": True}
         )
@@ -70,26 +75,42 @@ def assess_stage(
             rubric_under_assessment=rubric,
             findings=[finding],
             evidence_profile=evidence,
+            quality_scores=[],
+            simulation_summary=(
+                "No starting rubric was provided; simulation cannot run until "
+                "a draft rubric exists."
+            ),
+            simulation_evidence=None,
         )
 
-    engines = [AmbiguityEngine(), ApplicabilityEngine(), DiscriminationEngine()]
-    findings = []
-    for engine in engines:
-        findings.extend(
-            engine.measure(
-                rubric=rubric,
-                evidence=parsed.ingest.evidence_profile,
-                student_texts=parsed.student_copies_text,
-                settings=settings,
-                audit_emitter=audit_emitter,
-            )
-        )
+    simulation = run_grader_simulation(
+        rubric,
+        parsed.exam_question_text,
+        parsed.teaching_material_text,
+        parsed.student_copies_text,
+        settings=settings,
+        audit_emitter=audit_emitter,
+    )
+
+    findings = [
+        *AmbiguityEngine().measure_from_simulation(
+            simulation, rubric=rubric, settings=settings
+        ),
+        *ApplicabilityEngine().measure_from_simulation(
+            simulation, rubric=rubric, settings=settings
+        ),
+        *DiscriminationEngine().measure_from_simulation(
+            simulation, rubric=rubric, settings=settings
+        ),
+    ]
+    quality_scores = scores_from_simulation(simulation, rubric=rubric, settings=settings)
 
     refined_evidence = parsed.ingest.evidence_profile.model_copy(
         update={
-            "synthetic_responses_used": (
-                len(parsed.student_copies_text) < settings.assess_min_real_copies
+            "synthetic_responses_used": any(
+                r.source == ResponseSource.SYNTHETIC for r in simulation.response_set
             )
+            or len(parsed.student_copies_text) < settings.assess_min_real_copies
         }
     )
 
@@ -99,6 +120,9 @@ def assess_stage(
         rubric_under_assessment=rubric,
         findings=findings,
         evidence_profile=refined_evidence,
+        quality_scores=quality_scores,
+        simulation_summary=_format_simulation_summary(simulation),
+        simulation_evidence=simulation,
     )
 
 

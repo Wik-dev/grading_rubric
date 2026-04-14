@@ -43,7 +43,9 @@ class TestAssessAndImproveWorkflow:
     def test_assess_has_api_key_secret(self) -> None:
         wf = create_assess_and_improve_workflow()
         assess = wf.tasks["assess"]
-        assert "ANTHROPIC_API_KEY" in (assess.secret_refs or [])
+        assert "OPENAI_API_KEY" in (assess.secret_refs or [])
+        assert assess.environment["GR_LLM_BACKEND"] == "openai"
+        assert assess.environment["GR_LLM_MODEL"] == "gpt-5.4"
 
     def test_task_chain_dependencies(self) -> None:
         """Task dependencies form a linear chain."""

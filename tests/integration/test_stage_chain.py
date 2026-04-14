@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 from uuid import UUID
 
 import pytest
@@ -21,6 +22,7 @@ from grading_rubric.models.findings import QualityCriterion, QualityMethod, Seve
 from grading_rubric.models.proposed_change import ApplicationStatus, TeacherDecision
 from grading_rubric.orchestrator.pipeline import PipelineInputs, run_pipeline
 
+from tests.integration.test_llm_e2e import SmartStubBackend
 from tests.conftest import CRIT_A_ID, CRIT_B_ID, LEVEL_A1_ID, LEVEL_A2_ID, RUBRIC_ID
 
 
@@ -28,7 +30,23 @@ from tests.conftest import CRIT_A_ID, CRIT_B_ID, LEVEL_A1_ID, LEVEL_A2_ID, RUBRI
 
 
 def _stub_settings() -> Settings:
-    return Settings(llm_backend="stub", llm_model_pinned="stub-test-model")
+    return Settings(
+        llm_backend="anthropic",
+        llm_model_pinned="claude-sonnet-4-20250514",
+        anthropic_api_key="sk-test-stage-chain-key",
+        assess_panel_size=4,
+        assess_target_response_count=6,
+        assess_pairwise_sample_size=3,
+    )
+
+
+@pytest.fixture(autouse=True)
+def _smart_stub_backend():
+    with patch(
+        "grading_rubric.gateway.gateway.make_backend",
+        return_value=SmartStubBackend(),
+    ):
+        yield
 
 
 def _write_exam(tmp_path: Path) -> Path:
@@ -331,9 +349,12 @@ class TestPartialEvidence:
         # SR-AS-06: synthetic responses used (no real copies)
         assert erf.evidence_profile.synthetic_responses_used is True
 
-        # SR-AS-08: confidence indicators reflect LOW range
+        # SR-AS-08: confidence indicators remain populated when synthetic
+        # responses are used. Simulation confidence is derived from trace
+        # statistics rather than capped by the old offline heuristic.
         for f in erf.findings:
-            assert f.confidence.score <= 0.40
+            assert 0.0 <= f.confidence.score <= 1.0
+            assert f.confidence.rationale
 
         # SR-IN-09: evidence_profile recorded
         assert erf.evidence_profile.student_copies_present is False

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
+from grading_rubric.models.deliverable import CriterionScore
 from grading_rubric.models.findings import AssessmentFinding
 from grading_rubric.models.rubric import EvidenceProfile, Rubric
 from grading_rubric.parsers.models import ParsedInputs
+from grading_rubric.assess.simulation import SimulationEvidence
 
 
 class AssessInputs(BaseModel):
@@ -27,3 +29,6 @@ class AssessOutputs(BaseModel):
     rubric_under_assessment: Rubric  # the snapshot the engines measured
     findings: list[AssessmentFinding]
     evidence_profile: EvidenceProfile  # refined (synthetic_responses_used set)
+    quality_scores: list[CriterionScore] = Field(default_factory=list)
+    simulation_summary: str = ""
+    simulation_evidence: SimulationEvidence | None = None

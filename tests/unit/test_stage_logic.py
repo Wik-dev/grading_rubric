@@ -1,131 +1,69 @@
-"""Unit tests — stage logic with stub gateway / canned responses.
-
-UT-STG-01 through UT-STG-09. Exercises each stage's deterministic offline
-path. No LLM calls, no network, no Validance.
-"""
+"""Unit tests for stage-level contracts that do not require real LLM calls."""
 
 from __future__ import annotations
 
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
 
-from grading_rubric.assess.engines import AmbiguityEngine, ApplicabilityEngine, DiscriminationEngine
-from grading_rubric.assess.models import AssessOutputs
+from grading_rubric.assess.llm_schemas import SynthesizedResponseSet
 from grading_rubric.assess.stage import assess_stage
 from grading_rubric.audit.emitter import NullEmitter
 from grading_rubric.config.settings import Settings
-from grading_rubric.improve.models import PlannerDecision, ProposeOutputs
-from grading_rubric.improve.stage import (
-    _plan_drafts,
-    _step1_conflict_resolution,
-    _step2_canonical_order,
-    _step3_apply_and_wrap,
-    propose_stage,
-)
-from grading_rubric.models.deliverable import ExplainedRubricFile
-from grading_rubric.models.findings import (
-    AssessmentFinding,
-    ConfidenceIndicator,
-    ConfidenceLevel,
-    Measurement,
-    QualityCriterion,
-    QualityMethod,
-    Severity,
-)
-from grading_rubric.models.proposed_change import ApplicationStatus, TeacherDecision
-from grading_rubric.models.rubric import (
-    EvidenceProfile,
-    Rubric,
-    RubricCriterion,
-    RubricFieldName,
-    RubricLevel,
-    RubricTarget,
-)
-from grading_rubric.parsers.models import IngestInputs, IngestOutputs, ParsedInputs
 from grading_rubric.models.audit import InputProvenance, InputSource, InputSourceKind
+from grading_rubric.models.findings import QualityCriterion
+from grading_rubric.models.rubric import EvidenceProfile, Rubric, RubricCriterion
+from grading_rubric.parsers.models import IngestInputs, IngestOutputs, ParsedInputs
+from grading_rubric.parsers.parse_stage import parse_inputs_stage
 
-from tests.conftest import CRIT_A_ID, CRIT_B_ID, LEVEL_A1_ID, LEVEL_A2_ID, RUBRIC_ID
-
-
-# ── Helpers ─────────────────────────────────────────────────────────────────
+from tests.conftest import RUBRIC_ID
 
 
 def _stub_settings() -> Settings:
     return Settings(llm_backend="stub", llm_model_pinned="stub-test-model")
 
 
-def _evidence(*, copies: bool = False, synthetic: bool = True) -> EvidenceProfile:
+def _evidence() -> EvidenceProfile:
     return EvidenceProfile(
         starting_rubric_present=True,
         exam_question_present=True,
         teaching_material_present=False,
-        student_copies_present=copies,
-        student_copies_count=3 if copies else 0,
-        synthetic_responses_used=synthetic,
+        student_copies_present=False,
+        synthetic_responses_used=True,
     )
 
 
-def _rubric_with_vague_terms() -> Rubric:
-    """A rubric whose criterion descriptions contain vague terms."""
-    return Rubric(
-        id=RUBRIC_ID,
-        schema_version="1.0.0",
-        title="Vague Rubric",
-        total_points=20.0,
-        criteria=[
-            RubricCriterion(
-                id=CRIT_A_ID,
-                name="Criterion A",
-                description="Student demonstrates appropriate understanding of the topic",
-                points=10.0,
-                levels=[
-                    RubricLevel(id=LEVEL_A1_ID, label="Good", descriptor="d", points=10.0),
-                    RubricLevel(id=LEVEL_A2_ID, label="Poor", descriptor="d", points=0.0),
-                ],
-            ),
-            RubricCriterion(
-                id=CRIT_B_ID,
-                name="Criterion B",
-                description="Identifies all relevant stakeholders in the case study and analyses their interactions",
-                points=10.0,
-                scoring_guidance="Look for at least 3 stakeholders mentioned by name with role descriptions",
-                levels=[
-                    RubricLevel(id=uuid4(), label="Excellent", descriptor="d", points=10.0),
-                    RubricLevel(id=uuid4(), label="Weak", descriptor="d", points=0.0),
-                ],
-            ),
-        ],
-    )
-
-
-def _make_parsed_inputs(rubric: Rubric | None, evidence: EvidenceProfile) -> ParsedInputs:
-    """Build a ParsedInputs with an inline exam question (no real files)."""
-    from pathlib import Path
-
-    exam_hash = "a" * 64
-    ingest_out = IngestOutputs(
+def _parsed(rubric: Rubric | None) -> ParsedInputs:
+    ingest = IngestOutputs(
         input_provenance=InputProvenance(
             exam_question=InputSource(
                 kind=InputSourceKind.INLINE_TEXT,
                 path=None,
                 marker="<inline:exam>",
-                hash=exam_hash,
+                hash="a" * 64,
             ),
             teaching_material=[],
             starting_rubric=None,
             student_copies=[],
         ),
-        evidence_profile=evidence,
+        evidence_profile=_evidence(),
         inputs=IngestInputs(exam_question_path=Path("/dev/null")),
     )
     return ParsedInputs(
-        ingest=ingest_out,
+        ingest=ingest,
         exam_question_text="Describe the bad actors strategy.",
         teaching_material_text="",
         starting_rubric=rubric,
+        starting_rubric_raw_text=None,
         synthetic_rubric_for_from_scratch=(
-            Rubric(id=uuid4(), schema_version="1.0.0", title="<from-scratch>", total_points=0.0, criteria=[])
+            Rubric(
+                id=uuid4(),
+                schema_version="1.0.0",
+                title="<from-scratch>",
+                total_points=0.0,
+                criteria=[],
+            )
             if rubric is None
             else None
         ),
@@ -133,209 +71,284 @@ def _make_parsed_inputs(rubric: Rubric | None, evidence: EvidenceProfile) -> Par
     )
 
 
-# ── UT-STG-01: assess stage — canned findings assembled ────────────────────
+def test_assess_requires_llm_for_existing_rubric(minimal_rubric) -> None:
+    with pytest.raises(RuntimeError, match="grader simulation requires"):
+        assess_stage(_parsed(minimal_rubric), settings=_stub_settings(), audit_emitter=NullEmitter())
 
 
-class TestAssessStage:
-    """UT-STG-01 / UT-STG-02: assess stage deterministic path."""
-
-    def test_assess_produces_findings(self) -> None:
-        """UT-STG-01: assess with a vague rubric → findings assembled."""
-        rubric = _rubric_with_vague_terms()
-        parsed = _make_parsed_inputs(rubric, _evidence())
-        result = assess_stage(parsed, settings=_stub_settings(), audit_emitter=NullEmitter())
-
-        assert isinstance(result, AssessOutputs)
-        assert len(result.findings) >= 1
-        # At least one ambiguity finding for the vague term "appropriate"
-        ambiguity_findings = [f for f in result.findings if f.criterion == QualityCriterion.AMBIGUITY]
-        assert len(ambiguity_findings) >= 1
-        assert all(f.measurement.method == QualityMethod.LINGUISTIC_SWEEP for f in ambiguity_findings)
-
-    def test_assess_empty_rubric_degenerate(self) -> None:
-        """UT-STG-02: empty rubric → degenerate AssessOutputs with HIGH APPLICABILITY."""
-        parsed = _make_parsed_inputs(None, _evidence())
-        result = assess_stage(parsed, settings=_stub_settings(), audit_emitter=NullEmitter())
-
-        assert len(result.findings) == 1
-        f = result.findings[0]
-        assert f.criterion == QualityCriterion.APPLICABILITY
-        assert f.severity == Severity.HIGH
-        assert f.target is None  # rubric-wide
+def test_assess_from_scratch_skips_simulation() -> None:
+    result = assess_stage(_parsed(None), settings=_stub_settings(), audit_emitter=NullEmitter())
+    assert result.rubric_under_assessment.criteria == []
+    assert result.quality_scores == []
+    assert "simulation cannot run" in result.simulation_summary
+    assert len(result.findings) == 1
+    assert result.findings[0].criterion == QualityCriterion.APPLICABILITY
 
 
-# ── UT-STG-03/04/05: propose stage — three paths ───────────────────────────
+class _FakeDocumentReader:
+    def __init__(self) -> None:
+        self.calls = []
 
-
-class TestProposeStage:
-    """UT-STG-03..05: propose stage deterministic paths."""
-
-    def test_modify_existing_path(self) -> None:
-        """UT-STG-03: findings with targets → drafts → APPLIED changes."""
-        rubric = _rubric_with_vague_terms()
-        parsed = _make_parsed_inputs(rubric, _evidence())
-        assessed = assess_stage(parsed, settings=_stub_settings(), audit_emitter=NullEmitter())
-
-        result = propose_stage(assessed, settings=_stub_settings(), audit_emitter=NullEmitter())
-        assert isinstance(result, ProposeOutputs)
-        assert len(result.proposed_changes) >= 1
-        applied = [c for c in result.proposed_changes if c.application_status == ApplicationStatus.APPLIED]
-        assert len(applied) >= 1
-        assert all(c.teacher_decision == TeacherDecision.PENDING for c in result.proposed_changes)
-
-    def test_generate_from_scratch_path(self) -> None:
-        """UT-STG-04: no starting rubric → generator path (degenerate assess → propose)."""
-        parsed = _make_parsed_inputs(None, _evidence())
-        assessed = assess_stage(parsed, settings=_stub_settings(), audit_emitter=NullEmitter())
-
-        result = propose_stage(assessed, settings=_stub_settings(), audit_emitter=NullEmitter())
-        assert isinstance(result, ProposeOutputs)
-        # The from-scratch path produces no targeted findings (the single finding
-        # has target=None), so the offline planner emits no drafts.
-        # This is the expected behavior — the LLM planner would emit ADD_NODE drafts.
-
-    def test_empty_improvement_path(self) -> None:
-        """UT-STG-05: rubric with no issues → NO_CHANGES_NEEDED."""
-        # A rubric with long descriptions and scoring guidance → no findings
-        rubric = Rubric(
-            id=RUBRIC_ID,
-            schema_version="1.0.0",
-            title="Perfect Rubric",
-            total_points=20.0,
-            criteria=[
-                RubricCriterion(
-                    id=CRIT_A_ID,
-                    name="Stakeholder Identification",
-                    description="Identifies and analyses all relevant stakeholders in the case study with explicit role descriptions and interaction patterns",
-                    points=15.0,
-                    scoring_guidance="Award full marks when 3+ stakeholders are named with roles. Deduct 3 points per missing stakeholder.",
-                    levels=[
-                        RubricLevel(id=LEVEL_A1_ID, label="Excellent", descriptor="d", points=15.0),
-                        RubricLevel(id=LEVEL_A2_ID, label="Poor", descriptor="d", points=0.0),
-                    ],
-                ),
-                RubricCriterion(
-                    id=CRIT_B_ID,
-                    name="Strategic Analysis",
-                    description="Evaluates the strategic implications of identified adversarial behaviours using economic reasoning and game theory concepts",
-                    points=5.0,
-                    scoring_guidance="Full marks for causal chain from actors to systemic risk. Half marks for descriptive listing only.",
-                    levels=[
-                        RubricLevel(id=uuid4(), label="Excellent", descriptor="d", points=5.0),
-                        RubricLevel(id=uuid4(), label="Weak", descriptor="d", points=0.0),
-                    ],
-                ),
-            ],
+    def read_text(
+        self,
+        path: Path,
+        *,
+        role: str,
+        context_text: str,
+        extracted_text_hint: str,
+        settings: Settings,
+        audit_emitter: NullEmitter,
+    ) -> str:
+        self.calls.append(
+            {
+                "path": path,
+                "role": role,
+                "context_text": context_text,
+                "extracted_text_hint": extracted_text_hint,
+            }
         )
-        parsed = _make_parsed_inputs(rubric, _evidence(copies=True, synthetic=False))
-        assessed = assess_stage(parsed, settings=_stub_settings(), audit_emitter=NullEmitter())
-
-        result = propose_stage(assessed, settings=_stub_settings(), audit_emitter=NullEmitter())
-        # No targeted findings → planner returns NO_CHANGES_NEEDED → empty changes
-        assert len(result.proposed_changes) == 0
+        return f"vision text for {role}"
 
 
-# ── UT-STG-06: score stage ─────────────────────────────────────────────────
+class _FakeRubricStructurer:
+    def __init__(self, rubric: Rubric | None) -> None:
+        self.rubric = rubric
+        self.calls = []
+
+    def structure_rubric(
+        self,
+        text: str,
+        *,
+        exam_question_text: str,
+        teaching_material_text: str,
+        settings: Settings,
+        audit_emitter: NullEmitter,
+    ) -> Rubric | None:
+        self.calls.append(
+            {
+                "text": text,
+                "exam_question_text": exam_question_text,
+                "teaching_material_text": teaching_material_text,
+            }
+        )
+        return self.rubric
 
 
-class TestScoreStage:
-    """UT-STG-06: score stage — severity-weighted criterion scores."""
+def _ingest_outputs_for_parse(
+    exam: Path,
+    *,
+    teaching: list[Path] | None = None,
+    starting_rubric: Path | None = None,
+    student_copies: list[Path] | None = None,
+) -> IngestOutputs:
+    return IngestOutputs(
+        input_provenance=InputProvenance(
+            exam_question=InputSource(
+                kind=InputSourceKind.FILE,
+                path=str(exam),
+                marker=None,
+                hash="a" * 64,
+            ),
+            teaching_material=[],
+            starting_rubric=None,
+            student_copies=[],
+        ),
+        evidence_profile=_evidence(),
+        inputs=IngestInputs(
+            exam_question_path=exam,
+            teaching_material_paths=teaching or [],
+            starting_rubric_path=starting_rubric,
+            student_copy_paths=student_copies or [],
+        ),
+    )
 
-    def test_score_produces_three_criteria(self) -> None:
-        """Score stage always produces exactly three CriterionScore entries."""
-        from grading_rubric.scorer.score_stage import score_stage
 
-        rubric = _rubric_with_vague_terms()
-        parsed = _make_parsed_inputs(rubric, _evidence())
-        assessed = assess_stage(parsed, settings=_stub_settings(), audit_emitter=NullEmitter())
-        proposed = propose_stage(assessed, settings=_stub_settings(), audit_emitter=NullEmitter())
+def test_parse_uses_vision_for_teaching_material_pdf_even_with_text_layer(
+    tmp_path: Path,
+) -> None:
+    exam = tmp_path / "exam.txt"
+    teaching = tmp_path / "teaching.pdf"
+    exam.write_text("exam text", encoding="utf-8")
+    teaching.write_bytes(b"%PDF text layer")
+    reader = _FakeDocumentReader()
 
-        result = score_stage(proposed, settings=_stub_settings(), audit_emitter=NullEmitter())
-        criteria_in_scores = {s.criterion for s in result.quality_scores}
-        assert criteria_in_scores == set(QualityCriterion)
-
-
-# ── UT-STG-07: render stage ────────────────────────────────────────────────
-
-
-class TestRenderStage:
-    """UT-STG-07: render stage assembles ExplainedRubricFile."""
-
-    def test_render_produces_valid_deliverable(self, tmp_path) -> None:
-        from grading_rubric.output.render_stage import render_stage
-        from grading_rubric.scorer.score_stage import score_stage
-
-        rubric = _rubric_with_vague_terms()
-        parsed = _make_parsed_inputs(rubric, _evidence())
-        assessed = assess_stage(parsed, settings=_stub_settings(), audit_emitter=NullEmitter())
-        proposed = propose_stage(assessed, settings=_stub_settings(), audit_emitter=NullEmitter())
-        scored = score_stage(proposed, settings=_stub_settings(), audit_emitter=NullEmitter())
-
-        out_path = tmp_path / "output.json"
-        result = render_stage(
-            scored,
-            output_path=out_path,
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(
+            "grading_rubric.parsers.parse_stage.read_any_text",
+            lambda path: "diagram text layer" if path == teaching else "exam text",
+        )
+        parsed = parse_inputs_stage(
+            _ingest_outputs_for_parse(exam, teaching=[teaching]),
             settings=_stub_settings(),
             audit_emitter=NullEmitter(),
+            document_reader=reader,
         )
-        assert out_path.exists()
-        # The ExplainedRubricFile model validates its own invariants on construction
-        erf = result.explained_rubric
-        assert isinstance(erf, ExplainedRubricFile)
-        assert len(erf.quality_scores) == 3
-        assert erf.improved_rubric is not None
+
+    assert parsed.teaching_material_text == "vision text for teaching_material"
+    assert reader.calls[0]["role"] == "teaching_material"
+    assert reader.calls[0]["extracted_text_hint"] == "diagram text layer"
 
 
-# ── UT-STG-08: source_findings traceability ─────────────────────────────────
+def test_parse_uses_vision_for_textless_student_copy_pdf(tmp_path: Path) -> None:
+    exam = tmp_path / "exam.txt"
+    student = tmp_path / "student.pdf"
+    exam.write_text("exam text", encoding="utf-8")
+    student.write_bytes(b"%PDF scanned")
+    reader = _FakeDocumentReader()
 
-
-class TestSourceFindingsTraceability:
-    """UT-STG-08: each draft's source_findings traces back to an AssessmentFinding.id."""
-
-    def test_source_findings_valid(self) -> None:
-        rubric = _rubric_with_vague_terms()
-        parsed = _make_parsed_inputs(rubric, _evidence())
-        assessed = assess_stage(parsed, settings=_stub_settings(), audit_emitter=NullEmitter())
-        proposed = propose_stage(assessed, settings=_stub_settings(), audit_emitter=NullEmitter())
-
-        finding_ids = {f.id for f in proposed.findings}
-        for change in proposed.proposed_changes:
-            for sf_id in change.source_findings:
-                assert sf_id in finding_ids, (
-                    f"ProposedChange {change.id} references finding {sf_id} "
-                    f"not in the assessment findings set"
-                )
-
-
-# ── UT-STG-09: grounding contradiction ──────────────────────────────────────
-
-
-class TestGroundingContradiction:
-    """UT-STG-09: teaching-material grounding pass (offline stub path).
-
-    The offline planner does not implement a full grounding pass (that requires
-    LLM calls). This test verifies the structural contract: the propose stage
-    runs without error when teaching material is present, and the output shape
-    is correct. True grounding contradiction detection is tested via the LLM
-    gateway in the system integration tests (§ 3.4).
-    """
-
-    def test_propose_with_teaching_material_present(self) -> None:
-        rubric = _rubric_with_vague_terms()
-        evidence = EvidenceProfile(
-            starting_rubric_present=True,
-            exam_question_present=True,
-            teaching_material_present=True,
-            student_copies_present=False,
-            synthetic_responses_used=True,
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(
+            "grading_rubric.parsers.parse_stage.read_any_text",
+            lambda path: "" if path == student else "exam text",
         )
-        parsed = _make_parsed_inputs(rubric, evidence)
-        assessed = assess_stage(parsed, settings=_stub_settings(), audit_emitter=NullEmitter())
-        proposed = propose_stage(assessed, settings=_stub_settings(), audit_emitter=NullEmitter())
+        parsed = parse_inputs_stage(
+            _ingest_outputs_for_parse(exam, student_copies=[student]),
+            settings=_stub_settings(),
+            audit_emitter=NullEmitter(),
+            document_reader=reader,
+        )
 
-        assert isinstance(proposed, ProposeOutputs)
-        # All changes should have valid source_findings
-        finding_ids = {f.id for f in proposed.findings}
-        for change in proposed.proposed_changes:
-            for sf_id in change.source_findings:
-                assert sf_id in finding_ids
+    assert parsed.student_copies_text == ["vision text for student_copy"]
+    assert reader.calls[0]["role"] == "student_copy"
+
+
+def test_parse_uses_vision_for_student_copy_pdf_even_with_text_layer(
+    tmp_path: Path,
+) -> None:
+    exam = tmp_path / "exam.txt"
+    student = tmp_path / "student.pdf"
+    exam.write_text("exam text", encoding="utf-8")
+    student.write_bytes(b"%PDF scanned")
+    reader = _FakeDocumentReader()
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(
+            "grading_rubric.parsers.parse_stage.read_any_text",
+            lambda path: "garbled text layer" if path == student else "exam text",
+        )
+        parsed = parse_inputs_stage(
+            _ingest_outputs_for_parse(exam, student_copies=[student]),
+            settings=_stub_settings(),
+            audit_emitter=NullEmitter(),
+            document_reader=reader,
+        )
+
+    assert parsed.student_copies_text == ["vision text for student_copy"]
+    assert reader.calls[0]["role"] == "student_copy"
+    assert reader.calls[0]["extracted_text_hint"] == "garbled text layer"
+
+
+def test_parse_structures_free_text_starting_rubric(tmp_path: Path) -> None:
+    exam = tmp_path / "exam.txt"
+    rubric_path = tmp_path / "rubric.txt"
+    exam.write_text("Describe bad actors.", encoding="utf-8")
+    rubric_path.write_text(
+        "3 points total: 0.5 points each for category match and 0.5 points each "
+        "for harmful impact across 3 actions.",
+        encoding="utf-8",
+    )
+    structured = Rubric(
+        id=uuid4(),
+        schema_version="1.0.0",
+        title="Structured rubric",
+        total_points=3.0,
+        criteria=[
+            RubricCriterion(
+                id=uuid4(),
+                name="Category correspondence",
+                description="Actions match chosen motivation categories.",
+                points=1.5,
+            ),
+            RubricCriterion(
+                id=uuid4(),
+                name="Harmful impact",
+                description="Actions explain concrete stakeholder harm.",
+                points=1.5,
+            ),
+        ],
+    )
+    structurer = _FakeRubricStructurer(structured)
+
+    parsed = parse_inputs_stage(
+        _ingest_outputs_for_parse(exam, starting_rubric=rubric_path),
+        settings=_stub_settings(),
+        audit_emitter=NullEmitter(),
+        rubric_structurer=structurer,
+    )
+
+    assert parsed.starting_rubric == structured
+    assert parsed.starting_rubric_raw_text == rubric_path.read_text(encoding="utf-8")
+    assert [c.name for c in parsed.starting_rubric.criteria] == [
+        "Category correspondence",
+        "Harmful impact",
+    ]
+    assert structurer.calls[0]["exam_question_text"] == "Describe bad actors."
+
+
+def test_parse_free_text_rubric_falls_back_when_structuring_returns_none(
+    tmp_path: Path,
+) -> None:
+    exam = tmp_path / "exam.txt"
+    rubric_path = tmp_path / "rubric.txt"
+    exam.write_text("Describe bad actors.", encoding="utf-8")
+    rubric_path.write_text("Rubric: 3 points total for a complete answer.", encoding="utf-8")
+    structurer = _FakeRubricStructurer(None)
+
+    parsed = parse_inputs_stage(
+        _ingest_outputs_for_parse(exam, starting_rubric=rubric_path),
+        settings=_stub_settings(),
+        audit_emitter=NullEmitter(),
+        rubric_structurer=structurer,
+    )
+
+    assert parsed.starting_rubric is not None
+    assert len(parsed.starting_rubric.criteria) == 1
+    assert parsed.starting_rubric.criteria[0].name == "Teacher rubric (free-text)"
+
+
+def test_synthesis_prompt_requires_wrong_category_sentinel() -> None:
+    prompt = Path(
+        "grading_rubric/gateway/prompts/assess_synthesize_responses.md"
+    ).read_text(encoding="utf-8")
+
+    assert "wrong_category_match" in prompt
+    assert "Required category-mismatch sentinel" in prompt
+    assert "category X" in prompt
+    assert "category Y" in prompt
+    assert "SmartCity" not in prompt
+
+
+def test_synthesis_prompt_forces_below_average_degradation() -> None:
+    prompt = Path(
+        "grading_rubric/gateway/prompts/assess_synthesize_responses.md"
+    ).read_text(encoding="utf-8")
+
+    assert "`below_average` should likely grade in 0.30-0.50" in prompt
+    assert "If it would grade above 0.60, it is too competent" in prompt
+    assert "Reject and rewrite any `weak`, `below_average`, or `average`" in prompt
+    assert "For `below_average`, target the shape of an answer" in prompt
+    assert "one item must be clearly flawed" in prompt
+
+
+def test_synthesis_prompt_inverts_length_by_quality() -> None:
+    prompt = Path(
+        "grading_rubric/gateway/prompts/assess_synthesize_responses.md"
+    ).read_text(encoding="utf-8")
+
+    assert "`weak`: 150-250 words" in prompt
+    assert "`below_average`: 150-250 words" in prompt
+    assert "`excellent`: 80-150 words" in prompt
+    assert "Do not let response length increase with quality" in prompt
+    assert "run-on sentences" in prompt
+    assert "maybe" in prompt
+    assert "I think" in prompt
+    assert "it could be" in prompt
+
+
+def test_synthesis_schema_accepts_auditable_self_check_notes() -> None:
+    synthesized = SynthesizedResponseSet(
+        responses=[],
+        self_check_notes="weak response rewritten after calibration check",
+    )
+
+    assert synthesized.self_check_notes == "weak response rewritten after calibration check"

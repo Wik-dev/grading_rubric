@@ -83,6 +83,28 @@ def _make_emitter() -> AuditEmitter:
     return JsonLineEmitter(sink=sys.stderr)
 
 
+class _TeeSink:
+    def __init__(self, *sinks) -> None:
+        self._sinks = sinks
+
+    def write(self, text: str) -> int:
+        for sink in self._sinks:
+            sink.write(text)
+        return len(text)
+
+    def flush(self) -> None:
+        for sink in self._sinks:
+            sink.flush()
+
+
+def _make_artifact_emitter(artifact_dir: Path | None) -> tuple[AuditEmitter, object | None]:
+    if artifact_dir is None:
+        return _make_emitter(), None
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    audit_file = (artifact_dir / "audit.jsonl").open("w", encoding="utf-8")
+    return JsonLineEmitter(sink=_TeeSink(sys.stderr, audit_file)), audit_file
+
+
 def _settings() -> Settings:
     return Settings.from_env()
 
@@ -309,6 +331,13 @@ def cmd_render(input_path: Path, output_path: Path) -> None:
     required=True,
     help="Where the ExplainedRubricFile JSON will be written.",
 )
+@click.option(
+    "--artifact-dir",
+    "artifact_dir",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Optional directory for per-stage artifacts and audit.jsonl.",
+)
 def cmd_run_pipeline(
     input_path: Path | None,
     exam_question: Path | None,
@@ -317,6 +346,7 @@ def cmd_run_pipeline(
     starting_rubric_inline: str | None,
     student_copy: tuple[Path, ...],
     output_path: Path,
+    artifact_dir: Path | None,
 ) -> None:
     """Chain the six stages in order via the in-process orchestrator (DR-ARC-04)."""
 
@@ -335,12 +365,18 @@ def cmd_run_pipeline(
             student_copy_paths=list(student_copy),
         )
 
-    result = run_pipeline(
-        pipeline_inputs=pipeline_inputs,
-        output_path=output_path,
-        settings=_settings(),
-        audit_emitter=_make_emitter(),
-    )
+    emitter, audit_file = _make_artifact_emitter(artifact_dir)
+    try:
+        result = run_pipeline(
+            pipeline_inputs=pipeline_inputs,
+            output_path=output_path,
+            settings=_settings(),
+            audit_emitter=emitter,
+            artifact_dir=artifact_dir,
+        )
+    finally:
+        if audit_file is not None:
+            audit_file.close()
     click.echo(str(result.explained_rubric_path))
 
 

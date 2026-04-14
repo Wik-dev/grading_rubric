@@ -1,43 +1,24 @@
-"""DR-AS-02..15 — three measurement engines under a stage-local protocol.
+"""Simulation-backed assessment engines.
 
-Each engine is **independent** (no engine reads another's output, no engine
-holds module-level state). The engines walk the rubric, run their method(s)
-through `gateway.measure(...)` (the only LLM seam, DR-LLM-01) where applicable,
-and return a list of `AssessmentFinding` instances.
-
-When an LLM backend is available, each engine uses `_measure_llm()` for deeper
-analysis. When the LLM is unavailable or fails, the engine falls back to the
-deterministic `_measure_deterministic()` path (DR-AS-06 sub-method b) so the
-full pipeline can run end-to-end without an API key. The honest reporting of
-confidence (low confidence on the synthetic-only path, DR-AS-13 floor of 0.20)
-makes this safe under SR-AS-08.
+The engines do not call the LLM. They compute rubric-quality findings and
+scores from grader simulation traces produced by `assess.simulation`.
 """
 
 from __future__ import annotations
 
-import itertools
-import json
-import logging
-import re
+import math
 import statistics
+from collections import defaultdict
+from dataclasses import dataclass, field
 from typing import Protocol
-from uuid import UUID, uuid4
+from uuid import uuid4
 
-from grading_rubric.assess.llm_schemas import (
-    CoverageInputs,
-    CoverageVerdict,
-    GraderPanelInputs,
-    GradingResult,
-    LinguisticSweepInputs,
-    LinguisticSweepReport,
-    PairwiseInputs,
-    PairwiseVerdict,
-    RubricScoring,
-    ScoringInputs,
+from grading_rubric.assess.simulation import (
+    CriterionGradeEntry,
+    SimulationEvidence,
 )
-from grading_rubric.audit.emitter import AuditEmitter
 from grading_rubric.config.settings import Settings
-from grading_rubric.gateway.gateway import Gateway, GatewayError
+from grading_rubric.models.deliverable import CriterionScore
 from grading_rubric.models.findings import (
     AssessmentFinding,
     ConfidenceIndicator,
@@ -46,109 +27,22 @@ from grading_rubric.models.findings import (
     QualityMethod,
     Severity,
 )
-from grading_rubric.models.rubric import (
-    EvidenceProfile,
-    Rubric,
-    RubricCriterion,
-    RubricFieldName,
-    RubricTarget,
-)
-
-logger = logging.getLogger(__name__)
-
-STAGE_ID = "assess"
+from grading_rubric.models.rubric import Rubric, RubricFieldName, RubricTarget
 
 
 class MeasurementEngine(Protocol):
-    """Stage-local protocol shared by the three engines."""
-
     criterion: QualityCriterion
 
-    def measure(
-        self,
-        *,
-        rubric: Rubric,
-        evidence: EvidenceProfile,
-        student_texts: list[str],
-        settings: Settings,
-        audit_emitter: AuditEmitter,
+    def measure_from_simulation(
+        self, sim: SimulationEvidence, *, rubric: Rubric, settings: Settings
     ) -> list[AssessmentFinding]: ...
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────
-
-
-_VAGUE_TERMS = (
-    "good",
-    "bad",
-    "well",
-    "poorly",
-    "appropriate",
-    "adequate",
-    "sufficient",
-    "clear",
-    "unclear",
-    "thorough",
-    "complete",
-    "incomplete",
-    "some",
-    "many",
-    "few",
-    "etc",
-)
-
-# Phrases that indicate undefined thresholds — graders cannot apply them
-# consistently because the boundary between pass/fail is subjective.
-_VAGUE_THRESHOLD_PATTERNS = [
-    (r"\btoo\s+\w+", "undefined threshold ('too …')"),
-    (r"\bnot\s+sufficient\w*", "undefined threshold ('not sufficient…')"),
-    (r"\bnot\s+enough", "undefined threshold ('not enough')"),
-    (r"\bsimilar\s+enough", "undefined threshold ('similar enough')"),
-]
-
-# References to external documents the rubric doesn't embed.
-_EXTERNAL_REF_PATTERNS = [
-    (r"\bcheck\s+the\b", "external reference ('check the …')"),
-    (r"\bsee\s+(?:the\s+)?(?:appendix|annex|table|sheet|document)\b", "external reference"),
-    (r"\brefer\s+to\b", "external reference ('refer to …')"),
-]
-
-# Fixed persona pool for grader panel agreement (DR-AS-06).
-_GRADER_PERSONAS = [
-    "Strict grader: focuses on technical precision, penalises missing details, expects complete answers.",
-    "Lenient grader: emphasises effort and partial understanding, gives benefit of the doubt.",
-    "Domain expert: deep subject knowledge, evaluates conceptual accuracy over presentation.",
-    "Novice TA: first-time grader, follows rubric literally, struggles with ambiguous criteria.",
-    "Experienced educator: 20 years of teaching, balances fairness with rigour, interprets rubric holistically.",
-    "Quantitative grader: focuses on measurable, observable evidence; ignores subjective impressions.",
-]
-
-
-def _walk(rubric: Rubric):
-    """Yield (path, criterion) for every node in the rubric tree, root → leaf."""
-
-    def visit(c: RubricCriterion, path: list):
-        new_path = [*path, c.id]
-        yield new_path, c
-        for child in c.sub_criteria:
-            yield from visit(child, new_path)
-
-    for root in rubric.criteria:
-        yield from visit(root, [])
-
-
-def _confidence_floor(evidence: EvidenceProfile, base: float) -> ConfidenceIndicator:
-    """DR-AS-13 — synthetic-only runs floor at 0.20."""
-
-    score = base
-    if evidence.synthetic_responses_used or not evidence.student_copies_present:
-        score = max(0.20, min(score, 0.40))  # honest LOW
-    rationale = (
-        "synthetic candidate responses only — confidence is honestly LOW"
-        if evidence.synthetic_responses_used or not evidence.student_copies_present
-        else "real student copies + grounded measurement"
-    )
-    return ConfidenceIndicator.from_score(score, rationale)
+def _target_for(sim: SimulationEvidence, criterion_id: str) -> RubricTarget | None:
+    path = sim.criterion_path_index.get(criterion_id)
+    if not path:
+        return None
+    return RubricTarget(criterion_path=path, level_id=None, field=RubricFieldName.DESCRIPTION)
 
 
 def _make_finding(
@@ -159,9 +53,9 @@ def _make_finding(
     evidence_text: str,
     method: QualityMethod,
     confidence: ConfidenceIndicator,
-    rubric_id,
+    rubric: Rubric,
     *,
-    samples: int = 1,
+    samples: int,
     agreement: float | None = None,
     source_operations: list | None = None,
     linked_finding_ids: list | None = None,
@@ -175,718 +69,667 @@ def _make_finding(
         evidence=evidence_text,
         measurement=Measurement(method=method, samples=samples, agreement=agreement),
         confidence=confidence,
-        measured_against_rubric_id=rubric_id,
+        measured_against_rubric_id=rubric.id,
         iteration=0,
         source_operations=source_operations or [],
         linked_finding_ids=linked_finding_ids or [],
     )
 
 
-def _llm_available(settings: Settings) -> bool:
-    """Check if an LLM backend is configured and usable."""
-    if settings.llm_backend == "stub":
-        return False
-    if settings.llm_backend == "anthropic" and not settings.anthropic_api_key:
-        return False
-    if settings.llm_backend == "openai" and not settings.openai_api_key:
-        return False
-    return True
+def _entries_by_criterion(sim: SimulationEvidence) -> dict[str, list[CriterionGradeEntry]]:
+    grouped: dict[str, list[CriterionGradeEntry]] = defaultdict(list)
+    for entry in sim.grade_entries:
+        grouped[entry.criterion_id].append(entry)
+    return grouped
 
 
-def _emit_fallback(audit_emitter: AuditEmitter, engine: str, exc: Exception) -> None:
-    """Record an audit event when the LLM path fails and we fall back."""
-    audit_emitter.record_operation({
-        "id": str(uuid4()),
-        "stage_id": STAGE_ID,
-        "status": "fallback",
-        "details": {
-            "kind": "llm_fallback",
-            "engine": engine,
-            "error": str(exc),
-        },
-        "error": None,
-    })
+@dataclass
+class ResponseCriterionSignal:
+    criterion_id: str
+    response_idx: int
+    entries: list[CriterionGradeEntry]
+    mean_grade: float
+    stdev: float
+    extremity: float
+    ambiguity_weight: float = 0.0
+    applicability_weight: float = 0.0
+    reasons: list[str] = field(default_factory=list)
 
 
-def _rubric_to_text(rubric: Rubric) -> str:
-    """Human-readable serialization of a rubric for LLM prompts."""
-    lines: list[str] = [f"# {rubric.title} (total: {rubric.total_points} points)\n"]
+def _grade_matrix_signals(sim: SimulationEvidence) -> dict[str, list[ResponseCriterionSignal]]:
+    """Infer ambiguity/applicability signals from grade shape only."""
 
-    def _render_criterion(c: RubricCriterion, depth: int = 0) -> None:
-        indent = "  " * depth
-        pts = f" ({c.points} pts)" if c.points else ""
-        lines.append(f"{indent}## {c.name}{pts}")
-        lines.append(f"{indent}ID path: {c.id}")
-        lines.append(f"{indent}Description: {c.description}")
-        if c.scoring_guidance:
-            lines.append(f"{indent}Scoring guidance: {c.scoring_guidance}")
-        for lv in c.levels:
-            lines.append(f"{indent}  - [{lv.label}] ({lv.points} pts): {lv.descriptor}")
-        for child in c.sub_criteria:
-            _render_criterion(child, depth + 1)
+    by_response_and_criterion: dict[int, dict[str, list[CriterionGradeEntry]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
+    for entry in sim.grade_entries:
+        by_response_and_criterion[entry.response_idx][entry.criterion_id].append(entry)
 
-    for root in rubric.criteria:
-        _render_criterion(root)
+    criterion_means_by_response: dict[int, dict[str, float]] = {}
+    overall_mean_by_response: dict[int, float] = {}
+    for response_idx, by_criterion in by_response_and_criterion.items():
+        criterion_means = {
+            criterion_id: statistics.mean(entry.grade for entry in entries)
+            for criterion_id, entries in by_criterion.items()
+            if entries
+        }
+        criterion_means_by_response[response_idx] = criterion_means
+        if criterion_means:
+            overall_mean_by_response[response_idx] = statistics.mean(
+                criterion_means.values()
+            )
+
+    signals: dict[str, list[ResponseCriterionSignal]] = defaultdict(list)
+    for response_idx, by_criterion in by_response_and_criterion.items():
+        for criterion_id, entries in by_criterion.items():
+            grades = [entry.grade for entry in entries]
+            mean_grade = statistics.mean(grades)
+            stdev = statistics.stdev(grades) if len(grades) >= 2 else 0.0
+            extremity = abs((2.0 * mean_grade) - 1.0)
+            signal = ResponseCriterionSignal(
+                criterion_id=criterion_id,
+                response_idx=response_idx,
+                entries=entries,
+                mean_grade=mean_grade,
+                stdev=stdev,
+                extremity=extremity,
+            )
+
+            at_floor = sum(1 for grade in grades if grade <= 0.10)
+            at_ceiling = sum(1 for grade in grades if grade >= 0.90)
+            if len(grades) >= 2 and at_floor >= 1 and at_ceiling >= 1:
+                signal.applicability_weight = max(signal.applicability_weight, 1.0)
+                signal.reasons.append(
+                    f"bimodal edge grades floor={at_floor}, ceiling={at_ceiling}"
+                )
+            elif stdev >= 0.10:
+                if extremity < 0.40:
+                    signal.ambiguity_weight = max(signal.ambiguity_weight, 1.0)
+                    signal.reasons.append(
+                        f"midscale disagreement stdev={stdev:.2f}, extremity={extremity:.2f}"
+                    )
+                elif extremity > 0.60:
+                    signal.applicability_weight = max(signal.applicability_weight, 1.0)
+                    signal.reasons.append(
+                        f"edge disagreement stdev={stdev:.2f}, extremity={extremity:.2f}"
+                    )
+                else:
+                    signal.ambiguity_weight = max(signal.ambiguity_weight, 0.5)
+                    signal.applicability_weight = max(signal.applicability_weight, 0.5)
+                    signal.reasons.append(
+                        f"grey-zone disagreement stdev={stdev:.2f}, extremity={extremity:.2f}"
+                    )
+
+            overall_mean = overall_mean_by_response.get(response_idx)
+            criterion_mean = criterion_means_by_response.get(response_idx, {}).get(
+                criterion_id
+            )
+            if (
+                overall_mean is not None
+                and criterion_mean is not None
+                and criterion_mean < 0.15
+                and overall_mean > 0.50
+            ):
+                signal.applicability_weight = max(signal.applicability_weight, 1.0)
+                signal.reasons.append(
+                    f"criterion-response orphan criterion_mean={criterion_mean:.2f}, overall_mean={overall_mean:.2f}"
+                )
+
+            signals[criterion_id].append(signal)
+    return signals
+
+
+def _signal_problem_rate(
+    rows: list[ResponseCriterionSignal], attr: str
+) -> tuple[float, list[ResponseCriterionSignal]]:
+    signal_rows = [row for row in rows if getattr(row, attr) > 0.0]
+    if not signal_rows:
+        return 0.0, []
+    return (
+        max(0.0, min(1.0, statistics.mean(getattr(row, attr) for row in signal_rows))),
+        signal_rows,
+    )
+
+
+def _midscale_response_count(rows: list[ResponseCriterionSignal]) -> int:
+    return sum(1 for row in rows if row.extremity < 0.40)
+
+
+def _signal_evidence(rows: list[ResponseCriterionSignal]) -> str:
+    lines: list[str] = []
+    for row in rows[:6]:
+        lines.append(
+            f"response={row.response_idx}, mean={row.mean_grade:.2f}, "
+            f"stdev={row.stdev:.2f}, extremity={row.extremity:.2f}: "
+            f"{'; '.join(row.reasons)}"
+        )
+        for entry in row.entries[:2]:
+            lines.append(
+                f"  persona={entry.persona_idx}, grade={entry.grade:.2f}: "
+                f"{entry.justification[:180]}"
+            )
     return "\n".join(lines)
 
 
-def _criterion_names(rubric: Rubric) -> str:
-    """List of criterion names with IDs for prompt injection."""
-    names: list[str] = []
-    for path, c in _walk(rubric):
-        path_str = " > ".join(str(p) for p in path)
-        names.append(f"- {c.name} (path: [{path_str}])")
-    return "\n".join(names)
+_TIER_ORDER = {
+    "very_poor": 0,
+    "poor": 0,
+    "very_weak": 0,
+    "weak": 1,
+    "below_average": 2,
+    "average": 3,
+    "above_average": 4,
+    "good": 4,
+    "strong": 5,
+    "very_strong": 5,
+    "excellent": 6,
+}
 
 
-def _severity_from_str(s: str) -> Severity:
-    """Parse severity string from LLM output."""
-    s_lower = s.lower().strip()
-    if s_lower in ("high", "critical"):
-        return Severity.HIGH
-    if s_lower in ("medium", "moderate"):
-        return Severity.MEDIUM
-    return Severity.LOW
+def _tier_separation(
+    means: dict[int, float], sim: SimulationEvidence
+) -> float | None:
+    tiered: list[tuple[int, float]] = []
+    for response_idx, mean_grade in means.items():
+        tier = sim.response_set[response_idx].quality_tier
+        if tier:
+            tiered.append((_TIER_ORDER.get(tier.lower(), 3), mean_grade))
+    if len(tiered) < 2:
+        return None
+
+    low_rank = min(rank for rank, _ in tiered)
+    high_rank = max(rank for rank, _ in tiered)
+    if low_rank == high_rank:
+        return None
+
+    low_scores = [score for rank, score in tiered if rank == low_rank]
+    high_scores = [score for rank, score in tiered if rank == high_rank]
+    return statistics.mean(high_scores) - statistics.mean(low_scores)
 
 
-# ── AmbiguityEngine ────────────────────────────────────────────────────────
+def _rank_values(values: list[float]) -> list[float]:
+    ordered = sorted(enumerate(values), key=lambda item: item[1])
+    ranks = [0.0] * len(values)
+    cursor = 0
+    while cursor < len(ordered):
+        end = cursor + 1
+        while end < len(ordered) and ordered[end][1] == ordered[cursor][1]:
+            end += 1
+        rank = (cursor + 1 + end) / 2.0
+        for original_idx, _ in ordered[cursor:end]:
+            ranks[original_idx] = rank
+        cursor = end
+    return ranks
+
+
+def _pearson_correlation(xs: list[float], ys: list[float]) -> float | None:
+    if len(xs) != len(ys) or len(xs) < 2:
+        return None
+    mean_x = statistics.mean(xs)
+    mean_y = statistics.mean(ys)
+    numerator = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys, strict=True))
+    denom_x = math.sqrt(sum((x - mean_x) ** 2 for x in xs))
+    denom_y = math.sqrt(sum((y - mean_y) ** 2 for y in ys))
+    if denom_x <= 0 or denom_y <= 0:
+        return None
+    return max(-1.0, min(1.0, numerator / (denom_x * denom_y)))
+
+
+def _spearman_rank_score(calibrated: list[tuple[int, float, float, str]]) -> float | None:
+    if len(calibrated) < 2:
+        return None
+    intended_ranks = _rank_values([intended for _, intended, _, _ in calibrated])
+    actual_ranks = _rank_values([actual for _, _, actual, _ in calibrated])
+    corr = _pearson_correlation(intended_ranks, actual_ranks)
+    if corr is None:
+        return None
+    return (corr + 1.0) / 2.0
+
+
+def _synthetic_calibration(
+    means: dict[int, float], sim: SimulationEvidence
+) -> tuple[float | None, float | None, float | None, float | None, str]:
+    """Score whether synthetic tiers received grades near their intended level.
+
+    A coarse rubric can have a high max-min range while still collapsing most
+    responses into full credit. Intended synthetic scores let us detect that
+    ceiling effect without asking the LLM to judge rubric quality directly.
+    """
+
+    calibrated: list[tuple[int, float, float, str]] = []
+    for response_idx, mean_grade in means.items():
+        if response_idx >= len(sim.response_set):
+            continue
+        response = sim.response_set[response_idx]
+        if response.intended_score is None:
+            continue
+        calibrated.append(
+            (
+                response_idx,
+                max(0.0, min(1.0, response.intended_score)),
+                max(0.0, min(1.0, mean_grade)),
+                response.quality_tier,
+            )
+        )
+
+    if len(calibrated) < 2:
+        return None, None, None, None, ""
+
+    mean_error = statistics.mean(abs(actual - intended) for _, intended, actual, _ in calibrated)
+    calibration_score = max(0.0, min(1.0, 1.0 - (2.0 * mean_error)))
+    rank_score = _spearman_rank_score(calibrated)
+
+    ceiling_candidates = [
+        (idx, intended, actual, tier)
+        for idx, intended, actual, tier in calibrated
+        if intended < 0.85
+    ]
+    if ceiling_candidates:
+        ceiling_hits = [
+            (idx, intended, actual, tier)
+            for idx, intended, actual, tier in ceiling_candidates
+            if actual >= 0.90
+        ]
+        ceiling_score = 1.0 - (len(ceiling_hits) / len(ceiling_candidates))
+    else:
+        ceiling_score = 1.0
+
+    non_excellent = [
+        (idx, intended, actual, tier)
+        for idx, intended, actual, tier in calibrated
+        if intended < 0.95 and tier.lower() != "excellent"
+    ]
+    if non_excellent:
+        non_excellent_ceiling_rate = sum(
+            1 for _, _, actual, _ in non_excellent if actual >= 0.90
+        ) / len(non_excellent)
+        ceiling_cap = 0.60 if non_excellent_ceiling_rate > 0.50 else None
+    else:
+        ceiling_cap = None
+
+    detail = ", ".join(
+        f"r{idx}:{tier or 'synthetic'} intended={intended:.2f} actual={actual:.2f}"
+        for idx, intended, actual, tier in calibrated
+    )
+    return calibration_score, ceiling_score, rank_score, ceiling_cap, detail
+
+
+def _weighted_average(parts: list[tuple[float, float | None]]) -> float:
+    usable = [(weight, value) for weight, value in parts if value is not None]
+    total_weight = sum(weight for weight, _ in usable)
+    if total_weight <= 0:
+        return 0.0
+    return max(
+        0.0,
+        min(1.0, sum(weight * value for weight, value in usable) / total_weight),
+    )
 
 
 class AmbiguityEngine:
+    """Ambiguity = grader disagreement on the same rubric criterion."""
+
     criterion = QualityCriterion.AMBIGUITY
 
-    def measure(
-        self,
-        *,
-        rubric: Rubric,
-        evidence: EvidenceProfile,
-        student_texts: list[str],
-        settings: Settings,
-        audit_emitter: AuditEmitter,
+    def measure_from_simulation(
+        self, sim: SimulationEvidence, *, rubric: Rubric, settings: Settings
     ) -> list[AssessmentFinding]:
-        if _llm_available(settings):
-            try:
-                return self._measure_llm(
-                    rubric=rubric, evidence=evidence, student_texts=student_texts,
-                    settings=settings, audit_emitter=audit_emitter,
+        findings: list[AssessmentFinding] = []
+        signals = _grade_matrix_signals(sim)
+        entries_by_criterion = _entries_by_criterion(sim)
+        for criterion_id, rows in signals.items():
+            problem_rate, signal_rows = _signal_problem_rate(rows, "ambiguity_weight")
+            if problem_rate < 0.20:
+                continue
+
+            agreement = 1.0 - problem_rate
+            severity = Severity.HIGH if problem_rate >= 0.50 else Severity.MEDIUM
+            midscale_count = _midscale_response_count(rows)
+            confidence_score = max(0.20, min(0.90, agreement))
+            confidence_rationale = "inferred from midscale grade disagreement across personas"
+            if midscale_count < 3:
+                confidence_score = 0.20
+                confidence_rationale = (
+                    "low confidence: fewer than 3 midscale responses exercised ambiguity"
                 )
-            except Exception as exc:
-                _emit_fallback(audit_emitter, self.criterion.value, exc)
-        return self._measure_deterministic(
-            rubric=rubric, evidence=evidence, student_texts=student_texts,
-            settings=settings, audit_emitter=audit_emitter,
-        )
-
-    def _measure_llm(
-        self,
-        *,
-        rubric: Rubric,
-        evidence: EvidenceProfile,
-        student_texts: list[str],
-        settings: Settings,
-        audit_emitter: AuditEmitter,
-    ) -> list[AssessmentFinding]:
-        """LLM path: linguistic sweep + grader panel agreement."""
-        gateway = Gateway()
-        findings: list[AssessmentFinding] = []
-
-        # (a) Linguistic sweep — 1 gateway call.
-        rubric_text = _rubric_to_text(rubric)
-        sweep_result = gateway.measure(
-            prompt_id="ambiguity_linguistic_sweep",
-            inputs=LinguisticSweepInputs(
-                rubric_text=rubric_text,
-                vague_term_seed_list=", ".join(_VAGUE_TERMS),
-            ),
-            output_schema=LinguisticSweepReport,
-            samples=1,
-            settings=settings,
-            audit_emitter=audit_emitter,
-            stage_id=STAGE_ID,
-        )
-        sweep_op_id = sweep_result.operation_id
-        if sweep_result.aggregate:
-            for hit in sweep_result.aggregate.hits:
-                severity = _severity_from_str(hit.severity)
-                target = None
-                if hit.criterion_path:
-                    try:
-                        criterion_path = [UUID(p) if isinstance(p, str) else p for p in hit.criterion_path]
-                        target = RubricTarget(
-                            criterion_path=criterion_path,
-                            level_id=None,
-                            field=RubricFieldName(hit.field) if hit.field in RubricFieldName.__members__.values() else RubricFieldName.DESCRIPTION,
-                        )
-                    except (ValueError, KeyError, Exception):
-                        target = None
-                findings.append(_make_finding(
-                    QualityCriterion.AMBIGUITY, severity, target,
-                    observation=f"LLM sweep: {hit.problematic_phrase!r} — {hit.explanation}",
-                    evidence_text=f"issue_type={hit.issue_type}, field={hit.field}",
-                    method=QualityMethod.LINGUISTIC_SWEEP,
-                    confidence=ConfidenceIndicator.from_score(
-                        0.75, "LLM linguistic sweep with structured output",
+            findings.append(
+                _make_finding(
+                    QualityCriterion.AMBIGUITY,
+                    severity,
+                    _target_for(sim, criterion_id),
+                    (
+                        f"Grade matrix shows midscale disagreement on rubric criterion "
+                        f"{criterion_id}; ambiguity_signal={problem_rate:.2f}."
                     ),
-                    rubric_id=rubric.id,
-                    source_operations=[sweep_op_id],
-                ))
-
-        # (b) Grader panel agreement — k calls per response.
-        if student_texts:
-            k = settings.assess_panel_size
-            personas = _GRADER_PERSONAS[:k]
-            criterion_names_str = _criterion_names(rubric)
-
-            # Collect per-criterion grades: {criterion_path_str: list[float]}
-            all_grades: dict[str, list[float]] = {}
-
-            for response_text in student_texts:
-                for persona in personas:
-                    panel_result = gateway.measure(
-                        prompt_id="ambiguity_grade_with_rubric",
-                        inputs=GraderPanelInputs(
-                            rubric_text=rubric_text,
-                            response_text=response_text,
-                            persona_description=persona,
-                            criterion_names=criterion_names_str,
-                        ),
-                        output_schema=GradingResult,
-                        samples=1,
-                        settings=settings,
-                        audit_emitter=audit_emitter,
-                        stage_id=STAGE_ID,
-                    )
-                    if panel_result.aggregate:
-                        for cg in panel_result.aggregate.grades:
-                            key = ">".join(str(p) for p in cg.criterion_path)
-                            all_grades.setdefault(key, []).append(cg.grade)
-
-            # Compute agreement per criterion. Low α → ambiguity finding.
-            for key, grades in all_grades.items():
-                if len(grades) < 2:
-                    continue
-                # Simple proxy for inter-rater agreement: stdev-based.
-                # True Krippendorff's α requires the krippendorff library;
-                # we use coefficient of variation as a lightweight proxy.
-                mean_grade = statistics.mean(grades)
-                stdev = statistics.stdev(grades) if len(grades) > 1 else 0.0
-                # α proxy: 1 - (stdev / max(0.01, range_possible))
-                alpha_proxy = max(0.0, 1.0 - (stdev / 0.5))
-
-                if alpha_proxy < 0.67:
-                    severity = Severity.HIGH if alpha_proxy < 0.40 else Severity.MEDIUM
-                    path_parts = key.split(">")
-                    findings.append(_make_finding(
-                        QualityCriterion.AMBIGUITY, severity, None,
-                        observation=(
-                            f"Grader panel disagreement on criterion path [{key}]: "
-                            f"agreement proxy α={alpha_proxy:.2f} (stdev={stdev:.3f} "
-                            f"across {len(grades)} grades). This suggests the rubric "
-                            f"is ambiguous on this criterion."
-                        ),
-                        evidence_text=(
-                            f"panel_size={k}, responses={len(student_texts)}, "
-                            f"grades_collected={len(grades)}, mean={mean_grade:.3f}"
-                        ),
-                        method=QualityMethod.LLM_PANEL_AGREEMENT,
-                        confidence=ConfidenceIndicator.from_score(
-                            0.65, "LLM grader panel agreement measurement",
-                        ),
-                        rubric_id=rubric.id,
-                        samples=len(grades),
-                        agreement=alpha_proxy,
-                    ))
-
-        return findings
-
-    def _measure_deterministic(
-        self,
-        *,
-        rubric: Rubric,
-        evidence: EvidenceProfile,
-        student_texts: list[str],
-        settings: Settings,
-        audit_emitter: AuditEmitter,
-    ) -> list[AssessmentFinding]:
-        """DR-AS-06 — linguistic sweep sub-method (deterministic, offline-safe).
-
-        Checks for: vague terms, undefined thresholds, external references
-        without embedded content, and duplicate level labels.
-        """
-
-        findings: list[AssessmentFinding] = []
-        conf = _confidence_floor(evidence, 0.65)
-
-        for path, c in _walk(rubric):
-            desc_lower = c.description.lower()
-            target = RubricTarget(
-                criterion_path=path, level_id=None, field=RubricFieldName.DESCRIPTION,
+                    _signal_evidence(signal_rows),
+                    QualityMethod.LLM_PANEL_AGREEMENT,
+                    ConfidenceIndicator.from_score(
+                        confidence_score,
+                        confidence_rationale,
+                    ),
+                    rubric,
+                    samples=len(entries_by_criterion.get(criterion_id, [])),
+                    agreement=agreement,
+                    source_operations=sim.source_operations,
+                )
             )
-
-            # 1. Vague terms — report ALL matches, not just the first.
-            matched_terms = [
-                t for t in _VAGUE_TERMS
-                if re.search(rf"\b{re.escape(t)}\b", desc_lower)
-            ]
-            for term in matched_terms:
-                findings.append(_make_finding(
-                    QualityCriterion.AMBIGUITY, Severity.MEDIUM, target,
-                    observation=(
-                        f"Criterion {c.name!r} uses vague term '{term}'. "
-                        f"Graders may interpret this differently — replace with "
-                        f"specific, observable language."
-                    ),
-                    evidence_text=(
-                        f"linguistic sweep matched '{term}' in: "
-                        f"{c.description[:120]}"
-                    ),
-                    method=QualityMethod.LINGUISTIC_SWEEP,
-                    confidence=conf, rubric_id=rubric.id,
-                ))
-
-            # 2. Undefined thresholds (e.g. "too similar", "not sufficient").
-            for pattern, label in _VAGUE_THRESHOLD_PATTERNS:
-                m = re.search(pattern, desc_lower)
-                if m:
-                    findings.append(_make_finding(
-                        QualityCriterion.AMBIGUITY, Severity.HIGH, target,
-                        observation=(
-                            f"Criterion {c.name!r} uses an {label}: "
-                            f"'{m.group()}'. Without a concrete threshold "
-                            f"(e.g. '≥80% overlap'), graders will disagree "
-                            f"on the boundary."
-                        ),
-                        evidence_text=(
-                            f"pattern '{pattern}' matched '{m.group()}' in: "
-                            f"{c.description[:120]}"
-                        ),
-                        method=QualityMethod.LINGUISTIC_SWEEP,
-                        confidence=conf, rubric_id=rubric.id,
-                    ))
-
-            # 3. External references without embedded content.
-            for pattern, label in _EXTERNAL_REF_PATTERNS:
-                m = re.search(pattern, desc_lower)
-                if m:
-                    findings.append(_make_finding(
-                        QualityCriterion.AMBIGUITY, Severity.HIGH, target,
-                        observation=(
-                            f"Criterion {c.name!r} contains an {label}: "
-                            f"'{m.group()}'. The referenced material is not "
-                            f"embedded in the rubric — graders without access "
-                            f"to it cannot apply this criterion."
-                        ),
-                        evidence_text=(
-                            f"pattern '{pattern}' matched '{m.group()}' in: "
-                            f"{c.description[:120]}"
-                        ),
-                        method=QualityMethod.LINGUISTIC_SWEEP,
-                        confidence=conf, rubric_id=rubric.id,
-                    ))
-
-            # 4. Duplicate level labels.
-            if c.levels and len({lv.label for lv in c.levels}) < len(c.levels):
-                findings.append(_make_finding(
-                    QualityCriterion.AMBIGUITY, Severity.HIGH,
-                    RubricTarget(
-                        criterion_path=path, level_id=c.levels[0].id,
-                        field=RubricFieldName.LEVEL_LABEL,
-                    ),
-                    observation=f"Criterion {c.name!r} has duplicate level labels.",
-                    evidence_text="at least two levels share a label",
-                    method=QualityMethod.LINGUISTIC_SWEEP,
-                    confidence=_confidence_floor(evidence, 0.85),
-                    rubric_id=rubric.id,
-                ))
-
         return findings
-
-
-# ── ApplicabilityEngine ────────────────────────────────────────────────────
 
 
 class ApplicabilityEngine:
+    """Applicability = graders can apply the criterion while grading."""
+
     criterion = QualityCriterion.APPLICABILITY
 
-    def measure(
-        self,
-        *,
-        rubric: Rubric,
-        evidence: EvidenceProfile,
-        student_texts: list[str],
-        settings: Settings,
-        audit_emitter: AuditEmitter,
+    def measure_from_simulation(
+        self, sim: SimulationEvidence, *, rubric: Rubric, settings: Settings
     ) -> list[AssessmentFinding]:
-        if _llm_available(settings):
-            try:
-                return self._measure_llm(
-                    rubric=rubric, evidence=evidence, student_texts=student_texts,
-                    settings=settings, audit_emitter=audit_emitter,
+        findings: list[AssessmentFinding] = []
+        signals = _grade_matrix_signals(sim)
+        entries_by_criterion = _entries_by_criterion(sim)
+        for criterion_id, rows in signals.items():
+            problem_rate, signal_rows = _signal_problem_rate(rows, "applicability_weight")
+            if problem_rate < 0.20:
+                continue
+
+            applicability_rate = 1.0 - problem_rate
+            severity = Severity.HIGH if problem_rate >= 0.50 else Severity.MEDIUM
+            findings.append(
+                _make_finding(
+                    QualityCriterion.APPLICABILITY,
+                    severity,
+                    _target_for(sim, criterion_id),
+                    (
+                        f"Grade matrix suggests an applicability gap on rubric criterion "
+                        f"{criterion_id}; applicability_gap_signal={problem_rate:.2f}."
+                    ),
+                    _signal_evidence(signal_rows),
+                    QualityMethod.SYNTHETIC_COVERAGE,
+                    ConfidenceIndicator.from_score(
+                        max(0.20, min(0.85, applicability_rate)),
+                        "inferred from edge polarization and criterion-response orphaning",
+                    ),
+                    rubric,
+                    samples=len(entries_by_criterion.get(criterion_id, [])),
+                    agreement=None,
+                    source_operations=sim.source_operations,
                 )
-            except Exception as exc:
-                _emit_fallback(audit_emitter, self.criterion.value, exc)
-        return self._measure_deterministic(
-            rubric=rubric, evidence=evidence, student_texts=student_texts,
-            settings=settings, audit_emitter=audit_emitter,
-        )
-
-    def _measure_llm(
-        self,
-        *,
-        rubric: Rubric,
-        evidence: EvidenceProfile,
-        student_texts: list[str],
-        settings: Settings,
-        audit_emitter: AuditEmitter,
-    ) -> list[AssessmentFinding]:
-        """LLM path: coverage check per student response."""
-        gateway = Gateway()
-        findings: list[AssessmentFinding] = []
-        rubric_text = _rubric_to_text(rubric)
-        evidence_ctx = (
-            f"Evidence: {evidence.student_copies_count} student copies, "
-            f"exam_question={'present' if evidence.exam_question_present else 'absent'}, "
-            f"teaching_material={'present' if evidence.teaching_material_present else 'absent'}"
-        )
-
-        for response_text in student_texts:
-            result = gateway.measure(
-                prompt_id="applicability_cover_response",
-                inputs=CoverageInputs(
-                    rubric_text=rubric_text,
-                    response_text=response_text,
-                    evidence_context=evidence_ctx,
-                ),
-                output_schema=CoverageVerdict,
-                samples=1,
-                settings=settings,
-                audit_emitter=audit_emitter,
-                stage_id=STAGE_ID,
             )
-            if result.aggregate and result.aggregate.status in ("uncovered", "partial"):
-                severity = Severity.HIGH if result.aggregate.status == "uncovered" else Severity.MEDIUM
-                findings.append(_make_finding(
-                    QualityCriterion.APPLICABILITY, severity, None,
-                    observation=(
-                        f"Rubric coverage is {result.aggregate.status.upper()} for a student response. "
-                        f"{result.aggregate.missing_dimension}"
-                    ),
-                    evidence_text=(
-                        f"LLM coverage verdict: {result.aggregate.status}. "
-                        f"Covered criteria: {', '.join(result.aggregate.covered_criteria)}. "
-                        f"{result.aggregate.evidence}"
-                    ),
-                    method=QualityMethod.SYNTHETIC_COVERAGE,
-                    confidence=ConfidenceIndicator.from_score(
-                        0.70, "LLM coverage analysis with structured output",
-                    ),
-                    rubric_id=rubric.id,
-                    source_operations=[result.operation_id],
-                ))
-
         return findings
-
-    def _measure_deterministic(
-        self,
-        *,
-        rubric: Rubric,
-        evidence: EvidenceProfile,
-        student_texts: list[str],
-        settings: Settings,
-        audit_emitter: AuditEmitter,
-    ) -> list[AssessmentFinding]:
-        findings: list[AssessmentFinding] = []
-        conf = _confidence_floor(evidence, 0.70)
-
-        for path, c in _walk(rubric):
-            target_desc = RubricTarget(
-                criterion_path=path, level_id=None, field=RubricFieldName.DESCRIPTION,
-            )
-            target_guidance = RubricTarget(
-                criterion_path=path, level_id=None,
-                field=RubricFieldName.SCORING_GUIDANCE,
-            )
-
-            # 1. No scoring guidance — regardless of description length.
-            if not c.scoring_guidance:
-                findings.append(_make_finding(
-                    QualityCriterion.APPLICABILITY, Severity.MEDIUM, target_guidance,
-                    observation=(
-                        f"Criterion {c.name!r} has no scoring guidance. "
-                        f"Graders need explicit instructions on how to apply "
-                        f"this criterion to student work."
-                    ),
-                    evidence_text=(
-                        f"scoring_guidance is empty; description alone may be "
-                        f"insufficient for consistent grading"
-                    ),
-                    method=QualityMethod.SYNTHETIC_COVERAGE,
-                    confidence=conf, rubric_id=rubric.id,
-                ))
-
-            # 2. No performance levels defined.
-            if not c.levels and not c.sub_criteria:
-                findings.append(_make_finding(
-                    QualityCriterion.APPLICABILITY, Severity.MEDIUM, target_desc,
-                    observation=(
-                        f"Criterion {c.name!r} has no performance levels "
-                        f"(e.g. Excellent / Good / Fair / Poor). Without levels, "
-                        f"graders must interpret quality thresholds themselves."
-                    ),
-                    evidence_text=(
-                        f"criterion has {len(c.levels)} levels and "
-                        f"{len(c.sub_criteria)} sub-criteria"
-                    ),
-                    method=QualityMethod.SYNTHETIC_COVERAGE,
-                    confidence=conf, rubric_id=rubric.id,
-                ))
-
-            # 3. External references that make the rubric non-self-contained.
-            desc_lower = c.description.lower()
-            for pattern, label in _EXTERNAL_REF_PATTERNS:
-                if re.search(pattern, desc_lower):
-                    findings.append(_make_finding(
-                        QualityCriterion.APPLICABILITY, Severity.HIGH, target_desc,
-                        observation=(
-                            f"Criterion {c.name!r} depends on an external "
-                            f"document ({label}). Graders without access to "
-                            f"it cannot apply the criterion. Embed the "
-                            f"relevant content directly in the rubric."
-                        ),
-                        evidence_text=f"detected {label} in description",
-                        method=QualityMethod.SYNTHETIC_COVERAGE,
-                        confidence=conf, rubric_id=rubric.id,
-                    ))
-                    break  # one finding per external-ref pattern is enough
-
-        return findings
-
-
-# ── DiscriminationEngine ───────────────────────────────────────────────────
 
 
 class DiscriminationEngine:
+    """Discrimination = score spread and pairwise consistency."""
+
     criterion = QualityCriterion.DISCRIMINATION_POWER
 
-    def measure(
-        self,
-        *,
-        rubric: Rubric,
-        evidence: EvidenceProfile,
-        student_texts: list[str],
-        settings: Settings,
-        audit_emitter: AuditEmitter,
+    def measure_from_simulation(
+        self, sim: SimulationEvidence, *, rubric: Rubric, settings: Settings
     ) -> list[AssessmentFinding]:
-        if _llm_available(settings):
-            try:
-                return self._measure_llm(
-                    rubric=rubric, evidence=evidence, student_texts=student_texts,
-                    settings=settings, audit_emitter=audit_emitter,
+        findings: list[AssessmentFinding] = []
+        entries_by_criterion = _entries_by_criterion(sim)
+
+        for criterion_id, entries in entries_by_criterion.items():
+            by_response: dict[int, list[float]] = defaultdict(list)
+            for entry in entries:
+                by_response[entry.response_idx].append(entry.grade)
+            means = {
+                response_idx: statistics.mean(grades)
+                for response_idx, grades in by_response.items()
+                if grades
+            }
+            if len(means) < 2:
+                continue
+
+            separation = max(means.values()) - min(means.values())
+            tier_sep = _tier_separation(means, sim)
+            if tier_sep is not None:
+                separation = tier_sep
+            (
+                calibration_score,
+                ceiling_score,
+                rank_score,
+                ceiling_cap,
+                calibration_detail,
+            ) = _synthetic_calibration(means, sim)
+
+            if separation < 0.25 or (
+                calibration_score is not None and calibration_score < 0.60
+            ) or (
+                ceiling_score is not None and ceiling_score < 0.70
+            ) or (
+                rank_score is not None and rank_score < 0.60
+            ) or (
+                ceiling_cap is not None
+            ):
+                findings.append(
+                    _make_finding(
+                        QualityCriterion.DISCRIMINATION_POWER,
+                        Severity.MEDIUM,
+                        _target_for(sim, criterion_id),
+                        (
+                            f"Rubric criterion {criterion_id} produced weak discrimination "
+                            f"across responses; separation={separation:.2f}, "
+                            f"calibration={calibration_score if calibration_score is not None else 1.0:.2f}, "
+                            f"ceiling={ceiling_score if ceiling_score is not None else 1.0:.2f}, "
+                            f"rank={rank_score if rank_score is not None else 1.0:.2f}."
+                        ),
+                        "\n".join(
+                            [
+                                f"mean_scores={{{', '.join(f'{k}: {v:.2f}' for k, v in means.items())}}}",
+                                calibration_detail,
+                            ]
+                        ).strip(),
+                        QualityMethod.SCORE_DISTRIBUTION_SEPARATION,
+                        ConfidenceIndicator.from_score(
+                            0.65, "score spread from grader simulation traces"
+                        ),
+                        rubric,
+                        samples=len(entries),
+                        source_operations=sim.source_operations,
+                    )
                 )
-            except Exception as exc:
-                _emit_fallback(audit_emitter, self.criterion.value, exc)
-        return self._measure_deterministic(
-            rubric=rubric, evidence=evidence, student_texts=student_texts,
-            settings=settings, audit_emitter=audit_emitter,
+
+        for pair in sim.pairwise_results:
+            affected = pair.affected_criterion_ids or sim.criterion_ids
+            for criterion_id in affected:
+                entries = entries_by_criterion.get(criterion_id, [])
+                by_response: dict[int, list[float]] = defaultdict(list)
+                for entry in entries:
+                    by_response[entry.response_idx].append(entry.grade)
+                if pair.response_a_idx not in by_response or pair.response_b_idx not in by_response:
+                    continue
+                a_score = statistics.mean(by_response[pair.response_a_idx])
+                b_score = statistics.mean(by_response[pair.response_b_idx])
+                scores_equal = abs(a_score - b_score) < 0.10
+                winner_is_tie = pair.winner.upper() in {"TIE", "EQUAL"}
+                if not scores_equal or winner_is_tie:
+                    continue
+
+                disc = _make_finding(
+                    QualityCriterion.DISCRIMINATION_POWER,
+                    Severity.MEDIUM,
+                    _target_for(sim, criterion_id),
+                    (
+                        f"Pairwise comparison found a winner for responses "
+                        f"{pair.response_a_idx} and {pair.response_b_idx}, but criterion "
+                        f"{criterion_id} gave near-equal scores."
+                    ),
+                    (
+                        f"winner={pair.winner}, confidence={pair.confidence:.2f}, "
+                        f"a_score={a_score:.2f}, b_score={b_score:.2f}; {pair.reason}"
+                    ),
+                    QualityMethod.PAIRWISE_CONSISTENCY,
+                    ConfidenceIndicator.from_score(
+                        0.60, "pairwise comparison against simulated criterion scores"
+                    ),
+                    rubric,
+                    samples=1,
+                    source_operations=[pair.source_operation_id] if pair.source_operation_id else [],
+                )
+                findings.append(disc)
+
+                if pair.ambiguity_attributed:
+                    amb = _make_finding(
+                        QualityCriterion.AMBIGUITY,
+                        Severity.MEDIUM,
+                        _target_for(sim, criterion_id),
+                        (
+                            f"Pairwise comparison attributed the near-equal scoring on "
+                            f"criterion {criterion_id} to rubric ambiguity."
+                        ),
+                        pair.reason,
+                        QualityMethod.PAIRWISE_CONSISTENCY,
+                        ConfidenceIndicator.from_score(
+                            0.55, "ambiguity signal from pairwise grading comparison"
+                        ),
+                        rubric,
+                        samples=1,
+                        linked_finding_ids=[disc.id],
+                        source_operations=[pair.source_operation_id] if pair.source_operation_id else [],
+                    )
+                    disc.linked_finding_ids.append(amb.id)
+                    findings.append(amb)
+        return findings
+
+
+def scores_from_simulation(
+    sim: SimulationEvidence, *, rubric: Rubric, settings: Settings
+) -> list[CriterionScore]:
+    entries_by_criterion = _entries_by_criterion(sim)
+
+    ambiguity_values: list[float] = []
+    ambiguity_midscale_counts: list[int] = []
+    applicability_values: list[float] = []
+    discrimination_values: list[float] = []
+    signal_rows_by_criterion = _grade_matrix_signals(sim)
+
+    for criterion_id in sim.criterion_ids:
+        entries = entries_by_criterion.get(criterion_id, [])
+        if not entries:
+            continue
+
+        signal_rows = signal_rows_by_criterion.get(criterion_id, [])
+        ambiguity_problem_rate, _ = _signal_problem_rate(
+            signal_rows, "ambiguity_weight"
+        )
+        midscale_count = _midscale_response_count(signal_rows)
+        ambiguity_midscale_counts.append(midscale_count)
+        applicability_problem_rate, _ = _signal_problem_rate(
+            signal_rows, "applicability_weight"
+        )
+        ambiguity_value = 1.0 - ambiguity_problem_rate
+        if midscale_count < 3:
+            ambiguity_value = min(ambiguity_value, 0.75)
+        ambiguity_values.append(ambiguity_value)
+        applicability_values.append(1.0 - applicability_problem_rate)
+
+        by_response: dict[int, list[float]] = defaultdict(list)
+        for entry in entries:
+            by_response[entry.response_idx].append(entry.grade)
+        means = {
+            response_idx: statistics.mean(grades)
+            for response_idx, grades in by_response.items()
+            if grades
+        }
+        if len(means) >= 2:
+            tier_sep = _tier_separation(means, sim)
+            if tier_sep is not None:
+                separation = tier_sep
+            else:
+                # Grades are normalized to 0..1, so this is already normalized.
+                separation = max(means.values()) - min(means.values())
+        else:
+            separation = 0.0
+        calibration_score, ceiling_score, rank_score, ceiling_cap, _ = _synthetic_calibration(means, sim)
+
+        relevant_pairs = [
+            p
+            for p in sim.pairwise_results
+            if not p.affected_criterion_ids or criterion_id in p.affected_criterion_ids
+        ]
+        consistent = 0
+        total = 0
+        for pair in relevant_pairs:
+            if pair.response_a_idx not in means or pair.response_b_idx not in means:
+                continue
+            total += 1
+            a_score = means[pair.response_a_idx]
+            b_score = means[pair.response_b_idx]
+            margin = 0.10
+            winner = pair.winner.upper()
+            if winner == "A" and a_score > b_score + margin:
+                consistent += 1
+            elif winner == "B" and b_score > a_score + margin:
+                consistent += 1
+            elif winner in {"TIE", "EQUAL"} and abs(a_score - b_score) <= margin:
+                consistent += 1
+        pairwise_consistency = consistent / total if total else 1.0
+        if calibration_score is not None:
+            discrimination = _weighted_average(
+                [
+                    (0.25, calibration_score),
+                    (0.20, rank_score),
+                    (0.15, pairwise_consistency),
+                    (0.40, ceiling_score),
+                ]
+            )
+            if ceiling_cap is not None:
+                discrimination = min(discrimination, ceiling_cap)
+            discrimination_values.append(
+                discrimination
+            )
+        else:
+            discrimination_values.append(
+                max(0.0, min(1.0, 0.5 * separation + 0.5 * pairwise_consistency))
+            )
+
+    def avg(values: list[float]) -> float:
+        return max(0.0, min(1.0, statistics.mean(values))) if values else 0.0
+
+    ambiguity_confidence_score = 0.70 if sim.response_set else 0.20
+    ambiguity_rationale = "computed from midscale grade disagreement across personas"
+    if not ambiguity_midscale_counts or min(ambiguity_midscale_counts) < 3:
+        ambiguity_confidence_score = 0.20
+        ambiguity_rationale = (
+            "low confidence: fewer than 3 midscale responses exercised ambiguity"
         )
 
-    def _measure_llm(
-        self,
-        *,
-        rubric: Rubric,
-        evidence: EvidenceProfile,
-        student_texts: list[str],
-        settings: Settings,
-        audit_emitter: AuditEmitter,
-    ) -> list[AssessmentFinding]:
-        """LLM path: score distribution + pairwise consistency."""
-        gateway = Gateway()
-        findings: list[AssessmentFinding] = []
-        rubric_text = _rubric_to_text(rubric)
-        criterion_names_str = _criterion_names(rubric)
+    def score(
+        criterion: QualityCriterion,
+        value: float,
+        rationale: str,
+        confidence_score: float | None = None,
+    ) -> CriterionScore:
+        return CriterionScore(
+            criterion=criterion,
+            score=value,
+            confidence=ConfidenceIndicator.from_score(
+                confidence_score
+                if confidence_score is not None
+                else 0.70
+                if sim.response_set
+                else 0.20,
+                rationale,
+            ),
+            method=QualityMethod.GRADER_SIMULATION,
+            source_operation_id=sim.source_operations[0] if sim.source_operations else None,
+        )
 
-        # (a) Score distribution — 1 call per response.
-        per_criterion_scores: dict[str, list[float]] = {}
-        for response_text in student_texts:
-            result = gateway.measure(
-                prompt_id="discrimination_score_response",
-                inputs=ScoringInputs(
-                    rubric_text=rubric_text,
-                    response_text=response_text,
-                    criterion_names=criterion_names_str,
-                ),
-                output_schema=RubricScoring,
-                samples=1,
-                settings=settings,
-                audit_emitter=audit_emitter,
-                stage_id=STAGE_ID,
-            )
-            if result.aggregate:
-                for cs in result.aggregate.criterion_scores:
-                    key = ">".join(str(p) for p in cs.criterion_path)
-                    per_criterion_scores.setdefault(key, []).append(cs.score)
-
-        # Low variance across responses → finding.
-        for key, scores in per_criterion_scores.items():
-            if len(scores) >= 2:
-                var = statistics.pvariance(scores)
-                if var < settings.assess_discrimination_variance_target:
-                    findings.append(_make_finding(
-                        QualityCriterion.DISCRIMINATION_POWER, Severity.MEDIUM, None,
-                        observation=(
-                            f"LLM-scored distribution on criterion [{key}] has low "
-                            f"variance ({var:.4f}) across {len(scores)} responses. "
-                            f"The rubric may not discriminate well on this dimension."
-                        ),
-                        evidence_text=(
-                            f"scores={[f'{s:.2f}' for s in scores]}, variance={var:.4f}"
-                        ),
-                        method=QualityMethod.SCORE_DISTRIBUTION_SEPARATION,
-                        confidence=ConfidenceIndicator.from_score(
-                            0.65, "LLM score distribution analysis",
-                        ),
-                        rubric_id=rubric.id,
-                        samples=len(scores),
-                    ))
-
-        # (b) Pairwise consistency — sample pairs.
-        if len(student_texts) >= 2:
-            all_pairs = list(itertools.combinations(range(len(student_texts)), 2))
-            sample_size = min(settings.assess_pairwise_sample_size, len(all_pairs))
-            sampled_pairs = all_pairs[:sample_size]
-
-            for i, j in sampled_pairs:
-                result = gateway.measure(
-                    prompt_id="discrimination_pairwise_compare",
-                    inputs=PairwiseInputs(
-                        rubric_text=rubric_text,
-                        response_a_text=student_texts[i],
-                        response_b_text=student_texts[j],
-                    ),
-                    output_schema=PairwiseVerdict,
-                    samples=1,
-                    settings=settings,
-                    audit_emitter=audit_emitter,
-                    stage_id=STAGE_ID,
-                )
-                if result.aggregate and result.aggregate.ambiguity_attributed:
-                    # Dual finding: DISCRIMINATION + linked AMBIGUITY.
-                    disc_finding = _make_finding(
-                        QualityCriterion.DISCRIMINATION_POWER, Severity.MEDIUM, None,
-                        observation=(
-                            f"Pairwise comparison of responses {i+1} vs {j+1} "
-                            f"attributed difficulty to rubric ambiguity. "
-                            f"Winner: {result.aggregate.winner}. "
-                            f"{result.aggregate.reason}"
-                        ),
-                        evidence_text=(
-                            f"confidence={result.aggregate.confidence:.2f}, "
-                            f"ambiguity_attributed=True"
-                        ),
-                        method=QualityMethod.PAIRWISE_CONSISTENCY,
-                        confidence=ConfidenceIndicator.from_score(
-                            0.60, "LLM pairwise comparison with ambiguity attribution",
-                        ),
-                        rubric_id=rubric.id,
-                        source_operations=[result.operation_id],
-                    )
-                    amb_finding = _make_finding(
-                        QualityCriterion.AMBIGUITY, Severity.MEDIUM, None,
-                        observation=(
-                            f"Rubric ambiguity detected via pairwise comparison "
-                            f"(responses {i+1} vs {j+1}): {result.aggregate.reason}"
-                        ),
-                        evidence_text="dual signal from pairwise discrimination test",
-                        method=QualityMethod.PAIRWISE_CONSISTENCY,
-                        confidence=ConfidenceIndicator.from_score(
-                            0.55, "ambiguity signal from pairwise discrimination test",
-                        ),
-                        rubric_id=rubric.id,
-                        linked_finding_ids=[disc_finding.id],
-                        source_operations=[result.operation_id],
-                    )
-                    disc_finding.linked_finding_ids.append(amb_finding.id)
-                    findings.append(disc_finding)
-                    findings.append(amb_finding)
-
-        return findings
-
-    def _measure_deterministic(
-        self,
-        *,
-        rubric: Rubric,
-        evidence: EvidenceProfile,
-        student_texts: list[str],
-        settings: Settings,
-        audit_emitter: AuditEmitter,
-    ) -> list[AssessmentFinding]:
-        findings: list[AssessmentFinding] = []
-        conf = _confidence_floor(evidence, 0.60)
-
-        all_nodes = list(_walk(rubric))
-        leaf_nodes = [(p, c) for p, c in all_nodes if not c.sub_criteria]
-
-        # 1. Single-criterion rubric — can't discriminate performance.
-        if len(rubric.criteria) <= 1 and not any(
-            c.sub_criteria for c in rubric.criteria
-        ):
-            findings.append(_make_finding(
-                QualityCriterion.DISCRIMINATION_POWER, Severity.HIGH, None,
-                observation=(
-                    "The rubric has only a single criterion with no "
-                    "sub-criteria. It cannot distinguish between students "
-                    "who succeed on different dimensions of the task."
-                ),
-                evidence_text=(
-                    f"rubric has {len(rubric.criteria)} root criterion(s) "
-                    f"and {len(leaf_nodes)} leaf node(s) total"
-                ),
-                method=QualityMethod.SCORE_DISTRIBUTION_SEPARATION,
-                confidence=conf, rubric_id=rubric.id,
-            ))
-
-        # 2. No levels on leaf criteria — binary pass/fail reduces spread.
-        for path, c in leaf_nodes:
-            if not c.levels:
-                findings.append(_make_finding(
-                    QualityCriterion.DISCRIMINATION_POWER, Severity.MEDIUM,
-                    RubricTarget(
-                        criterion_path=path, level_id=None,
-                        field=RubricFieldName.DESCRIPTION,
-                    ),
-                    observation=(
-                        f"Criterion {c.name!r} has no performance levels. "
-                        f"Without graded levels (e.g. 0 / 0.5 / 1), scoring "
-                        f"becomes binary and limits the spread of student grades."
-                    ),
-                    evidence_text=(
-                        f"0 levels defined on leaf criterion {c.name!r}"
-                    ),
-                    method=QualityMethod.SCORE_DISTRIBUTION_SEPARATION,
-                    confidence=conf, rubric_id=rubric.id,
-                ))
-
-        # 3. Flat point distribution across leaf criteria.
-        leaf_points = [c.points for _, c in leaf_nodes if c.points and not c.sub_criteria]
-        if len(leaf_points) >= 2:
-            var = statistics.pvariance(leaf_points)
-            normalized = max(p for p in leaf_points) or 1.0
-            normalized_var = var / (normalized * normalized)
-            target = settings.assess_discrimination_variance_target
-            if normalized_var < target:
-                findings.append(_make_finding(
-                    QualityCriterion.DISCRIMINATION_POWER, Severity.MEDIUM, None,
-                    observation=(
-                        "Rubric scoring distribution is too flat across leaf "
-                        "criteria; graders will struggle to distinguish "
-                        "performance levels."
-                    ),
-                    evidence_text=(
-                        f"normalized variance {normalized_var:.4f} below "
-                        f"target {target:.4f}"
-                    ),
-                    method=QualityMethod.SCORE_DISTRIBUTION_SEPARATION,
-                    confidence=conf, rubric_id=rubric.id,
-                ))
-
-        return findings
+    return [
+        score(
+            QualityCriterion.AMBIGUITY,
+            avg(ambiguity_values),
+            ambiguity_rationale,
+            ambiguity_confidence_score,
+        ),
+        score(
+            QualityCriterion.APPLICABILITY,
+            avg(applicability_values),
+            "computed from edge polarization and criterion-response orphaning",
+        ),
+        score(
+            QualityCriterion.DISCRIMINATION_POWER,
+            avg(discrimination_values),
+            "computed from score separation and pairwise consistency",
+        ),
+    ]
