@@ -97,11 +97,11 @@ export interface Rubric {
 // ── § 4.9 ExplainedRubricFile ────────────────────────────────────────────
 
 export type QualityMethod =
-  | "LLM_PANEL_AGREEMENT"
-  | "PAIRWISE_CONSISTENCY"
-  | "SYNTHETIC_COVERAGE"
-  | "SCORE_DISTRIBUTION_SEPARATION"
-  | "LINGUISTIC_SWEEP";
+  | "llm_panel_agreement"
+  | "pairwise_consistency"
+  | "synthetic_coverage"
+  | "score_distribution_separation"
+  | "grader_simulation";
 
 export interface CriterionScore {
   criterion: QualityCriterion;

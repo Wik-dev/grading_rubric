@@ -580,7 +580,6 @@ class QualityMethod(StrEnum):
     PAIRWISE_CONSISTENCY          = "pairwise_consistency"           # head-to-head ranking vs absolute scores
     SYNTHETIC_COVERAGE            = "synthetic_coverage"             # coverage over candidate-response space
     SCORE_DISTRIBUTION_SEPARATION = "score_distribution_separation"  # separation across difficulty tiers
-    LINGUISTIC_SWEEP              = "linguistic_sweep"               # rubric-text scan (defined for extensibility; not used in v1.0)
     GRADER_SIMULATION             = "grader_simulation"              # headline scores from grader simulation traces
 
 

@@ -19,7 +19,7 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict
 
 from grading_rubric.audit.emitter import AuditEmitter
-from grading_rubric.audit.hashing import _canonical
+from grading_rubric.audit.hashing import canonical
 from grading_rubric.config.settings import Settings
 from grading_rubric.models.deliverable import ExplainedRubricFile
 from grading_rubric.models.explanation import CriterionSection, Explanation
@@ -106,7 +106,7 @@ def _atomic_write_json(path: Path, payload: dict) -> None:
 
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    text = json.dumps(_canonical(payload), indent=2, ensure_ascii=False)
+    text = json.dumps(canonical(payload), indent=2, ensure_ascii=False)
     with open(tmp, "w", encoding="utf-8") as fh:
         fh.write(text)
         fh.flush()

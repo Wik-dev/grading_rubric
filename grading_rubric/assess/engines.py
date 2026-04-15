@@ -195,10 +195,6 @@ def _signal_problem_rate(
     )
 
 
-def _midscale_response_count(rows: list[ResponseCriterionSignal]) -> int:
-    return sum(1 for row in rows if row.extremity < 0.40)
-
-
 def _signal_evidence(rows: list[ResponseCriterionSignal]) -> str:
     lines: list[str] = []
     for row in rows[:6]:

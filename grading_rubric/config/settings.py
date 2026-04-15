@@ -52,6 +52,17 @@ class Settings(BaseModel):
     # ── Output ─────────────────────────────────────────────────────────────
     deliverable_schema_version: str = Field(default="1.0.0")
 
+    @property
+    def llm_available(self) -> bool:
+        """Whether an LLM backend is configured and usable."""
+        if self.llm_backend == "stub":
+            return False
+        if self.llm_backend == "anthropic" and not self.anthropic_api_key:
+            return False
+        if self.llm_backend == "openai" and not self.openai_api_key:
+            return False
+        return True
+
     @model_validator(mode="after")
     def _check_pinned_model(self) -> "Settings":
         if not self.llm_model_pinned:

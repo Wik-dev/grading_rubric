@@ -34,7 +34,7 @@ def _inline_source(marker: str, text: str) -> InputSource:
 
 
 def ingest_stage(
-    inputs,
+    inputs: IngestInputs,
     *,
     settings: Settings,
     audit_emitter: AuditEmitter,

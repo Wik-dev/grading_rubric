@@ -30,17 +30,6 @@ class GradingResult(BaseModel):
     grades: list[CriterionGrade] = Field(default_factory=list)
 
 
-class CoverageVerdict(BaseModel):
-    """DR-AS-07 — applicability coverage verdict for one response."""
-
-    model_config = ConfigDict(strict=True)
-
-    status: str  # covered | partial | uncovered
-    covered_criteria: list[str] = Field(default_factory=list)
-    missing_dimension: str = ""
-    evidence: str = ""
-
-
 class PairwiseVerdict(BaseModel):
     """DR-AS-09 — head-to-head comparison of two responses."""
 
@@ -85,16 +74,6 @@ class GraderPanelInputs(BaseModel):
     response_text: str
     persona_description: str
     criterion_names: str
-
-
-class CoverageInputs(BaseModel):
-    """Inputs for the applicability_cover_response prompt."""
-
-    model_config = ConfigDict(strict=True)
-
-    rubric_text: str
-    response_text: str
-    evidence_context: str
 
 
 class PairwiseInputs(BaseModel):

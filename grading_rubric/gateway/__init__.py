@@ -30,30 +30,3 @@ __all__ = [
     "AnthropicBackend",
     "make_backend",
 ]
-
-
-def measure(
-    *,
-    prompt_id: str,
-    inputs,
-    output_schema,
-    samples: int = 1,
-    model: str | None = None,
-    temperature: float | None = None,
-    settings,
-    audit_emitter,
-    stage_id: str = "unknown",
-):
-    """Module-level shorthand for `Gateway().measure(...)` (DR-LLM-01)."""
-
-    return Gateway().measure(
-        prompt_id=prompt_id,
-        inputs=inputs,
-        output_schema=output_schema,
-        samples=samples,
-        model=model,
-        temperature=temperature,
-        settings=settings,
-        audit_emitter=audit_emitter,
-        stage_id=stage_id,
-    )

@@ -30,23 +30,6 @@ class RubricStructurer(Protocol):
     ) -> Rubric | None: ...
 
 
-def _llm_available(settings: Settings) -> bool:
-    if settings.llm_backend == "stub":
-        return False
-    if settings.llm_backend == "anthropic" and not settings.anthropic_api_key:
-        return False
-    if settings.llm_backend == "openai" and not settings.openai_api_key:
-        return False
-    return True
-
-
-def _node_points(node: DecomposedCriterion) -> float:
-    child_sum = sum(_node_points(child) for child in node.sub_criteria)
-    if node.points is not None:
-        return max(0.0, node.points)
-    return child_sum
-
-
 def _to_criterion(node: DecomposedCriterion) -> RubricCriterion:
     children = [_to_criterion(child) for child in node.sub_criteria]
     child_sum = sum((child.points or 0.0) for child in children)
@@ -125,7 +108,7 @@ class GatewayRubricStructurer:
         settings: Settings,
         audit_emitter: AuditEmitter,
     ) -> Rubric | None:
-        if not _llm_available(settings):
+        if not settings.llm_available:
             return None
 
         gateway = self._gateway or Gateway()

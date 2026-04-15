@@ -19,7 +19,7 @@ from pathlib import Path
 from uuid import UUID
 
 from grading_rubric.audit.hashing import (
-    _canonical,
+    canonical,
     canonical_json,
     hash_file,
     hash_object,
@@ -96,7 +96,7 @@ class TestCanonicalJson:
         result = canonical_json({"ts": dt})
         assert "2026-04-12T10:30:00" in result
 
-    def test_nested_canonicalization(self) -> None:
+    def test_nestedcanonicalization(self) -> None:
         uid = UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
         obj = {"outer": {"inner": uid, "list": [uid, "text"]}}
         result = canonical_json(obj)

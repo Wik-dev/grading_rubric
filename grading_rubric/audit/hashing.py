@@ -18,7 +18,7 @@ from typing import Any
 from uuid import UUID
 
 
-def _canonical(obj: Any) -> Any:
+def canonical(obj: Any) -> Any:
     """Recursive canonicalisation. UUIDs → str, datetimes → ISO-8601."""
 
     if isinstance(obj, UUID):
@@ -26,9 +26,9 @@ def _canonical(obj: Any) -> Any:
     if isinstance(obj, datetime):
         return obj.isoformat()
     if isinstance(obj, dict):
-        return {k: _canonical(v) for k, v in obj.items()}
+        return {k: canonical(v) for k, v in obj.items()}
     if isinstance(obj, list | tuple):
-        return [_canonical(v) for v in obj]
+        return [canonical(v) for v in obj]
     return obj
 
 
@@ -56,7 +56,7 @@ def canonical_json(obj: Any) -> str:
     """
 
     return json.dumps(
-        _canonical(obj),
+        canonical(obj),
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,

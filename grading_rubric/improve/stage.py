@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import logging
 from copy import deepcopy
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from grading_rubric.assess.models import AssessOutputs
 from grading_rubric.audit.emitter import AuditEmitter
@@ -29,13 +29,18 @@ from grading_rubric.models.proposed_change import (
     ApplicationStatus,
     NodeKind,
     ProposedChange,
-    RemoveNodeChange,
-    ReorderNodesChange,
     ReplaceFieldChange,
     TeacherDecision,
-    UpdatePointsChange,
 )
-from grading_rubric.models.rubric import EvidenceProfile, Rubric, RubricCriterion, RubricFieldName
+from grading_rubric.models.rubric import (
+    EvidenceProfile,
+    Rubric,
+    RubricCriterion,
+    RubricFieldName,
+    RubricLevel,
+    RubricTarget,
+)
+from grading_rubric.models.types import CriterionId
 
 logger = logging.getLogger(__name__)
 
@@ -52,17 +57,6 @@ _CANONICAL_ORDER = [
 
 
 # ── LLM planner ──────────────────────────────────────────────────────────
-
-
-def _llm_available(settings: Settings) -> bool:
-    """Check if an LLM backend is configured and usable."""
-    if settings.llm_backend == "stub":
-        return False
-    if settings.llm_backend == "anthropic" and not settings.anthropic_api_key:
-        return False
-    if settings.llm_backend == "openai" and not settings.openai_api_key:
-        return False
-    return True
 
 
 def _collect_criterion_paths(rubric: Rubric) -> list[dict]:
@@ -134,7 +128,6 @@ def _convert_and_ground(
             criterion = QualityCriterion.AMBIGUITY
 
         # Convert source_finding_ids from strings to UUIDs.
-        from uuid import UUID
         source_findings = []
         for fid in grounded_ids:
             try:
@@ -248,6 +241,19 @@ def _step2_canonical_order(
     return [d for _, d in indexed]
 
 
+def _find_criterion(criteria: list[RubricCriterion], path: list) -> RubricCriterion | None:
+    """Walk the rubric tree to find the criterion at `path` (stringified UUIDs)."""
+    if not path:
+        return None
+    head = path[0]
+    for c in criteria:
+        if str(c.id) == str(head):
+            if len(path) == 1:
+                return c
+            return _find_criterion(c.sub_criteria, path[1:])
+    return None
+
+
 def _replace_field_in_rubric(
     rubric: Rubric, draft: ProposedChangeDraft
 ) -> tuple[Rubric, bool]:
@@ -260,19 +266,7 @@ def _replace_field_in_rubric(
     path = target.get("criterion_path") or []
     level_id = target.get("level_id")
 
-    # Walk to the criterion at `path`. The path stores stringified UUIDs.
-    def find_criterion(criteria: list[RubricCriterion], remaining: list) -> RubricCriterion | None:
-        if not remaining:
-            return None
-        head = remaining[0]
-        for c in criteria:
-            if str(c.id) == str(head):
-                if len(remaining) == 1:
-                    return c
-                return find_criterion(c.sub_criteria, remaining[1:])
-        return None
-
-    target_crit = find_criterion(new_rubric.criteria, path)
+    target_crit = _find_criterion(new_rubric.criteria, path)
     if target_crit is None:
         return new_rubric, False
 
@@ -323,19 +317,7 @@ def _add_node_to_rubric(
     if raw_node is None:
         return new_rubric, False
 
-    # Walk to parent criterion.
-    def find_criterion(criteria: list[RubricCriterion], remaining: list) -> RubricCriterion | None:
-        if not remaining:
-            return None
-        head = remaining[0]
-        for c in criteria:
-            if str(c.id) == str(head):
-                if len(remaining) == 1:
-                    return c
-                return find_criterion(c.sub_criteria, remaining[1:])
-        return None
-
-    parent = find_criterion(new_rubric.criteria, parent_path)
+    parent = _find_criterion(new_rubric.criteria, parent_path)
     if parent is None:
         return new_rubric, False
 
@@ -343,19 +325,17 @@ def _add_node_to_rubric(
         try:
             # Ensure fresh UUID so there are no collisions.
             if isinstance(raw_node, dict):
-                from uuid import uuid4 as _uuid4
-
                 if "id" not in raw_node or raw_node["id"] is None:
-                    raw_node["id"] = str(_uuid4())
+                    raw_node["id"] = str(uuid4())
                 # Recursively assign IDs to nested sub_criteria if missing.
                 def _ensure_ids(n: dict) -> None:
                     if "id" not in n or n["id"] is None:
-                        n["id"] = str(_uuid4())
+                        n["id"] = str(uuid4())
                     for sub in n.get("sub_criteria", []):
                         _ensure_ids(sub)
                     for lv in n.get("levels", []):
                         if "id" not in lv or lv["id"] is None:
-                            lv["id"] = str(_uuid4())
+                            lv["id"] = str(uuid4())
                 _ensure_ids(raw_node)
                 child = RubricCriterion.model_validate(raw_node, strict=False)
             elif isinstance(raw_node, RubricCriterion):
@@ -391,10 +371,8 @@ def _add_node_to_rubric(
     if node_kind == "level":
         try:
             if isinstance(raw_node, dict):
-                from uuid import uuid4 as _uuid4
-
                 if "id" not in raw_node or raw_node["id"] is None:
-                    raw_node["id"] = str(_uuid4())
+                    raw_node["id"] = str(uuid4())
                 level = RubricLevel.model_validate(raw_node, strict=False)
             elif isinstance(raw_node, RubricLevel):
                 level = raw_node
@@ -436,8 +414,6 @@ def _step3_apply_and_wrap(
         change_id = uuid4()
         if draft.operation == "REPLACE_FIELD":
             target = draft.payload.get("target", {})
-            from grading_rubric.models.rubric import RubricTarget
-
             try:
                 rt = RubricTarget.model_validate(target, strict=False)
             except Exception:  # noqa: BLE001
@@ -461,8 +437,6 @@ def _step3_apply_and_wrap(
             )
         elif draft.operation == "ADD_NODE":
             parent_path_raw = draft.payload.get("parent_path", [])
-            from grading_rubric.models.types import CriterionId
-
             try:
                 parent_ids = [CriterionId(str(p)) for p in parent_path_raw]
             except Exception:  # noqa: BLE001
@@ -478,7 +452,6 @@ def _step3_apply_and_wrap(
                 if nk == NodeKind.CRITERION:
                     typed_node = RubricCriterion.model_validate(raw_node, strict=False)
                 else:
-                    from grading_rubric.models.rubric import RubricLevel
                     typed_node = RubricLevel.model_validate(raw_node, strict=False)
             except Exception:  # noqa: BLE001
                 continue
@@ -517,7 +490,7 @@ def propose_stage(
     starting = inputs.parsed.starting_rubric
     base_rubric = starting or inputs.rubric_under_assessment
 
-    if not _llm_available(settings):
+    if not settings.llm_available:
         raise RuntimeError(
             "propose stage requires an LLM backend; configure ANTHROPIC_API_KEY "
             "or an equivalent provider key"

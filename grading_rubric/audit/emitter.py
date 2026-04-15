@@ -19,7 +19,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel
 
-from grading_rubric.audit.hashing import _canonical
+from grading_rubric.audit.hashing import canonical
 
 
 class AuditEvent(BaseModel):
@@ -97,7 +97,7 @@ class JsonLineEmitter:
     def _emit(self, event: AuditEvent) -> None:
         with self._lock:
             self.events.append(event)
-            line = json.dumps(_canonical(event.model_dump()), ensure_ascii=False)
+            line = json.dumps(canonical(event.model_dump()), ensure_ascii=False)
             self._sink.write(line + "\n")
             try:
                 self._sink.flush()
