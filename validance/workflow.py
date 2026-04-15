@@ -33,7 +33,7 @@ function in-process. The only contact surface between L1 and L3 is:
 
 from __future__ import annotations
 
-from validance.sdk import Task, Workflow
+from validance import Task, Workflow
 
 # ── L2 image registry ──────────────────────────────────────────────────────
 #
