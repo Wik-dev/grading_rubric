@@ -233,5 +233,4 @@ pytest
 
 - [Requirements](docs/requirements.md) — User needs, user requirements, system requirements
 - [Design](docs/design.md) — Architecture, data models, design requirements
-- [UI Draft](docs/ui-draft.md) — SPA screen designs
 - [Verification Plan](docs/verification-plan.md) — Test strategy and procedures
