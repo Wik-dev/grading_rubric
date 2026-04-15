@@ -1,9 +1,11 @@
-# Challenge reference materials (confidential)
+# Challenge meta-materials (not project inputs)
 EPFL_Coding_Challenge.pdf
-ExamQuestionAndRubric.pdf
-StudentAnswer-*.pdf
-TeachingResource-*.pdf
 job_description.txt
+
+# Root-level copies of project materials (tracked under project_materials/)
+/ExamQuestionAndRubric.pdf
+/StudentAnswer-*.pdf
+/TeachingResource-*.pdf
 
 # Personal notes and working files
 notes/

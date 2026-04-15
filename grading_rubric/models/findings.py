@@ -85,6 +85,7 @@ class QualityMethod(StrEnum):
     SYNTHETIC_COVERAGE = "synthetic_coverage"
     SCORE_DISTRIBUTION_SEPARATION = "score_distribution_separation"
     GRADER_SIMULATION = "grader_simulation"
+    LINGUISTIC_SWEEP = "linguistic_sweep"  # reserved for future linguistic sweep sub-method
 
 
 class Measurement(BaseModel):

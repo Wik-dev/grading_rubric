@@ -27,18 +27,18 @@ ingest → parse → assess → propose → score → render → output.json
 
 Each criterion is scored 0–1, computed from simulation traces:
 
-- **Ambiguity** — Do graders agree? Measured via weighted persona standard deviation across responses. Low agreement on borderline responses signals vague wording.
-- **Applicability** — Can graders apply every criterion? Measured via difficulty rate (partial / not-applicable verdicts). External dependencies (e.g. "check the cheatsheet") surface here.
-- **Discrimination Power** — Does the rubric separate strong from weak work? Four-component weighted average: calibration (0.25), rank correlation (0.20), pairwise consistency (0.15), ceiling score (0.40). A hard cap of 0.60 engages when >50% of non-excellent synthetics score ≥ 0.90.
+- **Ambiguity** — Do graders agree? Measured via Krippendorff's α (ordinal) across a 4-persona grader panel. α ≥ 0.80 = good agreement, 0.67–0.80 = moderate, < 0.67 = poor. Score is the weighted average of per-criterion α values.
+- **Applicability** — Can graders apply every criterion? Measured via edge-case polarization rate and orphan detection. Score = `1 - weighted_problem_rate`. External dependencies (e.g. "check the cheatsheet") surface here.
+- **Discrimination Power** — Does the rubric separate strong from weak work? When synthetic calibration data is available: 4-component weighted average — calibration error (0.25), rank correlation (0.20), pairwise consistency (0.15), ceiling score (0.40). Hard cap of 0.60 when >50% of non-excellent synthetics score ≥ 0.90. Fallback (no calibration): `0.5 × separation + 0.5 × pairwise_consistency`.
 
 ### Key design choices
 
-- **Grader personas, not quality judges** — 6 hardcoded personas (strict, lenient, domain-expert, novice, detail-focused, holistic), sliced to panel size 4. The LLM grades student work; Python measures rubric quality from traces.
+- **Grader personas, not quality judges** — 4 fixed personas (bottom-up strict, top-down generous, rubric-literal, student-intent). The LLM grades student work; Python measures rubric quality from traces.
 - **Stratified pairwise sampling** — High-contrast pairs, borderline pairs, then random. Prioritises the most informative comparisons.
 - **Difficulty weighting** — `max(0, min(1, 1 - |2 × mean_grade - 1|))`. Borderline responses (mean ≈ 0.5) influence ambiguity and applicability more than trivial floor/ceiling cases.
 - **Penalties as metadata** — Penalties are parsed into `metadata["penalizations"]`, not as negative-point criteria. Prevents the simulation from grading deduction rules as dimensions.
 - **Leaf-only grading** — Only leaf criteria are graded, avoiding double-counting parent + child scores.
-- **Deterministic calls** — Temperature 0.0 for all single-sample calls (current default). Reproducible grading traces.
+- **Deterministic calls** — Temperature 0.3 for grading calls, 0.2 for pairwise comparisons, 0.4 for synthesis. Single-sample non-simulation calls use temperature 0.0.
 - **Opus for structure, Sonnet for bulk** — One Opus 4.6 call for rubric decomposition; ~100 Sonnet calls for grading, pairwise, synthesis, and planning.
 
 ## Installation
@@ -85,12 +85,12 @@ Installed automatically via `pip install .`:
 export ANTHROPIC_API_KEY="sk-ant-..."
 
 grading-rubric-cli run-pipeline \
-    --exam-question ExamQuestionAndRubric.pdf \
-    --teaching-material TeachingResource.pdf \
-    --starting-rubric ExamQuestionAndRubric.pdf \
-    --student-copy StudentAnswer-Student1.pdf \
-    --student-copy StudentAnswer-Student2.pdf \
-    --student-copy StudentAnswer-Student3.pdf \
+    --exam-question project_materials/ExamQuestionAndRubric.pdf \
+    --teaching-material project_materials/TeachingResource-BAD_ACTORS_STRATEGY.pdf \
+    --starting-rubric project_materials/ExamQuestionAndRubric.pdf \
+    --student-copy project_materials/StudentAnswer-Student1.pdf \
+    --student-copy project_materials/StudentAnswer-Student2.pdf \
+    --student-copy project_materials/StudentAnswer-Student3.pdf \
     --output result.json
 ```
 
@@ -127,7 +127,7 @@ docker run -e ANTHROPIC_API_KEY \
     -v "$(pwd)":/work \
     grading-rubric:latest \
     grading-rubric-cli run-pipeline \
-        --exam-question ExamQuestionAndRubric.pdf \
+        --exam-question project_materials/ExamQuestionAndRubric.pdf \
         --output result.json
 ```
 
@@ -210,7 +210,7 @@ All settings are via environment variables (defaults are sensible):
 | `GR_LLM_BACKEND` | `anthropic` | LLM backend (`anthropic`, `openai`, `stub`) |
 | `GR_LLM_MODEL` | `claude-sonnet-4-20250514` | Model for grading, synthesis, planning |
 | `GR_LLM_MODEL_RUBRIC_DECOMPOSITION` | `claude-opus-4-6` | Model for rubric parsing (one-time) |
-| `GR_LLM_TEMPERATURE` | `0.7` | Sampling temperature (overridden to 0.0 when samples=1) |
+| `GR_LLM_TEMPERATURE` | `0.7` | Default sampling temperature (gateway overrides to 0.0 when samples=1; simulation uses explicit per-call temperatures: 0.3 grading, 0.2 pairwise, 0.4 synthesis) |
 | `GR_ASSESS_LLM_BACKEND` | — | Backend override for assessment simulation |
 | `GR_ASSESS_LLM_MODEL` | — | Model override for assessment simulation |
 | `GR_ASSESS_PANEL_SIZE` | `4` | Number of grader personas per response |
