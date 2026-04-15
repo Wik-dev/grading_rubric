@@ -32,7 +32,6 @@ import requests
 
 VALIDANCE_BASE = "http://localhost:8001"
 WORKFLOW_NAME = "grading_rubric.assess_and_improve"
-TRAIN_WORKFLOW_NAME = "grading_rubric.train_scorer"
 FIXTURES_DIR = Path("/home/Wik-dev/repos/validance-workflow/data/grading_rubric_fixtures")
 
 # Maximum wait for a full pipeline run (offline / stub — no LLM calls).
@@ -148,19 +147,13 @@ def successful_run() -> dict:
 
 
 class TestWorkflowRegistration:
-    """IT-SYS-01: Both grading_rubric workflows are registered."""
+    """IT-SYS-01: The grading_rubric workflow is registered."""
 
     def test_assess_and_improve_registered(self) -> None:
         r = requests.get(f"{VALIDANCE_BASE}/api/workflows", timeout=10)
         r.raise_for_status()
         names = [w["name"] for w in r.json().get("workflows", [])]
         assert WORKFLOW_NAME in names
-
-    def test_train_scorer_registered(self) -> None:
-        r = requests.get(f"{VALIDANCE_BASE}/api/workflows", timeout=10)
-        r.raise_for_status()
-        names = [w["name"] for w in r.json().get("workflows", [])]
-        assert TRAIN_WORKFLOW_NAME in names
 
 
 # ── IT-SYS-02: Workflow trigger ───────────────────────────────────────────

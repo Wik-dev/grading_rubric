@@ -1,6 +1,6 @@
 """DR-ARC-08 — `grading-rubric-cli` console-script entry point.
 
-Eight subcommands realising the per-stage CLI surface of § 3.10:
+Seven subcommands realising the per-stage CLI surface of § 3.10:
 
   ingest          IngestInputs  JSON → IngestOutputs   JSON
   parse-inputs    IngestOutputs JSON → ParsedInputs    JSON
@@ -10,7 +10,6 @@ Eight subcommands realising the per-stage CLI surface of § 3.10:
   render          ScoreOutputs   JSON → ExplainedRubricFile JSON
   run-pipeline    IngestInputs JSON OR --exam-question/--starting-rubric/...
                                     → ExplainedRubricFile JSON
-  train-scorer    TrainingEvidence JSON → TrainedScorerArtefact placeholder
 
 Each per-stage subcommand is a thin shell: read the input JSON, call the
 stage callable through the `Stage` protocol, write the output JSON. Per
@@ -40,9 +39,8 @@ from grading_rubric.output.render_stage import render_stage
 from grading_rubric.parsers.ingest_stage import ingest_stage
 from grading_rubric.parsers.models import IngestInputs, IngestOutputs, ParsedInputs
 from grading_rubric.parsers.parse_stage import parse_inputs_stage
-from grading_rubric.scorer.models import ScoreOutputs, TrainingEvidence
+from grading_rubric.scorer.models import ScoreOutputs
 from grading_rubric.scorer.score_stage import score_stage
-from grading_rubric.scorer.train_scorer import train_scorer
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
@@ -252,22 +250,11 @@ def cmd_propose(input_path: Path, output_path: Path) -> None:
 @main.command("score")
 @click.option("--input", "input_path", type=click.Path(path_type=Path), required=True)
 @click.option("--output", "output_path", type=click.Path(path_type=Path), required=True)
-@click.option(
-    "--scorer-backend",
-    type=click.Choice(["llm_panel", "trained_model"]),
-    default=None,
-    help="Override Settings.scorer_backend (DR-SCR-04).",
-)
-def cmd_score(
-    input_path: Path, output_path: Path, scorer_backend: str | None
-) -> None:
+def cmd_score(input_path: Path, output_path: Path) -> None:
     """Score the improved rubric against the three quality criteria."""
 
     inputs = _read_model(input_path, ProposeOutputs)
-    settings = _settings()
-    if scorer_backend is not None:
-        settings = settings.model_copy(update={"scorer_backend": scorer_backend})
-    out = score_stage(inputs, settings=settings, audit_emitter=_make_emitter())
+    out = score_stage(inputs, settings=_settings(), audit_emitter=_make_emitter())
     _write_json(output_path, out)
     click.echo(str(output_path))
 
@@ -378,37 +365,6 @@ def cmd_run_pipeline(
         if audit_file is not None:
             audit_file.close()
     click.echo(str(result.explained_rubric_path))
-
-
-# ── 8. train-scorer ──────────────────────────────────────────────────────
-
-
-@main.command("train-scorer")
-@click.option(
-    "--input",
-    "input_path",
-    type=click.Path(path_type=Path),
-    required=True,
-    help="JSON file matching TrainingEvidence (DR-SCR-05).",
-)
-@click.option(
-    "--output",
-    "output_path",
-    type=click.Path(path_type=Path),
-    required=True,
-    help="Where the placeholder TrainedScorerArtefact file will be written.",
-)
-def cmd_train_scorer(input_path: Path, output_path: Path) -> None:
-    """Train-button stub: validates inputs, emits STUB_NOT_TRAINED, writes placeholder."""
-
-    evidence = _read_model(input_path, TrainingEvidence)
-    artefact = train_scorer(
-        evidence,
-        settings=_settings(),
-        audit_emitter=_make_emitter(),
-        artefact_path=output_path,
-    )
-    click.echo(str(artefact.artefact_path))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
-"""DR-INT-02 — Validance workflow definitions for the grading rubric pipeline.
+"""DR-INT-02 — Validance workflow definition for the grading rubric pipeline.
 
-Defines two workflows registered against a Validance instance:
+Defines one workflow registered against a Validance instance:
 
   ``grading_rubric.assess_and_improve``
       The full assessment pipeline as one Validance task per L1 stage:
@@ -8,19 +8,13 @@ Defines two workflows registered against a Validance instance:
           ingest → parse_inputs → assess → propose → [gate] → score → render
 
       Where ``[gate]`` is an ``ApprovalGate`` (gate="human-confirm" on the
-      preceding ``propose`` task per DR-INT-06) that pauses the run until the
-      teacher accepts or rejects each ``ProposedChange`` in the L4 SPA.
+      ``score`` task per DR-INT-06) that pauses the run until the teacher
+      accepts or rejects each ``ProposedChange`` in the L4 SPA.
       Each task wraps one L2 image CLI subcommand:
       ``docker run grading-rubric:latest <subcommand> --input … --output …``.
       The ``parse_inputs`` task uses ``trigger_inputs=True`` (ADR-007 § 9
       amendment) so it receives the staged PDFs/images for OCR alongside
       the structured ``ingest_outputs.json`` from the ``ingest`` task.
-
-  ``grading_rubric.train_scorer``
-      The standalone train-button capability per DR-SCR-06 / DR-DEP-06. One
-      task wrapping ``grading-rubric-cli train-scorer``. Explicitly **not**
-      chained into ``assess_and_improve`` because training has a different
-      input contract (``TrainingEvidence``).
 
 Per DR-INT-02 the Validance workflow definitions never call any L1 Python
 function in-process. The only contact surface between L1 and L3 is:
@@ -75,9 +69,6 @@ ASSESS_OUTPUTS_FILE = "assess_outputs.json"
 PROPOSE_OUTPUTS_FILE = "propose_outputs.json"
 SCORE_OUTPUTS_FILE = "score_outputs.json"
 EXPLAINED_RUBRIC_FILE = "explained_rubric.json"
-
-TRAINING_EVIDENCE_FILE = "training_evidence.json"
-TRAINED_ARTEFACT_FILE = "trained_scorer.json"
 
 
 # ── grading_rubric.assess_and_improve ──────────────────────────────────────
@@ -222,38 +213,6 @@ def create_assess_and_improve_workflow() -> Workflow:
     return wf
 
 
-# ── grading_rubric.train_scorer ────────────────────────────────────────────
-
-
-def create_train_scorer_workflow() -> Workflow:
-    """Build the standalone train-button workflow.
-
-    A single task wrapping ``grading-rubric-cli train-scorer``. The L1 stub
-    of DR-SCR-05 emits one ``ml_inference`` operation event with
-    ``error.code = STUB_NOT_TRAINED`` and writes a placeholder
-    ``TrainedScorerArtefact`` JSON. Wired as a separate workflow so the main
-    demo path (DR-DEP-06) is unaffected.
-    """
-
-    wf = Workflow("grading_rubric.train_scorer")
-
-    train = Task(
-        name="train_scorer",
-        docker_image=TASK_IMAGE,
-        command=(
-            f"grading-rubric-cli train-scorer "
-            f"--input {TRAINING_EVIDENCE_FILE} "
-            f"--output {TRAINED_ARTEFACT_FILE}"
-        ),
-        inputs={},  # training evidence provided via trigger input_files
-        output_files={"trained_artefact": TRAINED_ARTEFACT_FILE},
-        timeout=3600,
-    )
-
-    wf.add_task(train)
-    return wf
-
-
 # ── Registry ───────────────────────────────────────────────────────────────
 #
 # The registration script in ``register.py`` consumes this dict; keep it in
@@ -261,7 +220,6 @@ def create_train_scorer_workflow() -> Workflow:
 
 WORKFLOWS: dict[str, callable] = {
     "assess_and_improve": create_assess_and_improve_workflow,
-    "train_scorer": create_train_scorer_workflow,
 }
 
 
@@ -270,10 +228,5 @@ WORKFLOW_DESCRIPTIONS: dict[str, str] = {
         "Six-stage rubric assessment + improvement pipeline (6 Validance tasks) "
         "with a human-confirm approval gate after the propose stage "
         "(DR-INT-02 / DR-INT-06)."
-    ),
-    "train_scorer": (
-        "Standalone train-button capability — DR-SCR-06 stub (does not call "
-        "the LLM gateway; emits STUB_NOT_TRAINED and writes a placeholder "
-        "TrainedScorerArtefact)."
     ),
 }

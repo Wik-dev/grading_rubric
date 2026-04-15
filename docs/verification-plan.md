@@ -167,8 +167,8 @@ Every DR group has a verification strategy. Representative unit-level procedures
 | DR-IO (8) | UT-STG-01 (ingest/parse stages) | Role-tagged ingest, inline-text, no-text-PDF policy | DR-IO-04/05 (handwritten OCR) via IT-CHN-01 with canned responses |
 | DR-OBS (4) | UT-AUD-01–03 | Event serialization, emitter contract, LLM call logging | DR-OBS-03/04 via § 3.4 IT-SYS-04 (live audit retrieval) |
 | DR-PER (8) | — | Not unit-testable (concurrency, scale, progress) | DR-PER-03/04/06 via § 3.1 IT-CHN-04; DR-PER-07 via § 3.4 IT-SYS-05 |
-| DR-SCR (7) | UT-MET-07, UT-STG-06 | Severity-weight aggregation, criterion scores | DR-SCR-03/05/06/07 (train-button) are commitment #5 capability — smoke test only |
-| DR-DEP (9) | UT-ARC-06 | Layer boundaries, Docker image separation | DR-DEP-06 (train-scorer carve-out) scoped below |
+| DR-SCR (2) | UT-MET-07, UT-STG-06 | Severity-weight aggregation, criterion scores | — |
+| DR-DEP (9) | UT-ARC-06 | Layer boundaries, Docker image separation | — |
 | DR-INT (9) | UT-PRP-01/02, IT-WRK-01–03, IT-HRV-01–02 | Payload mapping, workflow definitions, harvester | DR-INT-06 (approval gate) via § 3.4 IT-SYS-03/06/07 |
 
 ---
@@ -208,13 +208,12 @@ When codegen lands: full Pydantic → JSON Schema → TypeScript drift detection
 
 These are DR-level contract tests using the `validance-sdk` API locally. They verify *our* wiring shapes (task names, dependencies, gate types), not Validance primitives. They are physically in the `tests/integration/` directory and cross module boundaries (importing from both L1 and L3), but trace to DRs rather than SRs — they verify our wiring shapes, not system-level behavior.
 
-Existing `test_workflows.py` (12 tests):
+Existing `test_workflows.py` (10 tests):
 
 | Test ID | Test | Assertion | Traced DR(s) |
 |---|---|---|---|
 | IT-WRK-01 | `assess_and_improve` workflow | Correct task names, dependencies, gate types | DR-INT-02 |
-| IT-WRK-02 | `train_scorer` workflow | Correct task name, no approval gate | DR-INT-02 |
-| IT-WRK-03 | Workflow registry | Both workflows registered, no duplicates | DR-INT-02 |
+| IT-WRK-02 | Workflow registry | Workflow registered, description present | DR-INT-02 |
 
 Existing `test_harvester.py` (6 tests):
 
@@ -229,16 +228,13 @@ Requires a live Validance instance on the dev VM (`http://localhost:8001`). Thes
 
 | Test ID | Scenario | Steps | Expected result | Traced SR(s) / DR(s) |
 |---|---|---|---|---|
-| IT-SYS-01 | Workflow registration | `python validance/register.py` | Both workflows visible in Validance catalog | DR-INT-02 |
+| IT-SYS-01 | Workflow registration | `python validance/register.py` | Workflow visible in Validance catalog | DR-INT-02 |
 | IT-SYS-02 | Proposal submission | `POST /api/proposals` with `assess_and_improve` payload | Proposal accepted, run starts | DR-INT-04, SR-IM-01 |
 | IT-SYS-03 | Approval gate round-trip | Wait for gate → `POST` approval resolution | `teacher_decision` patched on the run's `ProposedChange` records | DR-INT-04, SR-UI-10, SR-OUT-05 |
 | IT-SYS-04 | Audit bundle retrieval | `GET /api/runs/{runId}/audit_bundle` | Valid `AuditBundle` JSON with operation records including model invocations | DR-INT-05, SR-OBS-01, SR-OBS-02, SR-OBS-03 |
 | IT-SYS-05 | Progress polling | Poll `GET /api/runs/{runId}` at 2000 ms cadence | Status transitions visible (PENDING → RUNNING → stages → COMPLETED) | DR-INT-06, SR-PRF-02 |
 | IT-SYS-06 | **Full workflow execution** | Submit `assess_and_improve` with demo inputs → wait for all tasks to complete → retrieve final output | Valid `ExplainedRubricFile`: non-empty `proposed_changes`, three `quality_scores`, `teacher_decision=PENDING`, explanation grouped by criteria | SR-IM-01, SR-IM-02, SR-IM-03, SR-AS-01, SR-AS-02, SR-AS-03, SR-OUT-01, SR-OUT-02, SR-OUT-03, DR-INT-04 |
 | IT-SYS-07 | **Re-measurement workflow re-entry** | Resolve approval gate (accept some, reject some) + request re-assessment | New iteration reaches approval gate again; `previous_quality_scores` present; before/after evidence visible | SR-AS-09, SR-UI-10, DR-INT-06 |
-| IT-SYS-08 | `train_scorer` registration smoke | Verify `train_scorer` workflow visible in catalog after registration | Workflow registered, correct task name | DR-INT-02 |
-
-**Note on `train_scorer`**: IT-SYS-08 is a registration/visibility smoke test only. The `train_scorer` workflow is a commitment #5 capability (CLAUDE.md § 6) outside the main UR/SR acceptance path. Full execution testing is not required for UR/SR acceptance.
 
 ---
 
@@ -398,7 +394,7 @@ ApprovalGate, audit chain, workflow orchestration, secret store, task execution,
 |---|---|---|
 | Proposal-payload mapping (L1 → Validance shapes) | `test_proposals.py` (UT-PRP-01/02) | DR-INT-04 |
 | Polling cadence / status mapping (SPA label table) | § 3.4 IT-SYS-05 | DR-INT-06 |
-| Workflow definitions (task names, deps, gates) | `test_workflows.py` (IT-WRK-01/02/03) | DR-INT-02 |
+| Workflow definitions (task names, deps, gates) | `test_workflows.py` (IT-WRK-01/02) | DR-INT-02 |
 | Audit-bundle harvester (raw chain → typed view) | `test_harvester.py` (IT-HRV-01/02) | DR-INT-05 |
 | Full workflow execution (output correctness) | § 3.4 IT-SYS-06 | DR-INT-04, SR-IM-01, SR-OUT-01 |
 | Re-measurement loop re-entry | § 3.4 IT-SYS-07 | DR-INT-06, SR-AS-09 |
@@ -499,5 +495,5 @@ Every UR-01 through UR-09 must have at least one test case or manual procedure t
 
 | Version | Date | Change |
 |---|---|---|
-| 0.2.0 | 2026-04-12 | **Review feedback absorbed.** (1) Added SR coverage matrix (§ 7) — all 46 SRs enumerated with verification procedures; SR-PRF-01 and SR-PRF-03 marked as explicit gaps with rationale. (2) Added DR group coverage summary (§ 2.5) — one row per DR group with representative procedures. (3) Added live workflow execution tests: IT-SYS-06 (full `assess_and_improve` run → valid `ExplainedRubricFile`) and IT-SYS-07 (re-measurement loop re-entry), closing the gap between API-mechanics tests and manual acceptance procedures. (4) Added IT-SYS-08 (`train_scorer` registration smoke) scoped as commitment capability, not UR/SR path. (5) Broadened IT-CHN-01 SR traces to include SR-AS-02, SR-AS-03, SR-IM-02, SR-IM-03, SR-OUT-02, SR-OUT-03, SR-IN-03, SR-IN-09, SR-AS-07. (6) Fixed IT-CHN-04 trace from SR-IN-05 → SR-AS-06, SR-AS-08, SR-IN-09. (7) Added IT-CHN-05 (teaching material grounding, SR-AS-04/SR-IM-04), IT-CHN-06 (partial parse failure, SR-IN-08), IT-CHN-07 (change-to-finding traceability, SR-IM-05), IT-CHN-08 (schema validation, SR-OUT-04), IT-CHN-09 (pairwise consistency, SR-AS-10). (8) Added UT-STG-08 (source_findings traceability), UT-STG-09 (grounding contradiction), UT-AUD-03 (LLM call logging), UT-MOD-06 (schema validation). (9) Fixed UT-MET-01 expected output: "clamped to LOW range (≤ 0.40)" not "0.20". (10) Fixed AT-LOOP-01 step 8: "fresh scores shown, previous preserved" instead of "scores differ". (11) Added evidence artifact / reviewer / notes columns to § 5 validation table. (12) Added § 1 pragmatic exception note for § 3.3 DR-INT wiring tests. (13) Made § 4.1 prerequisite explicit: IT-SYS-06 must PASS before acceptance. (14) Updated § 6 Validance wiring table with IT-SYS-06/07. |
+| 0.2.0 | 2026-04-12 | **Review feedback absorbed.** (1) Added SR coverage matrix (§ 7) — all 46 SRs enumerated with verification procedures; SR-PRF-01 and SR-PRF-03 marked as explicit gaps with rationale. (2) Added DR group coverage summary (§ 2.5) — one row per DR group with representative procedures. (3) Added live workflow execution tests: IT-SYS-06 (full `assess_and_improve` run → valid `ExplainedRubricFile`) and IT-SYS-07 (re-measurement loop re-entry), closing the gap between API-mechanics tests and manual acceptance procedures. (4) [IT-SYS-08 removed in v0.3.0 — train-button capability removed.] (5) Broadened IT-CHN-01 SR traces to include SR-AS-02, SR-AS-03, SR-IM-02, SR-IM-03, SR-OUT-02, SR-OUT-03, SR-IN-03, SR-IN-09, SR-AS-07. (6) Fixed IT-CHN-04 trace from SR-IN-05 → SR-AS-06, SR-AS-08, SR-IN-09. (7) Added IT-CHN-05 (teaching material grounding, SR-AS-04/SR-IM-04), IT-CHN-06 (partial parse failure, SR-IN-08), IT-CHN-07 (change-to-finding traceability, SR-IM-05), IT-CHN-08 (schema validation, SR-OUT-04), IT-CHN-09 (pairwise consistency, SR-AS-10). (8) Added UT-STG-08 (source_findings traceability), UT-STG-09 (grounding contradiction), UT-AUD-03 (LLM call logging), UT-MOD-06 (schema validation). (9) Fixed UT-MET-01 expected output: "clamped to LOW range (≤ 0.40)" not "0.20". (10) Fixed AT-LOOP-01 step 8: "fresh scores shown, previous preserved" instead of "scores differ". (11) Added evidence artifact / reviewer / notes columns to § 5 validation table. (12) Added § 1 pragmatic exception note for § 3.3 DR-INT wiring tests. (13) Made § 4.1 prerequisite explicit: IT-SYS-06 must PASS before acceptance. (14) Updated § 6 Validance wiring table with IT-SYS-06/07. |
 | 0.1.0 | 2026-04-12 | Initial verification plan. Covers 95 existing unit-level tests (§ 2), reclassifies `test_architecture.py` from acceptance to § 2.4 architectural invariants, frames DR-INT wiring tests as § 3.3 (DR-level, not SR-level), identifies § 3.2 schema round-trip as a gap, defines § 3.1 offline stage chain and § 3.4 system integration test cases, writes manual acceptance procedures for all three screens plus a dedicated cross-screen re-measurement loop (UR-08), and enumerates external dependency boundaries in § 6. |

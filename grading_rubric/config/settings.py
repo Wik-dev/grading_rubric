@@ -41,10 +41,6 @@ class Settings(BaseModel):
     # ── Propose / improve stage ────────────────────────────────────────────
     max_iterations: int = 3
 
-    # ── Score stage (DR-SCR) ───────────────────────────────────────────────
-    scorer_backend: Literal["llm_panel", "trained_model"] = "llm_panel"
-    trained_scorer_artefact_path: str | None = None
-
     # ── Pipeline ───────────────────────────────────────────────────────────
     schema_version: str = "1.0.0"
     request_id: str | None = None  # opaque correlation id when present
@@ -112,8 +108,6 @@ class Settings(BaseModel):
             assess_target_response_count=int(e.get("GR_ASSESS_TARGET_RESPONSE_COUNT", "10")),
             assess_llm_concurrency=int(e.get("GR_ASSESS_LLM_CONCURRENCY", "4")),
             max_iterations=int(e.get("GR_MAX_ITERATIONS", "3")),
-            scorer_backend=e.get("GR_SCORER_BACKEND", "llm_panel"),  # type: ignore[arg-type]
-            trained_scorer_artefact_path=e.get("GR_TRAINED_SCORER_ARTEFACT_PATH"),
             schema_version=e.get("GR_SCHEMA_VERSION", "1.0.0"),
             request_id=e.get("GR_REQUEST_ID"),
             deliverable_schema_version=e.get("GR_DELIVERABLE_SCHEMA_VERSION", "1.0.0"),

@@ -220,7 +220,6 @@ All settings are via environment variables (defaults are sensible):
 | `GR_ASSESS_PANEL_SIZE` | `4` | Number of grader personas per response |
 | `GR_ASSESS_TARGET_RESPONSE_COUNT` | `10` | Total responses (real + synthetic) |
 | `GR_ASSESS_PAIRWISE_SAMPLE_SIZE` | `10` | Max pairwise comparisons per simulation |
-| `GR_SCORER_BACKEND` | `llm_panel` | Scorer backend (`llm_panel`, `trained_model`) |
 
 ## Tests
 

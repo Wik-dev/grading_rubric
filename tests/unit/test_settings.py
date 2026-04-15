@@ -20,7 +20,6 @@ class TestSettingsFromEnv:
         assert s.llm_backend == "anthropic"
         assert s.llm_model_pinned == "claude-sonnet-4-20250514"
         assert s.max_iterations == 3
-        assert s.scorer_backend == "llm_panel"
         assert s.schema_version == "1.0.0"
         assert s.assess_llm_concurrency == 4
         assert s.assess_llm_backend is None

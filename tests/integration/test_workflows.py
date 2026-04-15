@@ -13,7 +13,6 @@ from validance.workflow import (
     WORKFLOWS,
     WORKFLOW_DESCRIPTIONS,
     create_assess_and_improve_workflow,
-    create_train_scorer_workflow,
 )
 
 
@@ -88,31 +87,11 @@ class TestAssessAndImproveWorkflow:
         assert h1 == h2
 
 
-class TestTrainScorerWorkflow:
-    """DR-INT-02: grading_rubric.train_scorer has 1 task."""
-
-    def test_creates_valid_workflow(self) -> None:
-        wf = create_train_scorer_workflow()
-        wf.validate()
-
-    def test_has_one_task(self) -> None:
-        wf = create_train_scorer_workflow()
-        assert len(wf.tasks) == 1
-        assert "train_scorer" in wf.tasks
-
-    def test_definition_hash_is_stable(self) -> None:
-        h1 = create_train_scorer_workflow().definition_hash
-        h2 = create_train_scorer_workflow().definition_hash
-        assert h1 == h2
-
-
 class TestWorkflowRegistry:
-    """DR-INT-02: the WORKFLOWS dict exports both workflow factories."""
+    """DR-INT-02: the WORKFLOWS dict exports the workflow factory."""
 
-    def test_both_workflows_registered(self) -> None:
+    def test_workflow_registered(self) -> None:
         assert "assess_and_improve" in WORKFLOWS
-        assert "train_scorer" in WORKFLOWS
 
     def test_descriptions_present(self) -> None:
         assert "assess_and_improve" in WORKFLOW_DESCRIPTIONS
-        assert "train_scorer" in WORKFLOW_DESCRIPTIONS
