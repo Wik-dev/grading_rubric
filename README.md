@@ -46,7 +46,7 @@ Each criterion is scored 0–1, computed from simulation traces:
 ### Prerequisites
 
 - Python 3.11+
-- An Anthropic API key
+- An Anthropic API key (default backend) **or** an OpenAI API key (set `GR_LLM_BACKEND=openai`)
 
 ### Install from source
 
@@ -75,6 +75,7 @@ Installed automatically via `pip install .`:
 | `pypdf`, `pdfplumber` | PDF text extraction |
 | `python-docx` | DOCX text extraction |
 | `Pillow` | Image handling for OCR |
+| `PyYAML` | Prompt front-matter parsing |
 | `click` | CLI framework |
 
 ## Usage
