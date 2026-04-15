@@ -169,20 +169,23 @@ The output is a single JSON file with the following structure:
     }
   },
   "quality_scores": [
-    { "criterion": "ambiguity", "score": 0.788, "confidence": "medium" },
-    { "criterion": "applicability", "score": 0.734, "confidence": "medium" },
-    { "criterion": "discrimination_power", "score": 0.764, "confidence": "medium" }
+    { "criterion": "ambiguity", "score": 0.788, "confidence": { "score": 0.72, "level": "MEDIUM", "rationale": "..." }, "method": "grader_simulation" },
+    { "criterion": "applicability", "score": 0.734, "confidence": { "score": 0.72, "level": "MEDIUM", "rationale": "..." }, "method": "grader_simulation" },
+    { "criterion": "discrimination_power", "score": 0.764, "confidence": { "score": 0.72, "level": "MEDIUM", "rationale": "..." }, "method": "grader_simulation" }
   ],
   "previous_quality_scores": [
-    { "criterion": "ambiguity", "score": 0.762 },
-    { "criterion": "applicability", "score": 0.344 },
-    { "criterion": "discrimination_power", "score": 0.735 }
+    { "criterion": "ambiguity", "score": 0.762, "confidence": { "score": 0.72, "level": "MEDIUM", "rationale": "..." }, "method": "grader_simulation" },
+    { "criterion": "applicability", "score": 0.344, "confidence": { "score": 0.72, "level": "MEDIUM", "rationale": "..." }, "method": "grader_simulation" },
+    { "criterion": "discrimination_power", "score": 0.735, "confidence": { "score": 0.72, "level": "MEDIUM", "rationale": "..." }, "method": "grader_simulation" }
   ],
   "evidence_profile": {
-    "real_student_copies": 3,
-    "synthetic_responses_used": true,
-    "total_responses": 10,
-    "grader_personas": 4
+    "starting_rubric_present": true,
+    "exam_question_present": true,
+    "teaching_material_present": true,
+    "teaching_material_count": 1,
+    "student_copies_present": true,
+    "student_copies_count": 3,
+    "synthetic_responses_used": true
   }
 }
 ```
