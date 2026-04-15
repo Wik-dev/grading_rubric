@@ -34,11 +34,11 @@ class TestAssessAndImproveWorkflow:
         expected = ["ingest", "parse_inputs", "assess", "propose", "score", "render"]
         assert names == expected
 
-    def test_propose_has_human_confirm_gate(self) -> None:
-        """DR-INT-06: the propose task carries a human-confirm gate."""
+    def test_score_has_human_confirm_gate(self) -> None:
+        """DR-INT-06: human-confirm gate on score (fires before scoring, after propose outputs are available)."""
         wf = create_assess_and_improve_workflow()
-        propose = wf.tasks["propose"]
-        assert propose.gate == "human-confirm"
+        score = wf.tasks["score"]
+        assert score.gate == "human-confirm"
 
     def test_assess_has_api_key_secrets(self) -> None:
         """Both API keys in secret_refs; no hardcoded backend in environment."""
