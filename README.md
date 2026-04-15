@@ -12,6 +12,8 @@ The LLM is never asked to judge rubric quality directly. Instead, the system use
 
 ```
 ingest → parse → assess → propose → score → render → output.json
+                   ▲                   │
+                   └───── iteration ────┘
 ```
 
 | Stage | What it does |
@@ -39,14 +41,14 @@ Each criterion is scored 0–1, computed from simulation traces:
 - **Penalties as metadata** — Penalties are parsed into `metadata["penalizations"]`, not as negative-point criteria. Prevents the simulation from grading deduction rules as dimensions.
 - **Leaf-only grading** — Only leaf criteria are graded, avoiding double-counting parent + child scores.
 - **Deterministic calls** — Temperature 0.3 for grading calls, 0.2 for pairwise comparisons, 0.4 for synthesis. Single-sample non-simulation calls use temperature 0.0.
-- **Opus for structure, Sonnet for bulk** — One Opus 4.6 call for rubric decomposition; ~100 Sonnet calls for grading, pairwise, synthesis, and planning.
+- **Three-model split** — Claude Opus 4.6 for rubric decomposition and proposal generation; Claude Sonnet 4 for OCR; GPT-5.4 for grader simulation (~100 calls: grading, pairwise, synthesis).
 
 ## Installation
 
 ### Prerequisites
 
 - Python 3.11+
-- An Anthropic API key (default backend) **or** an OpenAI API key (set `GR_LLM_BACKEND=openai`)
+- An Anthropic API key (OCR, rubric decomposition, planning) **and** an OpenAI API key (grader simulation)
 
 ### Install from source
 
@@ -210,13 +212,13 @@ All settings are via environment variables (defaults are sensible):
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ANTHROPIC_API_KEY` | — | Anthropic API key (**required**) |
-| `OPENAI_API_KEY` | — | OpenAI API key, only when an OpenAI backend is selected |
+| `OPENAI_API_KEY` | — | OpenAI API key (**required** — grader simulation uses GPT-5.4 by default) |
 | `GR_LLM_BACKEND` | `anthropic` | LLM backend (`anthropic`, `openai`, `stub`) |
 | `GR_LLM_MODEL` | `claude-sonnet-4-20250514` | Model for grading, synthesis, planning |
 | `GR_LLM_MODEL_RUBRIC_DECOMPOSITION` | `claude-opus-4-6` | Model for rubric parsing (one-time) |
 | `GR_LLM_TEMPERATURE` | `0.7` | Default sampling temperature (gateway overrides to 0.0 when samples=1; simulation uses explicit per-call temperatures: 0.3 grading, 0.2 pairwise, 0.4 synthesis) |
-| `GR_ASSESS_LLM_BACKEND` | — | Backend override for assessment simulation |
-| `GR_ASSESS_LLM_MODEL` | — | Model override for assessment simulation |
+| `GR_ASSESS_LLM_BACKEND` | `openai` | Backend for grader simulation (assess + score stages) |
+| `GR_ASSESS_LLM_MODEL` | `gpt-5.4` | Model for grader simulation |
 | `GR_ASSESS_PANEL_SIZE` | `4` | Number of grader personas per response |
 | `GR_ASSESS_TARGET_RESPONSE_COUNT` | `10` | Total responses (real + synthetic) |
 | `GR_ASSESS_PAIRWISE_SAMPLE_SIZE` | `10` | Max pairwise comparisons per simulation |
@@ -230,6 +232,7 @@ pytest
 
 ## Documentation
 
+- [Architecture diagram](docs/architecture.pdf) — System architecture overview
 - [Requirements](docs/requirements.md) — User needs, user requirements, system requirements
 - [Design](docs/design.md) — Architecture, data models, design requirements
 - [Verification Plan](docs/verification-plan.md) — Test strategy and procedures

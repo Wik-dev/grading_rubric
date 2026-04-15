@@ -22,8 +22,8 @@ class TestSettingsFromEnv:
         assert s.max_iterations == 3
         assert s.schema_version == "1.0.0"
         assert s.assess_llm_concurrency == 4
-        assert s.assess_llm_backend is None
-        assert s.assess_llm_model_pinned is None
+        assert s.assess_llm_backend == "openai"
+        assert s.assess_llm_model_pinned == "gpt-5.4"
 
     def test_stub_backend(self) -> None:
         s = Settings.from_env({"GR_LLM_BACKEND": "stub"})

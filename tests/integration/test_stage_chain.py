@@ -34,6 +34,8 @@ def _stub_settings() -> Settings:
         llm_backend="anthropic",
         llm_model_pinned="claude-sonnet-4-20250514",
         anthropic_api_key="sk-test-stage-chain-key",
+        assess_llm_backend="anthropic",
+        assess_llm_model_pinned="claude-sonnet-4-20250514",
         assess_panel_size=4,
         assess_target_response_count=6,
         assess_pairwise_sample_size=3,

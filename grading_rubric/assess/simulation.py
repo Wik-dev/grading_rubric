@@ -338,15 +338,18 @@ def _require_llm(settings: Settings) -> None:
 
 
 def _simulation_settings(settings: Settings) -> Settings:
+    # When the main backend is stub, honour it — no real LLM calls.
+    if settings.llm_backend == "stub":
+        return settings
     backend = settings.assess_llm_backend
     model = settings.assess_llm_model_pinned
-    if backend is None and not model:
-        return settings
     updates: dict[str, str] = {}
     if backend is not None:
         updates["llm_backend"] = backend
     if model:
         updates["llm_model_pinned"] = model
+    if not updates:
+        return settings
     return settings.model_copy(update=updates)
 
 

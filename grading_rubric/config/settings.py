@@ -30,8 +30,8 @@ class Settings(BaseModel):
     openai_api_key: str | None = None
 
     # ── Assess stage ───────────────────────────────────────────────────────
-    assess_llm_backend: Literal["anthropic", "openai", "stub"] | None = None
-    assess_llm_model_pinned: str | None = None
+    assess_llm_backend: Literal["anthropic", "openai", "stub"] = "openai"
+    assess_llm_model_pinned: str = "gpt-5.4"
     assess_min_real_copies: int = 3
     assess_pairwise_sample_size: int = 10
     assess_panel_size: int = 4
@@ -100,8 +100,8 @@ class Settings(BaseModel):
             llm_model_rubric_decomposition=rubric_model,
             anthropic_api_key=e.get("ANTHROPIC_API_KEY"),
             openai_api_key=e.get("OPENAI_API_KEY"),
-            assess_llm_backend=e.get("GR_ASSESS_LLM_BACKEND"),  # type: ignore[arg-type]
-            assess_llm_model_pinned=e.get("GR_ASSESS_LLM_MODEL"),
+            assess_llm_backend=e.get("GR_ASSESS_LLM_BACKEND", "openai"),  # type: ignore[arg-type]
+            assess_llm_model_pinned=e.get("GR_ASSESS_LLM_MODEL", "gpt-5.4"),
             assess_min_real_copies=int(e.get("GR_ASSESS_MIN_REAL_COPIES", "3")),
             assess_pairwise_sample_size=int(e.get("GR_ASSESS_PAIRWISE_SAMPLE_SIZE", "10")),
             assess_panel_size=int(e.get("GR_ASSESS_PANEL_SIZE", "4")),

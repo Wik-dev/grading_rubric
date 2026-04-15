@@ -9,11 +9,11 @@
 
 ## § 1  Test strategy
 
-### V-shape discipline
+### Test-level discipline
 
-Each test level on the right arm of the V validates requirements at the corresponding level on the left arm:
+Each test level validates requirements at the corresponding abstraction level:
 
-| V-level (left) | V-level (right) | Scope |
+| Requirement level | Test level | Scope |
 |---|---|---|
 | Design Requirements (DR) | Unit tests | Single function / class, deterministic, offline |
 | System Requirements (SR) | Integration tests | Multi-stage pipeline or system-level wiring |
