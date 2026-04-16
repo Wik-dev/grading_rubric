@@ -88,12 +88,12 @@ Installed automatically via `pip install .`:
 export ANTHROPIC_API_KEY="sk-ant-..."
 
 grading-rubric-cli run-pipeline \
-    --exam-question project_materials/ExamQuestionAndRubric.pdf \
-    --teaching-material project_materials/TeachingResource-BAD_ACTORS_STRATEGY.pdf \
-    --starting-rubric project_materials/ExamQuestionAndRubric.pdf \
-    --student-copy project_materials/StudentAnswer-Student1.pdf \
-    --student-copy project_materials/StudentAnswer-Student2.pdf \
-    --student-copy project_materials/StudentAnswer-Student3.pdf \
+    --exam-question project_materials/exam_question/ExamQuestionAndRubric.pdf \
+    --teaching-material project_materials/teaching_material/TeachingResource-BAD_ACTORS_STRATEGY.pdf \
+    --starting-rubric project_materials/starting_rubric/ExamQuestionAndRubric.pdf \
+    --student-copy project_materials/student_copy/StudentAnswer-Student1.pdf \
+    --student-copy project_materials/student_copy/StudentAnswer-Student2.pdf \
+    --student-copy project_materials/student_copy/StudentAnswer-Student3.pdf \
     --output result.json
 ```
 
@@ -110,15 +110,15 @@ Only `--exam-question` is required. All other inputs are optional:
 
 ### Running individual stages
 
-Each stage can be invoked independently for inspection or debugging:
+The same `project_materials/` directory doubles as the role-tagged input root for stage-by-stage execution:
 
 ```bash
-grading-rubric-cli ingest       --input ingest_inputs.json --output ingest_outputs.json
-grading-rubric-cli parse-inputs --input ingest_outputs.json --output parsed_inputs.json
-grading-rubric-cli assess       --input parsed_inputs.json  --output assess_outputs.json
-grading-rubric-cli propose      --input assess_outputs.json --output propose_outputs.json
-grading-rubric-cli score        --input propose_outputs.json --output score_outputs.json
-grading-rubric-cli render       --input score_outputs.json   --output explained_rubric.json
+grading-rubric-cli ingest       --input-root project_materials   --output ingest_outputs.json
+grading-rubric-cli parse-inputs --input ingest_outputs.json       --output parsed_inputs.json
+grading-rubric-cli assess       --input parsed_inputs.json        --output assess_outputs.json
+grading-rubric-cli propose      --input assess_outputs.json       --output propose_outputs.json
+grading-rubric-cli score        --input propose_outputs.json      --output score_outputs.json
+grading-rubric-cli render       --input score_outputs.json        --output explained_rubric.json
 ```
 
 ### Docker
@@ -130,7 +130,7 @@ docker run -e ANTHROPIC_API_KEY \
     -v "$(pwd)":/work \
     grading-rubric:latest \
     grading-rubric-cli run-pipeline \
-        --exam-question project_materials/ExamQuestionAndRubric.pdf \
+        --exam-question project_materials/exam_question/ExamQuestionAndRubric.pdf \
         --output result.json
 ```
 
