@@ -170,7 +170,7 @@ def _llm_settings(panel_size: int = 4) -> Settings:
         simulation_model="claude-sonnet-4-20250514",
         simulation_panel_size=panel_size,
         simulation_target_responses=6,
-        simulation_pairwise_pairs=3,
+        simulation_pairwise_pairs=15,  # C(6,2) — all pairs; no sampling noise in stub
     )
 
 
