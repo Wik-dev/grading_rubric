@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from validance.workflow import (
+from validance_integration.workflow import (
     WORKFLOWS,
     WORKFLOW_DESCRIPTIONS,
     create_assess_and_improve_workflow,

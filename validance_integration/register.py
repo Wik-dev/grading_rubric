@@ -1,6 +1,6 @@
 """DR-INT-07 — idempotent workflow registration script.
 
-Reads the two workflow definitions from `validance/workflow.py`, serialises
+Reads the workflow definitions from `validance_integration/workflow.py`, serialises
 each via the SDK's ``Workflow.to_dict()``, and POSTs them to the Validance
 instance whose base URL is read from the ``VALIDANCE_BASE_URL`` environment
 variable. Validance's ``POST /api/workflows`` endpoint is itself idempotent
@@ -16,7 +16,7 @@ Exit codes:
 
 Usage:
 
-    VALIDANCE_BASE_URL=http://localhost:8001 python validance/register.py
+    VALIDANCE_BASE_URL=https://api.validance.io python -m validance_integration.register
 
 This script is the **sole** caller of ``requests`` in the L3 directory; the
 rest of the package is pure (no I/O, no network).
@@ -30,7 +30,7 @@ from typing import Any
 
 import requests
 
-from validance.workflow import WORKFLOW_DESCRIPTIONS, WORKFLOWS
+from validance_integration.workflow import WORKFLOW_DESCRIPTIONS, WORKFLOWS
 
 
 def _workflow_payload(wf, description: str) -> dict[str, Any]:
@@ -96,7 +96,7 @@ def main() -> int:
         print(
             "ERROR: VALIDANCE_BASE_URL is not set. "
             "Set it to the Validance instance you want to register against, "
-            "e.g. VALIDANCE_BASE_URL=http://localhost:8001",
+            "e.g. VALIDANCE_BASE_URL=https://api.validance.io",
             file=sys.stderr,
         )
         return 1

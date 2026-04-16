@@ -1,6 +1,6 @@
 """Unit tests — DR-INT-04 proposal-payload mapping (L3).
 
-`validance/proposals.py` is a pure mapping module with no I/O and no SDK
+`validance_integration/proposals.py` is a pure mapping module with no I/O and no SDK
 calls. Forward direction: L1 ProposedChange → JSON-safe payload. Inverse
 direction: approval resolution → TeacherDecision patching.
 """
@@ -27,7 +27,7 @@ from grading_rubric.models.rubric import RubricFieldName, RubricTarget
 from tests.conftest import CHANGE_1_ID, CHANGE_2_ID, CRIT_A_ID, FINDING_1_ID
 
 # Import L3 mapping module — the only place validance vocabulary appears.
-from validance.proposals import (
+from validance_integration.proposals import (
     apply_approval_resolution,
     proposed_change_to_payload,
     proposed_changes_to_payload,

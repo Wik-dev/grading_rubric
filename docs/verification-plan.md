@@ -1,8 +1,8 @@
 # Grading Rubric Studio — Verification & Validation Plan
 
-**Version**: 0.2.0
-**Date**: 2026-04-12
-**Status**: Review feedback absorbed — SR coverage matrix added, missing SRs covered, integration traces broadened, live workflow execution tests added
+**Version**: 0.3.0
+**Date**: 2026-04-16
+**Status**: Codebase alignment pass — test counts, line numbers, new test groups documented, IT-SYS table rewritten to match actual 10 tests
 **Author**: Wiktor Lisowski
 
 ---
@@ -34,7 +34,7 @@ Each test level validates requirements at the corresponding abstraction level:
 | Environment | What runs | External dependencies |
 |---|---|---|
 | **Offline** (CI, laptop) | Unit tests + § 3.1 + § 3.3 | None — no API key, no Validance, no network |
-| **Dev VM** (Validance running) | § 3.4 system integration, § 4.1 / § 4.2 acceptance | Validance at `http://localhost:8001`, Anthropic API key |
+| **Production** (Validance running) | § 3.4 system integration, § 4.1 / § 4.2 acceptance | Validance at `https://api.validance.io`, Anthropic API key |
 
 ### Integration test sub-levels
 
@@ -60,17 +60,17 @@ Deterministic functions with exact assertions. No LLM calls, no network, no rand
 
 | Test ID | Function under test | Location | Inputs | Expected output | Traced DR(s) |
 |---|---|---|---|---|---|
-| UT-MET-01 | `_confidence_floor()` | `engines.py:93` | `EvidenceProfile` with `synthetic_responses_used=True`, base score 0.85 | Floor clamped to LOW range (≤ 0.40) | DR-AS-13 |
-| UT-MET-02 | `_confidence_floor()` | `engines.py:93` | `EvidenceProfile` with real copies, base score 0.85 | No clamping (returns base) | DR-AS-13 |
+| UT-MET-01 | `_confidence_floor()` | `simulation.py:316` | `EvidenceProfile` with `synthetic_responses_used=True`, base score 0.85 | Floor clamped to LOW range (≤ 0.40) | DR-AS-13 |
+| UT-MET-02 | `_confidence_floor()` | `simulation.py:316` | `EvidenceProfile` with real copies, base score 0.85 | No clamping (returns base) | DR-AS-13 |
 | UT-MET-03 | `AmbiguityEngine.measure_from_simulation()` | `engines.py` | Grade matrix with midscale persona disagreement | Ambiguity finding with `method=LLM_PANEL_AGREEMENT` | DR-AS-06 |
 | UT-MET-04 | `ApplicabilityEngine.measure_from_simulation()` | `engines.py` | Grade matrix with edge polarization | Applicability finding with `method=SYNTHETIC_COVERAGE` | DR-AS-07 |
 | UT-MET-05 | `scores_from_simulation()` ambiguity guard | `engines.py` | Trivial ceiling/floor grades and too few midscale responses | Ambiguity score confidence forced LOW | DR-AS-06 |
 | UT-MET-06 | `DiscriminationEngine.measure_from_simulation()` | `engines.py` | Synthetic intended scores with ceiling effect and rank collapse | Discrimination finding from calibration / ceiling / rank checks | DR-AS-08 |
 | UT-MET-07 | `scores_from_simulation()` | `engines.py` | Complete `SimulationEvidence` grade matrix | Three `CriterionScore` records with `method=GRADER_SIMULATION` | DR-SCR-01, DR-SCR-02 |
-| UT-MET-08 | `_step2_canonical_order()` | `stage.py:117–132` | Drafts: `[REMOVE_NODE, ADD_NODE, REPLACE_FIELD]` | Sorted: `[REPLACE_FIELD, ADD_NODE, REMOVE_NODE]` | DR-IM-07 |
-| UT-MET-09 | `_step1_conflict_resolution()` | `stage.py:104–114` | Drafts: `[REMOVE_NODE(X), REPLACE_FIELD(X.desc)]` | `REPLACE_FIELD` superseded, `REMOVE_NODE` kept | DR-IM-07 |
-| UT-MET-10 | `_step3_apply_and_wrap()` | `stage.py:189–231` | Starting rubric + one `REPLACE_FIELD` draft | `application_status=APPLIED`, `teacher_decision=PENDING`, rubric updated | DR-IM-07 |
-| UT-MET-11 | `_step3_apply_and_wrap()` superseded draft | `stage.py:189–231` | Draft marked as superseded by step 1 | `application_status=NOT_APPLIED` | DR-IM-07 |
+| UT-MET-08 | `_step2_canonical_order()` | `stage.py:218` | Drafts: `[REMOVE_NODE, ADD_NODE, REPLACE_FIELD]` | Sorted: `[REPLACE_FIELD, ADD_NODE, REMOVE_NODE]` | DR-IM-07 |
+| UT-MET-09 | `_step1_conflict_resolution()` | `stage.py:205` | Drafts: `[REMOVE_NODE(X), REPLACE_FIELD(X.desc)]` | `REPLACE_FIELD` superseded, `REMOVE_NODE` kept | DR-IM-07 |
+| UT-MET-10 | `_step3_apply_and_wrap()` | `stage.py:393` | Starting rubric + one `REPLACE_FIELD` draft | `application_status=APPLIED`, `teacher_decision=PENDING`, rubric updated | DR-IM-07 |
+| UT-MET-11 | `_step3_apply_and_wrap()` superseded draft | `stage.py:393` | Draft marked as superseded by step 1 | `application_status=NOT_APPLIED` | DR-IM-07 |
 
 **NOTE — Krippendorff's α**: The inter-rater agreement computation is delegated to the pinned `krippendorff>=0.6` PyPI library. Statistical correctness is trusted (published, peer-reviewed algorithm). We test only that we call it with the correct input shape (see § 6).
 
@@ -94,7 +94,7 @@ Each stage's deterministic offline path exercised with a stub gateway returning 
 
 ### § 2.3  Data model validation (Pydantic invariants)
 
-Existing `test_models.py` coverage (27 tests). Representative cases:
+Existing `test_models.py` coverage (29 tests). Representative cases:
 
 | Test ID | Model | Scenario | Traced DR(s) |
 |---|---|---|---|
@@ -114,13 +114,16 @@ Existing `test_hashing.py` coverage (17 tests):
 | UT-HSH-03 | `canonical_json()` | Sort keys, compact separators, ensure_ascii=False | DR-DAT-06 case (c) |
 | UT-HSH-04 | `hash_object()` | Object → canonical JSON → SHA-256 match | DR-DAT-06 case (c) |
 
-Existing `test_audit_emitter.py` coverage (9 tests):
+Existing `test_audit_emitter.py` coverage (12 tests):
 
 | Test ID | Class | Scenario | Traced DR(s) |
 |---|---|---|---|
 | UT-AUD-01 | `JsonLineEmitter` | Event serialization to JSONL | DR-OBS-01 |
 | UT-AUD-02 | `NullEmitter` | No-op emitter (offline mode) | DR-OBS-01 |
 | UT-AUD-03 | `JsonLineEmitter` | LLM call event records purpose, prompt ID, outcome | DR-LLM-08, DR-LLM-11 |
+| UT-AUD-04 | `NullEmitter` | Collects events in memory | DR-OBS-01 |
+| UT-AUD-05 | `NullEmitter` | No side effects | DR-OBS-01 |
+| UT-AUD-06 | `JsonLineEmitter` | LLM call failure outcome recorded | DR-LLM-08 |
 
 Existing `test_proposals.py` coverage (10 tests):
 
@@ -129,13 +132,54 @@ Existing `test_proposals.py` coverage (10 tests):
 | UT-PRP-01 | `ForwardMapping` | L1 models → Validance proposal payload | DR-INT-04 |
 | UT-PRP-02 | `InverseMapping` | Validance result → L1 models | DR-INT-04 |
 
-Existing `test_settings.py` coverage (8 tests):
+Existing `test_llm_integration.py` coverage (4 tests):
+
+| Test ID | Function | Scenario | Traced DR(s) |
+|---|---|---|---|
+| UT-LLM-01 | `_rubric_to_text()` | Rubric text contains criterion names | DR-AS-04 |
+| UT-LLM-02 | `_collect_criterion_paths()` | Collects all leaf criterion paths | DR-AS-06 |
+| UT-LLM-03 | `_convert_and_ground()` | Valid draft converts to `ProposedChange` | DR-IM-06, DR-IM-07 |
+| UT-LLM-04 | `_convert_and_ground()` | Draft referencing unknown finding is dropped | DR-IM-06 |
+
+Existing `test_ingest_input_root.py` coverage (12 tests):
 
 | Test ID | Class | Scenario | Traced DR(s) |
 |---|---|---|---|
-| UT-SET-01 | `Settings` | Construction from env vars | DR-ARC-03 |
+| UT-INP-01 | `StructuredInputAdapter` | Minimal exam-only input root | DR-IO-01 |
+| UT-INP-02 | `StructuredInputAdapter` | All roles populated (exam, teaching, rubric, copies) | DR-IO-01, DR-IO-02 |
+| UT-INP-03 | `StructuredInputAdapter` | Missing exam question directory fails | DR-IO-01 |
+| UT-INP-04 | CLI mutual exclusion | `--input` and `--input-root` together fails | DR-ARC-08 |
+| UT-INP-05 | CLI mutual exclusion | Neither `--input` nor `--input-root` fails | DR-ARC-08 |
+| UT-INP-06 | `StructuredInputAdapter` | File order is deterministic | DR-IO-01 |
+
+Existing `test_simulation.py` coverage (12 tests):
+
+| Test ID | Function | Scenario | Traced DR(s) |
+|---|---|---|---|
+| UT-SIM-01 | `_require_llm()` | Stub backend fails with clear message | DR-AS-03 |
+| UT-SIM-02 | `AmbiguityEngine.measure_from_simulation()` | Ambiguity findings from grade matrix | DR-AS-06 |
+| UT-SIM-03 | `ApplicabilityEngine.measure_from_simulation()` | Applicability gap findings | DR-AS-07 |
+| UT-SIM-04 | `DiscriminationEngine.measure_from_simulation()` | Discrimination findings | DR-AS-08 |
+| UT-SIM-05 | `scores_from_simulation()` | Three criterion scores produced | DR-SCR-01, DR-SCR-02 |
+| UT-SIM-06 | `run_grader_simulation()` | Injected gateway produces grade entries | DR-AS-03, DR-LLM-01 |
+
+Existing `test_stage_logic.py` coverage (11 tests):
+
+| Test ID | Stage | Scenario | Traced DR(s) |
+|---|---|---|---|
+| UT-SLG-01 | `assess` | Empty rubric → degenerate `AssessOutputs` | DR-AS-15 |
+| UT-SLG-02 | `parse_inputs` | Inline rubric text parsed | DR-IO-07 |
+| UT-SLG-03 | `propose` | Modify-existing path with stub gateway | DR-IM-02 |
+| UT-SLG-04 | `propose` | From-scratch path with stub gateway | DR-IM-02 |
+| UT-SLG-05 | `propose` | No-changes path | DR-IM-05 |
+
+Existing `test_settings.py` coverage (9 tests):
+
+| Test ID | Class | Scenario | Traced DR(s) |
+|---|---|---|---|
+| UT-SET-01 | `Settings` | Construction from env vars (defaults) | DR-ARC-03 |
 | UT-SET-02 | `Settings` | Frozen after construction | DR-ARC-03 |
-| UT-SET-03 | `Settings` | Model pin validation | DR-LLM-06 |
+| UT-SET-03 | `Settings` | Model pin validation (ocr_backend/ocr_model, simulation_backend/simulation_model) | DR-LLM-06 |
 
 ### § 2.4  Architectural invariants
 
@@ -148,8 +192,7 @@ Existing `test_architecture.py` (6 tests):
 | UT-ARC-01 | `test_no_validance_imports_in_l1` | `grep -rn "import validance" grading_rubric/` returns empty | DR-ARC-07 |
 | UT-ARC-02 | `test_model_files_in_expected_locations` | Stage-local models in their packages | DR-DAT-01 |
 | UT-ARC-03 | `test_no_py_files_in_frontend_src` | No `.py` files in `frontend/src/` | DR-UI-01 |
-| UT-ARC-04 | `test_l3_files_in_validance_directory` | L3 files only in `validance/` | DR-INT-01 |
-| UT-ARC-05 | `test_validance_is_namespace_package` | No `__init__.py` in `validance/` | DR-ARC-11 |
+| UT-ARC-04 | `test_l3_files_present` | L3 files in `validance_integration/` | DR-INT-01 |
 | UT-ARC-06 | `test_layer_separation` | L1/L2/L3/L4 boundaries intact | DR-ARC-01 |
 
 ### § 2.5  DR group coverage summary
@@ -158,18 +201,18 @@ Every DR group has a verification strategy. Representative unit-level procedures
 
 | DR group | Count | Representative tests | Coverage notes |
 |---|---|---|---|
-| DR-ARC (12) | UT-ARC-01–06, UT-SET-01–02 | Layer separation, hermetic tasks, frozen settings | DR-ARC-08 (CLI subcommands) exercised via § 3.1 stage chain |
-| DR-LLM (11) | UT-AUD-03, UT-SET-03 | Gateway prompt/response contract, model pin, call logging | DR-LLM-01/02 (gateway signature, prompt files) verified structurally |
+| DR-ARC (12) | UT-ARC-01–06, UT-SET-01–02, UT-INP-04/05 | Layer separation, hermetic tasks, frozen settings, CLI mutual exclusion | DR-ARC-08 (CLI subcommands) exercised via § 3.1 stage chain |
+| DR-LLM (11) | UT-AUD-03/06, UT-SET-03, UT-LLM-01–04 | Gateway contract, model pin, call logging, rubric helpers, grounding | DR-LLM-01/02 (gateway signature, prompt files) verified structurally |
 | DR-DAT (11) | UT-MOD-01–06, UT-HSH-01–04 | Model round-trip, hashing rule, schema validation | DR-DAT-03 (codegen) is a gap — see § 3.2 |
-| DR-AS (15) | UT-MET-01–06, UT-STG-01–02 | Engines, confidence floor, degenerate assess | DR-AS-09 (pairwise consistency) via UT-MET-06 sub-method |
-| DR-IM (14) | UT-MET-08–11, UT-STG-03–05/08–09 | Three-step pipeline, three paths, traceability, grounding | DR-IM-10 (idempotency) verified by canonical sort determinism |
+| DR-AS (15) | UT-MET-01–06, UT-STG-01–02, UT-SIM-01–06 | Engines, confidence floor, degenerate assess, simulation wiring | DR-AS-09 (pairwise consistency) via UT-MET-06 sub-method |
+| DR-IM (14) | UT-MET-08–11, UT-STG-03–05/08–09, UT-LLM-03/04, UT-SLG-03–05 | Three-step pipeline, three paths, traceability, grounding | DR-IM-10 (idempotency) verified by canonical sort determinism |
 | DR-UI (8) | UT-ARC-03 | No `.py` in frontend, tech stack isolation | Remaining DR-UI verified via § 4.1 manual procedures |
-| DR-IO (8) | UT-STG-01 (ingest/parse stages) | Role-tagged ingest, inline-text, no-text-PDF policy | DR-IO-04/05 (handwritten OCR) via IT-CHN-01 with canned responses |
-| DR-OBS (4) | UT-AUD-01–03 | Event serialization, emitter contract, LLM call logging | DR-OBS-03/04 via § 3.4 IT-SYS-04 (live audit retrieval) |
+| DR-IO (8) | UT-INP-01–06, UT-SLG-02 | Role-tagged ingest, inline-text, no-text-PDF policy, structured input adapter | DR-IO-04/05 (handwritten OCR) via IT-CHN-01 with canned responses |
+| DR-OBS (4) | UT-AUD-01–06 | Event serialization, emitter contract, LLM call logging, failure recording | DR-OBS-03/04 via § 3.4 IT-SYS-08 (stage event emission) |
 | DR-PER (8) | — | Not unit-testable (concurrency, scale, progress) | DR-PER-03/04/06 via § 3.1 IT-CHN-04; DR-PER-07 via § 3.4 IT-SYS-05 |
-| DR-SCR (2) | UT-MET-07, UT-STG-06 | Severity-weight aggregation, criterion scores | — |
+| DR-SCR (2) | UT-MET-07, UT-STG-06, UT-SIM-05 | Severity-weight aggregation, criterion scores | — |
 | DR-DEP (9) | UT-ARC-06 | Layer boundaries, Docker image separation | — |
-| DR-INT (9) | UT-PRP-01/02, IT-WRK-01–03, IT-HRV-01–02 | Payload mapping, workflow definitions, harvester | DR-INT-06 (approval gate) via § 3.4 IT-SYS-03/06/07 |
+| DR-INT (9) | UT-PRP-01/02, IT-WRK-01–03, IT-HRV-01–02 | Payload mapping, workflow definitions, harvester | DR-INT-06 (approval gate) via § 3.4 IT-SYS-05 |
 
 ---
 
@@ -190,6 +233,17 @@ Full pipeline exercised end-to-end with a stub gateway. No Validance, no API key
 | IT-CHN-07 | **Change-to-finding traceability** | Full pipeline → inspect `proposed_changes` | Each `ProposedChange.source_findings` traces to an `AssessmentFinding.id` | SR-IM-05 |
 | IT-CHN-08 | **Schema validation** | Full pipeline → validate output against documented JSON schema | `ExplainedRubricFile` conforms to schema | SR-OUT-04 |
 | IT-CHN-09 | **Pairwise consistency** | Assess with student copies → inspect discrimination findings | Pairwise inconsistencies reported as discrimination findings; cross-linked ambiguity findings when warranted | SR-AS-10 |
+
+### § 3.1b  Shared grader simulation E2E (stub gateway, offline)
+
+Existing `test_llm_e2e.py` coverage (4 tests). Exercises the full pipeline with a `SmartStubBackend` that dispatches schema-aware canned responses for each gateway call type (synthesis, grading, pairwise, planner). Verifies simulation-backed findings, quality scores, and artifact persistence.
+
+| Test ID | Scenario | Expected result | Traced SR(s) |
+|---|---|---|---|
+| IT-E2E-01 | Full pipeline with student copies | `ExplainedRubricFile` with three `GRADER_SIMULATION` scores, simulation-derived findings, at least one APPLIED change | SR-AS-01, SR-AS-02, SR-AS-03, SR-IM-01, SR-IM-03, SR-OUT-01 |
+| IT-E2E-02 | Stub backend with no API key | `RuntimeError("grader simulation requires")` | DR-AS-03 |
+| IT-E2E-03 | No student copies → synthetic path | `synthetic_responses_used=True`, findings still produced | SR-AS-06 |
+| IT-E2E-04 | Artifact directory persistence | Stage outputs, simulation evidence, grade matrix, pairwise comparisons, grade distribution all persisted | DR-OBS-01 |
 
 ### § 3.2  Schema round-trip (DR-DAT-03)
 
@@ -224,17 +278,20 @@ Existing `test_harvester.py` (6 tests):
 
 ### § 3.4  System integration (Validance running)
 
-Requires a live Validance instance on the dev VM (`http://localhost:8001`). These tests exercise the full L3 wiring in a real environment, including **running the actual `assess_and_improve` workflow end-to-end** and verifying the output.
+Requires the Validance production API (`https://api.validance.io`). These tests exercise the full L3 wiring in a real environment, including **running the actual `assess_and_improve` workflow end-to-end** and verifying the output.
 
 | Test ID | Scenario | Steps | Expected result | Traced SR(s) / DR(s) |
 |---|---|---|---|---|
-| IT-SYS-01 | Workflow registration | `python validance/register.py` | Workflow visible in Validance catalog | DR-INT-02 |
+| IT-SYS-01 | Workflow registration | `python -m validance_integration.register` | Workflow visible in Validance catalog | DR-INT-02 |
 | IT-SYS-02 | Proposal submission | `POST /api/proposals` with `assess_and_improve` payload | Proposal accepted, run starts | DR-INT-04, SR-IM-01 |
-| IT-SYS-03 | Approval gate round-trip | Wait for gate → `POST` approval resolution | `teacher_decision` patched on the run's `ProposedChange` records | DR-INT-04, SR-UI-10, SR-OUT-05 |
-| IT-SYS-04 | Audit bundle retrieval | `GET /api/runs/{runId}/audit_bundle` | Valid `AuditBundle` JSON with operation records including model invocations | DR-INT-05, SR-OBS-01, SR-OBS-02, SR-OBS-03 |
-| IT-SYS-05 | Progress polling | Poll `GET /api/runs/{runId}` at 2000 ms cadence | Status transitions visible (PENDING → RUNNING → stages → COMPLETED) | DR-INT-06, SR-PRF-02 |
-| IT-SYS-06 | **Full workflow execution** | Submit `assess_and_improve` with demo inputs → wait for all tasks to complete → retrieve final output | Valid `ExplainedRubricFile`: non-empty `proposed_changes`, three `quality_scores`, `teacher_decision=PENDING`, explanation grouped by criteria | SR-IM-01, SR-IM-02, SR-IM-03, SR-AS-01, SR-AS-02, SR-AS-03, SR-OUT-01, SR-OUT-02, SR-OUT-03, DR-INT-04 |
-| IT-SYS-07 | **Re-measurement workflow re-entry** | Resolve approval gate (accept some, reject some) + request re-assessment | New iteration reaches approval gate again; `previous_quality_scores` present; before/after evidence visible | SR-AS-09, SR-UI-10, DR-INT-06 |
+| IT-SYS-03 | All six tasks succeed | Wait for run completion, inspect task statuses | All tasks have `status=completed` | DR-INT-02, SR-PRF-01 |
+| IT-SYS-04 | Workflow completes successfully | Full run reaches `completed` status | Run status is `completed` | DR-INT-02 |
+| IT-SYS-05 | Status endpoint returns tasks | Poll `GET /api/runs/{runId}` | Status transitions visible, task list populated | DR-INT-06, SR-PRF-02 |
+| IT-SYS-06 | **ExplainedRubricFile downloadable** | Retrieve final output from render task | Valid `ExplainedRubricFile` JSON | SR-OUT-01, SR-OUT-02, DR-INT-04 |
+| IT-SYS-07 | **Intermediate outputs available** | Retrieve assess, propose outputs from completed tasks | Stage outputs are downloadable JSON | DR-INT-05, SR-OBS-01 |
+| IT-SYS-08 | **Ingest emits stage events** | Inspect ingest task audit events | Stage start/end events present | DR-OBS-01, DR-OBS-03 |
+| IT-SYS-09 | Run appears in listing | `GET /api/runs` | Submitted run visible in run listing | DR-INT-06 |
+| IT-SYS-10 | Missing input file fails task | Submit with non-existent file path | Task fails with clear error | DR-IO-01 |
 
 ---
 
@@ -397,11 +454,11 @@ ApprovalGate, audit chain, workflow orchestration, secret store, task execution,
 | Workflow definitions (task names, deps, gates) | `test_workflows.py` (IT-WRK-01/02) | DR-INT-02 |
 | Audit-bundle harvester (raw chain → typed view) | `test_harvester.py` (IT-HRV-01/02) | DR-INT-05 |
 | Full workflow execution (output correctness) | § 3.4 IT-SYS-06 | DR-INT-04, SR-IM-01, SR-OUT-01 |
-| Re-measurement loop re-entry | § 3.4 IT-SYS-07 | DR-INT-06, SR-AS-09 |
+| Re-measurement loop re-entry | § 4.1 AT-LOOP-01 | DR-INT-06, SR-AS-09 |
 
 ### Anthropic API (trusted, always stubbed in automated tests)
 
-We trust the Anthropic SDK to make correct API calls. We test that our gateway wraps it correctly (unit level — stub gateway returns canned responses, we verify our code handles them). We **never** make live API calls in automated tests — all LLM interaction goes through the stub gateway in offline mode. Live API calls occur only in manual § 4.1 procedures and § 3.4 system integration tests when the full pipeline runs on the dev VM.
+We trust the Anthropic SDK to make correct API calls. We test that our gateway wraps it correctly (unit level — stub gateway returns canned responses, we verify our code handles them). We **never** make live API calls in automated tests — all LLM interaction goes through the stub gateway in offline mode. Live API calls occur only in manual § 4.1 procedures and § 3.4 system integration tests when the full pipeline runs against the Validance production API.
 
 ### Krippendorff library (trusted)
 
@@ -434,7 +491,7 @@ Every SR has at least one verification procedure or an explicit gap/rationale en
 | SR-AS-06 | Could | Fall back to synthetic responses | IT-CHN-04, UT-MOD-04 | Covered |
 | SR-AS-07 | Must | Tag findings with exactly one criterion | IT-CHN-01 (assert criterion field), UT-STG-01 | Covered |
 | SR-AS-08 | Should | Attach confidence indicator | IT-CHN-04, UT-MET-01–02 | Covered |
-| SR-AS-09 | Should | Re-measure before/after quality scores | IT-SYS-07, AT-LOOP-01 | Covered |
+| SR-AS-09 | Should | Re-measure before/after quality scores | AT-LOOP-01 | Covered (manual) |
 | SR-AS-10 | Should | Pairwise consistency check | IT-CHN-09 | Covered |
 | SR-IM-01 | Must | Produce improved rubric | IT-CHN-01, IT-CHN-02, IT-SYS-06 | Covered |
 | SR-IM-02 | Must | Improved rubric is structured | IT-CHN-01 (assert criteria/points/guidance), UT-MOD-02 | Covered |
@@ -451,15 +508,15 @@ Every SR has at least one verification procedure or an explicit gap/rationale en
 | SR-UI-07 | Must | Side-by-side rubric display | AT-REV-01 step 1 | Manual |
 | SR-UI-08 | Must | Changes with criterion + rationale | AT-REV-01 steps 2–3 | Manual |
 | SR-UI-09 | Could | Per-change accept/reject | AT-REV-01 steps 4–5 | Manual |
-| SR-UI-10 | Should | Re-run after edits | AT-LOOP-01, IT-SYS-07 | Covered |
+| SR-UI-10 | Should | Re-run after edits | AT-LOOP-01 | Covered (manual) |
 | SR-OUT-01 | Must | Produce explained rubric file | IT-CHN-01, IT-SYS-06, AT-REV-02 | Covered |
 | SR-OUT-02 | Must | Root fields: rubric + explanation | IT-CHN-01 (assert root keys) | Covered |
 | SR-OUT-03 | Must | Explanation grouped by three criteria | IT-CHN-01 (assert three-criteria grouping) | Covered |
 | SR-OUT-04 | Should | Validate against documented schema | IT-CHN-08, UT-MOD-06 | Covered |
 | SR-OUT-05 | Could | Reflect teacher decisions in JSON | IT-SYS-03, AT-REV-02 step 3 | Covered |
-| SR-OBS-01 | Should | Record audit bundle per run | IT-SYS-04, AT-RUN-01, AT-REV-04 | Covered |
-| SR-OBS-02 | Should | Log every model invocation | IT-SYS-04 (assert operation records), UT-AUD-03 | Covered |
-| SR-OBS-03 | Could | Audit bundle retrievable from UI | IT-SYS-04, AT-REV-04 | Covered |
+| SR-OBS-01 | Should | Record audit bundle per run | IT-SYS-07, IT-SYS-08, AT-RUN-01, AT-REV-04 | Covered |
+| SR-OBS-02 | Should | Log every model invocation | IT-SYS-08 (assert stage events), UT-AUD-03/06 | Covered |
+| SR-OBS-03 | Could | Audit bundle retrievable from UI | IT-SYS-07, AT-REV-04 | Covered |
 | SR-PRF-01 | Should | Scale to 100 copies | Not exercised in v0.2.0 plan — requires dedicated scale/stress fixture with 100 synthetic copies. Deferred to v0.3.0 or post-delivery. | **Gap** |
 | SR-PRF-02 | Must | Visible progress (>5s) | IT-SYS-05, AT-RUN-01 | Covered |
 | SR-PRF-03 | Could | Cancellation / responsiveness | Not exercised in v0.2.0 plan — requires cancel-during-run UI interaction. Deferred: Could-priority, DR-PER-08 weakened `SIGTERM` semantics. | **Gap (Could)** |
@@ -495,5 +552,6 @@ Every UR-01 through UR-09 must have at least one test case or manual procedure t
 
 | Version | Date | Change |
 |---|---|---|
+| 0.3.0 | 2026-04-16 | **Codebase alignment pass.** (1) Fixed stale line number references in § 2.1: `_confidence_floor()` → `simulation.py:316`, `_step1/_step2/_step3` updated to current `stage.py` offsets. (2) Updated test counts: `test_models.py` 27→29, `test_audit_emitter.py` 9→12 (added UT-AUD-04/05/06), `test_settings.py` 8→9 (field rename). (3) Documented four previously undocumented unit test files: `test_llm_integration.py` (4 tests, UT-LLM-01–04), `test_ingest_input_root.py` (12 tests, UT-INP-01–06), `test_simulation.py` (12 tests, UT-SIM-01–06), `test_stage_logic.py` (11 tests, UT-SLG-01–05). (4) Added § 3.1b for `test_llm_e2e.py` (4 tests, IT-E2E-01–04). (5) Rewrote IT-SYS table (§ 3.4) to match actual 10 system integration tests (IT-SYS-01 through IT-SYS-10). (6) Updated § 2.5 DR group coverage summary with newly documented test groups. (7) Fixed stale IT-SYS references in § 6 (re-measurement → AT-LOOP-01) and § 7 SR matrix (SR-OBS-01/02/03 → IT-SYS-07/08, SR-AS-09/SR-UI-10 → manual-only). (8) Settings field names updated throughout to match the `GR_SIMULATION_*` / `GR_OCR_*` rename. |
 | 0.2.0 | 2026-04-12 | **Review feedback absorbed.** (1) Added SR coverage matrix (§ 7) — all 46 SRs enumerated with verification procedures; SR-PRF-01 and SR-PRF-03 marked as explicit gaps with rationale. (2) Added DR group coverage summary (§ 2.5) — one row per DR group with representative procedures. (3) Added live workflow execution tests: IT-SYS-06 (full `assess_and_improve` run → valid `ExplainedRubricFile`) and IT-SYS-07 (re-measurement loop re-entry), closing the gap between API-mechanics tests and manual acceptance procedures. (4) [IT-SYS-08 removed in v0.3.0 — train-button capability removed.] (5) Broadened IT-CHN-01 SR traces to include SR-AS-02, SR-AS-03, SR-IM-02, SR-IM-03, SR-OUT-02, SR-OUT-03, SR-IN-03, SR-IN-09, SR-AS-07. (6) Fixed IT-CHN-04 trace from SR-IN-05 → SR-AS-06, SR-AS-08, SR-IN-09. (7) Added IT-CHN-05 (teaching material grounding, SR-AS-04/SR-IM-04), IT-CHN-06 (partial parse failure, SR-IN-08), IT-CHN-07 (change-to-finding traceability, SR-IM-05), IT-CHN-08 (schema validation, SR-OUT-04), IT-CHN-09 (pairwise consistency, SR-AS-10). (8) Added UT-STG-08 (source_findings traceability), UT-STG-09 (grounding contradiction), UT-AUD-03 (LLM call logging), UT-MOD-06 (schema validation). (9) Fixed UT-MET-01 expected output: "clamped to LOW range (≤ 0.40)" not "0.20". (10) Fixed AT-LOOP-01 step 8: "fresh scores shown, previous preserved" instead of "scores differ". (11) Added evidence artifact / reviewer / notes columns to § 5 validation table. (12) Added § 1 pragmatic exception note for § 3.3 DR-INT wiring tests. (13) Made § 4.1 prerequisite explicit: IT-SYS-06 must PASS before acceptance. (14) Updated § 6 Validance wiring table with IT-SYS-06/07. |
 | 0.1.0 | 2026-04-12 | Initial verification plan. Covers 95 existing unit-level tests (§ 2), reclassifies `test_architecture.py` from acceptance to § 2.4 architectural invariants, frames DR-INT wiring tests as § 3.3 (DR-level, not SR-level), identifies § 3.2 schema round-trip as a gap, defines § 3.1 offline stage chain and § 3.4 system integration test cases, writes manual acceptance procedures for all three screens plus a dedicated cross-screen re-measurement loop (UR-08), and enumerates external dependency boundaries in § 6. |

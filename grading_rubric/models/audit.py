@@ -1,7 +1,7 @@
 """§ 4.8 *Provenance: AuditBundle* — typed view populated by the L3 harvester.
 
 These shapes are **not** written by L1 task code. They define the contract
-between the L3 harvester (`validance/harvester.py`, DR-INT-05) and the SPA /
+between the L3 harvester (`validance_integration/harvester.py`, DR-INT-05) and the SPA /
 `ExplainedRubricFile` consumers (DR-DAT-07a). On Path A (single-stage CLI
 inspection) no `AuditBundle` is produced.
 """

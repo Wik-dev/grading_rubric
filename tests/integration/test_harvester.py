@@ -16,7 +16,7 @@ import pytest
 
 from grading_rubric.models.audit import AuditBundle
 
-from validance.harvester import ValidanceRunClient, harvest_audit_bundle
+from validance_integration.harvester import ValidanceRunClient, harvest_audit_bundle
 
 
 class StubValidanceClient:

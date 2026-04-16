@@ -95,19 +95,12 @@ class TestModelCoverage:
 
 
 class TestL3BoundaryFiles:
-    """DR-INT-01: L3 integration files live in validance/ (top-level)."""
+    """DR-INT-01: L3 integration files live in validance_integration/ (top-level)."""
 
     def test_l3_files_present(self) -> None:
-        validance_dir = REPO_ROOT / "validance"
+        validance_dir = REPO_ROOT / "validance_integration"
         expected_files = ["workflow.py", "proposals.py", "harvester.py", "register.py"]
         for name in expected_files:
             assert (validance_dir / name).exists(), (
-                f"Missing L3 file: validance/{name}"
+                f"Missing L3 file: validance_integration/{name}"
             )
-
-    def test_no_init_py_namespace_package(self) -> None:
-        """PEP 420: validance/ must NOT have __init__.py (namespace pkg)."""
-        validance_dir = REPO_ROOT / "validance"
-        assert not (validance_dir / "__init__.py").exists(), (
-            "validance/__init__.py must not exist (PEP 420 namespace package)"
-        )

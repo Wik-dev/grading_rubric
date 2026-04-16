@@ -6,7 +6,7 @@
 PY ?= python3
 DOCKER ?= docker
 IMAGE_NAME ?= grading-rubric:latest
-VALIDANCE_BASE_URL ?= http://localhost:8001
+VALIDANCE_BASE_URL ?= https://api.validance.io
 
 .PHONY: help install images register schemas build dev test lint clean
 
@@ -29,7 +29,7 @@ images:
 	$(DOCKER) build -t $(IMAGE_NAME) -f docker/grading-rubric/Dockerfile .
 
 register:
-	VALIDANCE_BASE_URL=$(VALIDANCE_BASE_URL) $(PY) -m validance.register
+	VALIDANCE_BASE_URL=$(VALIDANCE_BASE_URL) $(PY) -m validance_integration.register
 
 schemas:
 	$(PY) -m grading_rubric.models.codegen schemas/

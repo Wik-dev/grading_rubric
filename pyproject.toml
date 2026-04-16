@@ -39,7 +39,7 @@ grading-rubric-cli = "grading_rubric.cli.main:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["grading_rubric*"]
-exclude = ["tests*", "validance*", "frontend*"]
+exclude = ["tests*", "validance_integration*", "frontend*"]
 
 [tool.setuptools.package-data]
 "grading_rubric.gateway" = ["prompts/*.md"]
