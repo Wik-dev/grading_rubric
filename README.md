@@ -86,6 +86,7 @@ Installed automatically via `pip install .`:
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENAI_API_KEY="sk-proj-..."
 
 grading-rubric-cli run-pipeline \
     --exam-question project_materials/exam_question/ExamQuestionAndRubric.pdf \
