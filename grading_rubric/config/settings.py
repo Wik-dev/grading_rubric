@@ -36,7 +36,7 @@ class Settings(BaseModel):
     simulation_concurrency: int = 4
 
     # ── Shared LLM settings ──────────────────────────────────────────────
-    llm_call_timeout_seconds: int = 60
+    llm_call_timeout_seconds: int = 300
     llm_rate_limit_max_retries: int = 3
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
@@ -96,7 +96,7 @@ class Settings(BaseModel):
             ocr_backend=ocr_backend,  # type: ignore[arg-type]
             ocr_model=ocr_model,
             reasoning_model=reasoning_model,
-            llm_call_timeout_seconds=int(e.get("GR_LLM_TIMEOUT", "60")),
+            llm_call_timeout_seconds=int(e.get("GR_LLM_TIMEOUT", "300")),
             llm_rate_limit_max_retries=int(e.get("GR_LLM_RATE_LIMIT_RETRIES", "3")),
             anthropic_api_key=e.get("ANTHROPIC_API_KEY"),
             openai_api_key=e.get("OPENAI_API_KEY"),
