@@ -49,6 +49,7 @@ TASK_IMAGE = "grading-rubric:latest"
 LLM_ENV: dict[str, str] = {
     "GR_SIMULATION_BACKEND": "openai",
     "GR_SIMULATION_MODEL": "gpt-5.4",
+    "GR_LLM_TIMEOUT": "300",
 }
 LLM_SECRET_REFS = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]
 

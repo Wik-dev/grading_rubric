@@ -147,8 +147,11 @@ It does not restate the full user/system requirements or cover out-of-scope prod
 
 ## 5. Design Requirements
 
+Design Requirements describe *how* the system is built to satisfy the System Requirements. They use the same MoSCoW criticality scale and are organized into twelve groups by area.
+
 ### 5.1 Architecture and module decomposition (DR-ARC)
 
+Package layout, module boundaries, dependency direction, and the hermetic-task structure that lets each stage run standalone or via an orchestrator. A reviewer can verify the dependency claims by running `pydeps` or reading `__init__.py` files.
 
 | ID            | Criticality | Statement                                                                                                                                                                                                                                                                                              | Trace                                      |
 | ------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
@@ -168,6 +171,7 @@ It does not restate the full user/system requirements or cover out-of-scope prod
 
 ### 5.2 LLM usage (DR-LLM)
 
+The `gateway` sub-package is the only LLM SDK import seam. All calls go through `gateway.measure(...)` — prompts on disk, structured tool-use output, schema-validated responses, and one operation event per call. The gateway holds no business logic, no cache, and no domain shapes; stages own aggregation policy.
 
 | ID            | Criticality | Statement                                                                                                                                                                                                                                                                              | Trace                                             |
 | ------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
@@ -186,6 +190,7 @@ It does not restate the full user/system requirements or cover out-of-scope prod
 
 ### 5.3 Data models and persistence (DR-DAT)
 
+Realizes § 4 schemas in code: strict Pydantic v2 validation, schema versioning and codegen, uniform hashing rules. Persistence is strictly per-stage — each stage writes one declared `--output` file. The `AuditBundle` is not an L1 artefact but a view the L3 harvester constructs. No cross-session storage, no `runs/` layout.
 
 | ID             | Criticality | Statement                                                                                                                                                                                                                                                                     | Trace                                      |
 | -------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
@@ -285,6 +290,7 @@ Planner-backed improvement:
 
 ### 5.6 User interface (DR-UI)
 
+Thin DR layer locking the L4 SPA (Vite + React + shadcn/ui) against the rest of the design. Three screens — *Input*, *Running*, *Review* — with no SPA-side persistence. Backend is Validance REST API only; wire shapes come from L1 codegen (DR-DAT-03/04). Approval wired through Validance's `ApprovalGate`; all internal vocabulary funnelled through one mapping table before reaching the teacher.
 
 | ID           | Criticality | Statement                                                                                                                                                                                                                                                                                                                    | Trace                                                                                                      |
 | ------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
@@ -300,6 +306,7 @@ Planner-backed improvement:
 
 ### 5.7 Input parsing and OCR (DR-IO)
 
+How inputs (exam questions, teaching material, rubrics, student copies) are loaded and parsed into structured text. Covers file and inline-text forms, OCR for handwritten copies via a pluggable `StudentCopyReader`, role-aware no-text-PDF policy, and partial-failure handling. Two stages: `ingest` (role tagging, hashing, provenance) and `parse_inputs` (format detection, extraction, OCR delegation).
 
 | ID           | Criticality | Statement                                                                                                                                                                                                                                                                                                                            | Trace                                                                               |
 | ------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
@@ -315,6 +322,7 @@ Planner-backed improvement:
 
 ### 5.8 Observability (DR-OBS)
 
+The `audit` sub-package exposes an `AuditEmitter` that emits structured-JSON events to `stderr` — one per stage lifecycle or gateway operation. It is not the writer of any audit chain; the typed `AuditBundle` view is produced by the L3 harvester (DR-INT-05). This group locks the wire format, the closed event-kind set, and the privacy invariant on `raw_responses`.
 
 | ID            | Criticality | Statement                                                                                                                                                                                                                                                                                                                                                              | Trace                                                                   |
 | ------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -326,6 +334,7 @@ Planner-backed improvement:
 
 ### 5.9 Performance, caching, and concurrency (DR-PER)
 
+No application-level cache (§ 3 decision #8). This group specifies concurrency for multi-sample LLM calls and student-copy fan-out (`ThreadPoolExecutor`), back-pressure via a gateway semaphore, and timeout policy. Cross-stage scheduling and cancellation are not L1 concerns — owned by Validance on Path B, by the OS on Path A.
 
 | ID            | Criticality | Statement                                                                                                                                                                                                                                                           | Trace                                      |
 | ------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
@@ -341,6 +350,7 @@ Planner-backed improvement:
 
 ### 5.10 Scorer interface (DR-SCR)
 
+The `score` stage re-runs `run_grader_simulation()` against the improved rubric (reusing the response set from assess) and calls `scores_from_simulation()` to produce headline `CriterionScore` records. Both functions live in `grading_rubric.assess` and are shared with the assess stage.
 
 | ID            | Criticality | Statement                                                                                                                                                                                                                                 | Trace                                                                       |
 | ------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -350,6 +360,7 @@ Planner-backed improvement:
 
 ### 5.11 Deployment, packaging, orchestration (DR-DEP)
 
+Locks the four-layer artefact set (L1 package + CLI, L2 Docker images, L3 Validance integration, L4 SPA) and the `Makefile` target surface. L3 content is locked in § 5.12; this group locks packaging and orchestration concerns only.
 
 | ID            | Criticality | Statement                                                                                                                                                                                                                                                                                            | Trace                     |
 | ------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
@@ -366,6 +377,7 @@ Planner-backed improvement:
 
 ### 5.12 Validance integration (DR-INT)
 
+The sole place in § 5 where Validance vocabulary appears in normative form. Locks the L3 directory contract: workflow shape, `validance-sdk` import boundary, proposal-payload mapping for `ProposedChange`, harvester producing the typed `AuditBundle`, and `ApprovalGate` binding for human-in-the-loop.
 
 | ID            | Criticality | Statement                                                                                                                                                                                                                                                                                                                                           | Trace                                                        |
 | ------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |

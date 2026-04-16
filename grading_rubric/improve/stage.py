@@ -29,6 +29,7 @@ from grading_rubric.models.proposed_change import (
     ApplicationStatus,
     NodeKind,
     ProposedChange,
+    RemoveNodeChange,
     ReplaceFieldChange,
     TeacherDecision,
 )
@@ -40,7 +41,7 @@ from grading_rubric.models.rubric import (
     RubricLevel,
     RubricTarget,
 )
-from grading_rubric.models.types import CriterionId
+from grading_rubric.models.types import CriterionId, LevelId
 
 logger = logging.getLogger(__name__)
 
@@ -205,14 +206,48 @@ def _plan_drafts_llm(
 def _step1_conflict_resolution(
     drafts: list[ProposedChangeDraft],
 ) -> tuple[list[ProposedChangeDraft], set[int]]:
-    """DR-IM-07 step 1: REMOVE_NODE supersedes ancestors.
+    """DR-IM-07 step 1: REMOVE_NODE supersedes overlapping operations.
 
-    Returns (kept_drafts_with_indices, superseded_indices). For the offline
-    planner we never emit REMOVE_NODE drafts so there is nothing to supersede,
-    but the function is here for completeness and to make the contract real.
+    If a REMOVE_NODE targets criterion X, any REPLACE_FIELD or ADD_NODE that
+    targets X or a descendant of X is superseded (the node won't exist after
+    removal, so editing/extending it is meaningless).
+
+    Returns (all_drafts, superseded_indices).
     """
+    # Collect criterion paths targeted by REMOVE_NODE drafts.
+    remove_paths: list[tuple[str, ...]] = []
+    for draft in drafts:
+        if draft.operation == "REMOVE_NODE":
+            raw_path = draft.payload.get("criterion_path", [])
+            remove_paths.append(tuple(str(p) for p in raw_path))
 
-    return drafts, set()
+    if not remove_paths:
+        return drafts, set()
+
+    def _is_at_or_under(target_path: tuple[str, ...], remove_path: tuple[str, ...]) -> bool:
+        """True if target_path is the same as or a descendant of remove_path."""
+        return (
+            len(target_path) >= len(remove_path)
+            and target_path[: len(remove_path)] == remove_path
+        )
+
+    superseded: set[int] = set()
+    for idx, draft in enumerate(drafts):
+        if draft.operation == "REMOVE_NODE":
+            continue
+        # Extract the criterion path this draft targets.
+        target = draft.payload.get("target", {})
+        parent_path = draft.payload.get("parent_path")
+        crit_path = target.get("criterion_path") or parent_path
+        if not crit_path:
+            continue
+        crit_tuple = tuple(str(p) for p in crit_path)
+        for rp in remove_paths:
+            if _is_at_or_under(crit_tuple, rp):
+                superseded.add(idx)
+                break
+
+    return drafts, superseded
 
 
 def _step2_canonical_order(
@@ -390,6 +425,63 @@ def _add_node_to_rubric(
     return new_rubric, False
 
 
+def _remove_node_from_rubric(
+    rubric: Rubric, draft: ProposedChangeDraft
+) -> tuple[Rubric, RubricCriterion | RubricLevel | None, bool]:
+    """Apply a REMOVE_NODE draft to a fresh deepcopy.
+
+    Returns (new_rubric, removed_snapshot, applied).
+    """
+    new_rubric = deepcopy(rubric)
+    crit_path = [str(p) for p in draft.payload.get("criterion_path", [])]
+    node_kind = draft.payload.get("node_kind", "criterion")
+    level_id = draft.payload.get("level_id")
+
+    if not crit_path:
+        return new_rubric, None, False
+
+    if node_kind == "level":
+        # Remove a level from the criterion at crit_path.
+        target = _find_criterion(new_rubric.criteria, crit_path)
+        if target is None or not level_id:
+            return new_rubric, None, False
+        for i, lv in enumerate(target.levels):
+            if str(lv.id) == str(level_id):
+                removed = target.levels.pop(i)
+                return new_rubric, removed, True
+        return new_rubric, None, False
+
+    # Criterion removal: find parent, remove child.
+    target_id = crit_path[-1]
+    parent_path = crit_path[:-1]
+
+    if parent_path:
+        parent = _find_criterion(new_rubric.criteria, parent_path)
+        if parent is None:
+            return new_rubric, None, False
+        children = parent.sub_criteria
+    else:
+        # Root-level criterion.
+        parent = None
+        children = new_rubric.criteria
+
+    for i, c in enumerate(children):
+        if str(c.id) == target_id:
+            removed = children.pop(i)
+            # Recalculate parent points (additive invariant).
+            if parent is not None and parent.additive and children:
+                parent.points = sum(ch.points or 0.0 for ch in children)
+            elif parent is not None and parent.additive and not children:
+                parent.points = 0.0
+            # Recalculate rubric total_points.
+            new_rubric.total_points = sum(
+                rc.points or 0.0 for rc in new_rubric.criteria
+            )
+            return new_rubric, removed, True
+
+    return new_rubric, None, False
+
+
 def _step3_apply_and_wrap(
     starting_rubric: Rubric,
     drafts: list[ProposedChangeDraft],
@@ -401,6 +493,7 @@ def _step3_apply_and_wrap(
     finals: list[ProposedChange] = []
     for idx, draft in enumerate(drafts):
         applied = False
+        removed_snapshot: RubricCriterion | RubricLevel | None = None
         if idx not in superseded:
             if draft.operation == "REPLACE_FIELD":
                 new_rubric, applied = _replace_field_in_rubric(current, draft)
@@ -408,6 +501,12 @@ def _step3_apply_and_wrap(
                     current = new_rubric
             elif draft.operation == "ADD_NODE":
                 new_rubric, applied = _add_node_to_rubric(current, draft)
+                if applied:
+                    current = new_rubric
+            elif draft.operation == "REMOVE_NODE":
+                new_rubric, removed_snapshot, applied = _remove_node_from_rubric(
+                    current, draft
+                )
                 if applied:
                     current = new_rubric
 
@@ -472,6 +571,47 @@ def _step3_apply_and_wrap(
                     insert_index=draft.payload.get("insert_index", 0),
                     node_kind=nk,
                     node=typed_node,
+                )
+            )
+        elif draft.operation == "REMOVE_NODE":
+            crit_path_raw = draft.payload.get("criterion_path", [])
+            try:
+                crit_ids = [CriterionId(str(p)) for p in crit_path_raw]
+            except Exception:  # noqa: BLE001
+                continue
+            node_kind_str = draft.payload.get("node_kind", "criterion")
+            try:
+                nk = NodeKind(node_kind_str)
+            except ValueError:
+                nk = NodeKind.CRITERION
+            level_id_raw = draft.payload.get("level_id")
+            level_id = LevelId(str(level_id_raw)) if level_id_raw else None
+            # Build the snapshot from the pre-apply rubric walk.
+            if applied and removed_snapshot is not None:
+                snapshot = removed_snapshot
+            else:
+                # Not applied — snapshot from the starting rubric for the record.
+                snap_crit = _find_criterion(starting_rubric.criteria, crit_path_raw)
+                if snap_crit is not None:
+                    snapshot = deepcopy(snap_crit)
+                else:
+                    continue
+            finals.append(
+                RemoveNodeChange(
+                    id=change_id,
+                    primary_criterion=draft.primary_criterion,
+                    source_findings=draft.source_findings,
+                    rationale=draft.rationale,
+                    confidence=draft.confidence,
+                    application_status=(
+                        ApplicationStatus.APPLIED if applied else ApplicationStatus.NOT_APPLIED
+                    ),
+                    teacher_decision=TeacherDecision.PENDING,
+                    source_operations=[],
+                    criterion_path=crit_ids,
+                    level_id=level_id,
+                    node_kind=nk,
+                    removed_snapshot=snapshot,
                 )
             )
     return current, finals

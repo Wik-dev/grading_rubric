@@ -146,8 +146,8 @@ export async function uploadFile(
  * We map `overall` to the `status` field the SPA expects.
  */
 export async function getHealth(): Promise<{ status: string }> {
-  const data = await jsonFetch<{ overall: string }>("/api/health");
-  return { status: data.overall ?? "unknown" };
+  const data = await jsonFetch<{ status?: string; overall?: string }>("/api/health");
+  return { status: data.status ?? data.overall ?? "unknown" };
 }
 
 /**

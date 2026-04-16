@@ -180,7 +180,7 @@ class AnthropicBackend:
 
                 resp = client.messages.create(
                     model=model,
-                    max_tokens=4096,
+                    max_tokens=16384,
                     temperature=temperature,
                     system=system or "",
                     messages=[{"role": "user", "content": content}],

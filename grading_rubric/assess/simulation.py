@@ -116,17 +116,17 @@ _GRADER_PERSONAS = [
 
 
 _PAIR_TIER_SCORES = {
-    "very_poor": 0.10,
-    "poor": 0.15,
-    "very_weak": 0.10,
-    "weak": 0.25,
-    "below_average": 0.40,
-    "average": 0.55,
-    "above_average": 0.70,
-    "good": 0.80,
-    "strong": 0.85,
-    "very_strong": 0.90,
-    "excellent": 0.95,
+    "very_poor": 0.02,
+    "poor": 0.05,
+    "very_weak": 0.02,
+    "weak": 0.05,
+    "below_average": 0.10,
+    "average": 0.25,
+    "above_average": 0.40,
+    "good": 0.55,
+    "strong": 0.55,
+    "very_strong": 0.65,
+    "excellent": 0.70,
 }
 
 
