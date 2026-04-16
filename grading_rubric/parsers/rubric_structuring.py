@@ -121,7 +121,7 @@ class GatewayRubricStructurer:
             ),
             output_schema=DecomposedRubric,
             samples=1,
-            model=settings.llm_model_rubric_decomposition,
+            model=settings.reasoning_model,
             settings=settings,
             audit_emitter=audit_emitter,
             stage_id=STAGE_ID,

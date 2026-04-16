@@ -29,7 +29,7 @@ from tests.conftest import CRIT_A_ID, CRIT_B_ID, RUBRIC_ID
 
 
 def _settings() -> Settings:
-    return Settings(llm_backend="stub", llm_model_pinned="stub-test-model")
+    return Settings(ocr_backend="stub", ocr_model="stub-test-model")
 
 
 def _sim(minimal_rubric) -> SimulationEvidence:
@@ -405,11 +405,11 @@ def test_pairwise_sampling_is_stratified_not_response_zero_prefix() -> None:
 
 def test_run_grader_simulation_with_injected_gateway(minimal_rubric) -> None:
     settings = Settings(
-        llm_backend="stub",
-        llm_model_pinned="stub-test-model",
-        assess_target_response_count=1,
-        assess_panel_size=1,
-        assess_pairwise_sample_size=0,
+        ocr_backend="stub",
+        ocr_model="stub-test-model",
+        simulation_target_responses=1,
+        simulation_panel_size=1,
+        simulation_pairwise_pairs=0,
     )
     gateway = Gateway(
         backend=StubBackend(

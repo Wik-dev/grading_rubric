@@ -111,7 +111,7 @@ def assess_stage(
             "synthetic_responses_used": any(
                 r.source == ResponseSource.SYNTHETIC for r in simulation.response_set
             )
-            or len(parsed.student_copies_text) < settings.assess_min_real_copies
+            or len(parsed.student_copies_text) < settings.simulation_min_real_copies
         }
     )
 

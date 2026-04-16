@@ -21,7 +21,7 @@ from tests.conftest import RUBRIC_ID
 
 
 def _stub_settings() -> Settings:
-    return Settings(llm_backend="stub", llm_model_pinned="stub-test-model")
+    return Settings(ocr_backend="stub", ocr_model="stub-test-model")
 
 
 def _evidence() -> EvidenceProfile:

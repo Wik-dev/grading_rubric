@@ -78,9 +78,9 @@ class Gateway:
         temperature = (
             temperature
             if temperature is not None
-            else 0.0 if samples == 1 else settings.llm_sampling_temperature
+            else 0.0 if samples == 1 else 0.7
         )
-        chosen_model = model or settings.llm_model_pinned
+        chosen_model = model or settings.ocr_model
 
         tool_schema = output_schema.model_json_schema()
         schema_hash = hash_text(canonical_json(tool_schema))

@@ -46,7 +46,7 @@ class TestAssessAndImproveWorkflow:
         assert "ANTHROPIC_API_KEY" in (assess.secret_refs or [])
         assert "OPENAI_API_KEY" in (assess.secret_refs or [])
         # Backend is not hardcoded — Settings.from_env() defaults apply
-        assert "GR_LLM_BACKEND" not in (assess.environment or {})
+        assert "GR_OCR_BACKEND" not in (assess.environment or {})
 
     def test_task_chain_dependencies(self) -> None:
         """Task dependencies form a linear chain."""

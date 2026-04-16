@@ -19,65 +19,68 @@ class Settings(BaseModel):
 
     model_config = ConfigDict(strict=True, frozen=True)
 
-    # ── LLM gateway ────────────────────────────────────────────────────────
-    llm_backend: Literal["anthropic", "openai", "stub"] = "anthropic"
-    llm_model_pinned: str = "claude-sonnet-4-20250514"
-    llm_sampling_temperature: float = 0.7
+    # ── OCR (parse stage) ────────────────────────────────────────────────
+    ocr_backend: Literal["anthropic", "openai", "stub"] = "anthropic"
+    ocr_model: str = "claude-sonnet-4-20250514"
+
+    # ── Reasoning (rubric decomposition + proposal generation) ───────────
+    reasoning_model: str | None = "claude-opus-4-6"
+
+    # ── Grader simulation (assess + score stages) ────────────────────────
+    simulation_backend: Literal["anthropic", "openai", "stub"] = "openai"
+    simulation_model: str = "gpt-5.4"
+    simulation_min_real_copies: int = 3
+    simulation_pairwise_pairs: int = 10
+    simulation_panel_size: int = 4
+    simulation_target_responses: int = 10
+    simulation_concurrency: int = 4
+
+    # ── Shared LLM settings ──────────────────────────────────────────────
     llm_call_timeout_seconds: int = 60
     llm_rate_limit_max_retries: int = 3
-    llm_model_rubric_decomposition: str | None = "claude-opus-4-6"
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
 
-    # ── Assess stage ───────────────────────────────────────────────────────
-    assess_llm_backend: Literal["anthropic", "openai", "stub"] = "openai"
-    assess_llm_model_pinned: str = "gpt-5.4"
-    assess_min_real_copies: int = 3
-    assess_pairwise_sample_size: int = 10
-    assess_panel_size: int = 4
-    assess_target_response_count: int = 10
-    assess_llm_concurrency: int = 4
-
-    # ── Propose / improve stage ────────────────────────────────────────────
+    # ── Propose / improve stage ──────────────────────────────────────────
     max_iterations: int = 3
 
-    # ── Pipeline ───────────────────────────────────────────────────────────
+    # ── Pipeline ─────────────────────────────────────────────────────────
     schema_version: str = "1.0.0"
     request_id: str | None = None  # opaque correlation id when present
 
-    # ── Output ─────────────────────────────────────────────────────────────
+    # ── Output ───────────────────────────────────────────────────────────
     deliverable_schema_version: str = Field(default="1.0.0")
 
     @property
     def llm_available(self) -> bool:
         """Whether an LLM backend is configured and usable."""
-        if self.llm_backend == "stub":
+        if self.ocr_backend == "stub":
             return False
-        if self.llm_backend == "anthropic" and not self.anthropic_api_key:
+        if self.ocr_backend == "anthropic" and not self.anthropic_api_key:
             return False
-        if self.llm_backend == "openai" and not self.openai_api_key:
+        if self.ocr_backend == "openai" and not self.openai_api_key:
             return False
         return True
 
     @model_validator(mode="after")
     def _check_pinned_model(self) -> "Settings":
-        if not self.llm_model_pinned:
-            raise ValueError("llm_model_pinned must be set")
-        if self.llm_backend == "anthropic" and not self.llm_model_pinned.startswith(
+        if not self.ocr_model:
+            raise ValueError("ocr_model must be set")
+        if self.ocr_backend == "anthropic" and not self.ocr_model.startswith(
             "claude-"
         ):
             raise ValueError(
                 f"anthropic backend requires a 'claude-*' model identifier, got "
-                f"{self.llm_model_pinned!r}"
+                f"{self.ocr_model!r}"
             )
         if (
-            self.assess_llm_backend == "anthropic"
-            and self.assess_llm_model_pinned
-            and not self.assess_llm_model_pinned.startswith("claude-")
+            self.simulation_backend == "anthropic"
+            and self.simulation_model
+            and not self.simulation_model.startswith("claude-")
         ):
             raise ValueError(
-                f"anthropic assess backend requires a 'claude-*' model identifier, got "
-                f"{self.assess_llm_model_pinned!r}"
+                f"anthropic simulation backend requires a 'claude-*' model identifier, got "
+                f"{self.simulation_model!r}"
             )
         return self
 
@@ -86,27 +89,26 @@ class Settings(BaseModel):
         """Build a `Settings` from a mapping (defaults to `os.environ`)."""
 
         e = env if env is not None else os.environ
-        llm_backend = e.get("GR_LLM_BACKEND", "anthropic")
-        llm_model = e.get("GR_LLM_MODEL", "claude-sonnet-4-20250514")
-        rubric_model = e.get("GR_LLM_MODEL_RUBRIC_DECOMPOSITION")
-        if rubric_model is None:
-            rubric_model = llm_model if llm_backend == "openai" else "claude-opus-4-6"
+        ocr_backend = e.get("GR_OCR_BACKEND", "anthropic")
+        ocr_model = e.get("GR_OCR_MODEL", "claude-sonnet-4-20250514")
+        reasoning_model = e.get("GR_REASONING_MODEL")
+        if reasoning_model is None:
+            reasoning_model = ocr_model if ocr_backend == "openai" else "claude-opus-4-6"
         return cls(
-            llm_backend=llm_backend,  # type: ignore[arg-type]
-            llm_model_pinned=llm_model,
-            llm_sampling_temperature=float(e.get("GR_LLM_TEMPERATURE", "0.7")),
+            ocr_backend=ocr_backend,  # type: ignore[arg-type]
+            ocr_model=ocr_model,
+            reasoning_model=reasoning_model,
             llm_call_timeout_seconds=int(e.get("GR_LLM_TIMEOUT", "60")),
             llm_rate_limit_max_retries=int(e.get("GR_LLM_RATE_LIMIT_RETRIES", "3")),
-            llm_model_rubric_decomposition=rubric_model,
             anthropic_api_key=e.get("ANTHROPIC_API_KEY"),
             openai_api_key=e.get("OPENAI_API_KEY"),
-            assess_llm_backend=e.get("GR_ASSESS_LLM_BACKEND", "openai"),  # type: ignore[arg-type]
-            assess_llm_model_pinned=e.get("GR_ASSESS_LLM_MODEL", "gpt-5.4"),
-            assess_min_real_copies=int(e.get("GR_ASSESS_MIN_REAL_COPIES", "3")),
-            assess_pairwise_sample_size=int(e.get("GR_ASSESS_PAIRWISE_SAMPLE_SIZE", "10")),
-            assess_panel_size=int(e.get("GR_ASSESS_PANEL_SIZE", "4")),
-            assess_target_response_count=int(e.get("GR_ASSESS_TARGET_RESPONSE_COUNT", "10")),
-            assess_llm_concurrency=int(e.get("GR_ASSESS_LLM_CONCURRENCY", "4")),
+            simulation_backend=e.get("GR_SIMULATION_BACKEND", "openai"),  # type: ignore[arg-type]
+            simulation_model=e.get("GR_SIMULATION_MODEL", "gpt-5.4"),
+            simulation_min_real_copies=int(e.get("GR_SIMULATION_MIN_REAL_COPIES", "3")),
+            simulation_pairwise_pairs=int(e.get("GR_SIMULATION_PAIRWISE_PAIRS", "10")),
+            simulation_panel_size=int(e.get("GR_SIMULATION_PANEL_SIZE", "4")),
+            simulation_target_responses=int(e.get("GR_SIMULATION_TARGET_RESPONSES", "10")),
+            simulation_concurrency=int(e.get("GR_SIMULATION_CONCURRENCY", "4")),
             max_iterations=int(e.get("GR_MAX_ITERATIONS", "3")),
             schema_version=e.get("GR_SCHEMA_VERSION", "1.0.0"),
             request_id=e.get("GR_REQUEST_ID"),

@@ -31,14 +31,14 @@ from tests.conftest import CRIT_A_ID, CRIT_B_ID, LEVEL_A1_ID, LEVEL_A2_ID, RUBRI
 
 def _stub_settings() -> Settings:
     return Settings(
-        llm_backend="anthropic",
-        llm_model_pinned="claude-sonnet-4-20250514",
+        ocr_backend="anthropic",
+        ocr_model="claude-sonnet-4-20250514",
         anthropic_api_key="sk-test-stage-chain-key",
-        assess_llm_backend="anthropic",
-        assess_llm_model_pinned="claude-sonnet-4-20250514",
-        assess_panel_size=4,
-        assess_target_response_count=6,
-        assess_pairwise_sample_size=3,
+        simulation_backend="anthropic",
+        simulation_model="claude-sonnet-4-20250514",
+        simulation_panel_size=4,
+        simulation_target_responses=6,
+        simulation_pairwise_pairs=3,
     )
 
 

@@ -177,7 +177,7 @@ def _plan_drafts_llm(
             simulation_summary=simulation_summary,
         ),
         output_schema=LlmPlannerOutput,
-        model=settings.llm_model_rubric_decomposition,
+        model=settings.reasoning_model,
         samples=1,
         settings=settings,
         audit_emitter=audit_emitter,

@@ -60,8 +60,8 @@ CHANGE_3_ID = UUID("dddddddd-0000-0000-0000-000000000003")
 def stub_settings() -> Settings:
     """DR-ARC-09 — minimal valid Settings for tests (no real API keys)."""
     return Settings(
-        llm_backend="stub",
-        llm_model_pinned="stub-test-model",
+        ocr_backend="stub",
+        ocr_model="stub-test-model",
     )
 
 

@@ -326,28 +326,28 @@ def _confidence_floor(evidence: EvidenceProfile, base: float) -> ConfidenceIndic
 
 
 def _require_llm(settings: Settings) -> None:
-    if settings.llm_backend == "stub":
+    if settings.ocr_backend == "stub":
         raise RuntimeError(
-            "grader simulation requires a real LLM backend; set GR_LLM_BACKEND=anthropic "
+            "grader simulation requires a real LLM backend; set GR_OCR_BACKEND=anthropic "
             "and ANTHROPIC_API_KEY, or inject a Gateway in tests"
         )
-    if settings.llm_backend == "anthropic" and not settings.anthropic_api_key:
+    if settings.ocr_backend == "anthropic" and not settings.anthropic_api_key:
         raise RuntimeError("grader simulation requires ANTHROPIC_API_KEY")
-    if settings.llm_backend == "openai" and not settings.openai_api_key:
+    if settings.ocr_backend == "openai" and not settings.openai_api_key:
         raise RuntimeError("grader simulation requires OPENAI_API_KEY")
 
 
 def _simulation_settings(settings: Settings) -> Settings:
     # When the main backend is stub, honour it — no real LLM calls.
-    if settings.llm_backend == "stub":
+    if settings.ocr_backend == "stub":
         return settings
-    backend = settings.assess_llm_backend
-    model = settings.assess_llm_model_pinned
+    backend = settings.simulation_backend
+    model = settings.simulation_model
     updates: dict[str, str] = {}
     if backend is not None:
-        updates["llm_backend"] = backend
+        updates["ocr_backend"] = backend
     if model:
-        updates["llm_model_pinned"] = model
+        updates["ocr_model"] = model
     if not updates:
         return settings
     return settings.model_copy(update=updates)
@@ -397,7 +397,7 @@ def run_grader_simulation(
         ]
 
     source_operations: list[OperationId] = []
-    target_count = max(settings.assess_target_response_count, len(responses))
+    target_count = max(settings.simulation_target_responses, len(responses))
     needed = target_count - len(responses)
     if response_set is None and needed > 0 and exam_question_text.strip():
         synth = gateway.measure(
@@ -427,8 +427,8 @@ def run_grader_simulation(
                     )
                 )
 
-    personas = _GRADER_PERSONAS[: max(1, settings.assess_panel_size)]
-    llm_concurrency = max(1, settings.assess_llm_concurrency)
+    personas = _GRADER_PERSONAS[: max(1, settings.simulation_panel_size)]
+    llm_concurrency = max(1, settings.simulation_concurrency)
 
     def call_gateway() -> Gateway:
         return gateway if injected_gateway else Gateway()
@@ -505,7 +505,7 @@ def run_grader_simulation(
 
     pairwise_results: list[PairwiseComparisonEntry] = []
     if len(responses) >= 2:
-        pairs = _stratified_pair_indices(responses, settings.assess_pairwise_sample_size)
+        pairs = _stratified_pair_indices(responses, settings.simulation_pairwise_pairs)
 
         def compare_one(
             pair_idx: int,

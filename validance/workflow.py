@@ -39,16 +39,16 @@ from validance import Task, Workflow
 TASK_IMAGE = "grading-rubric:latest"
 
 # Model split:
-#   Claude Sonnet 4 → OCR, planner (structured extraction at T=0.0)
-#   Claude Opus 4.6 → rubric decomposition (hardest parsing task)
-#   GPT-5.4 → grading simulation only (via GR_ASSESS_LLM_* override)
+#   Claude Sonnet 4 → OCR (structured extraction at T=0.0)
+#   Claude Opus 4.6 → rubric decomposition + proposal generation
+#   GPT-5.4 → grading simulation only (via GR_SIMULATION_* override)
 #
 # Main defaults (anthropic + claude-sonnet-4-20250514 + claude-opus-4-6)
-# come from Settings.from_env() with no override needed. The assess stage
-# uses a separate backend/model so the measurement work runs on GPT-5.4.
+# come from Settings.from_env() with no override needed. The simulation
+# backend/model defaults to openai/gpt-5.4 via Settings.
 LLM_ENV: dict[str, str] = {
-    "GR_ASSESS_LLM_BACKEND": "openai",
-    "GR_ASSESS_LLM_MODEL": "gpt-5.4",
+    "GR_SIMULATION_BACKEND": "openai",
+    "GR_SIMULATION_MODEL": "gpt-5.4",
 }
 LLM_SECRET_REFS = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]
 

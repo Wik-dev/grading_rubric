@@ -163,14 +163,14 @@ class SmartStubBackend:
 
 def _llm_settings(panel_size: int = 4) -> Settings:
     return Settings(
-        llm_backend="anthropic",
-        llm_model_pinned="claude-sonnet-4-20250514",
+        ocr_backend="anthropic",
+        ocr_model="claude-sonnet-4-20250514",
         anthropic_api_key="sk-test-e2e-key",
-        assess_llm_backend="anthropic",
-        assess_llm_model_pinned="claude-sonnet-4-20250514",
-        assess_panel_size=panel_size,
-        assess_target_response_count=6,
-        assess_pairwise_sample_size=3,
+        simulation_backend="anthropic",
+        simulation_model="claude-sonnet-4-20250514",
+        simulation_panel_size=panel_size,
+        simulation_target_responses=6,
+        simulation_pairwise_pairs=3,
     )
 
 
@@ -306,7 +306,7 @@ class TestSharedGraderSimulationE2E:
                     student_copy_paths=_write_student_copies(tmp_path),
                 ),
                 output_path=tmp_path / "output.json",
-                settings=Settings(llm_backend="stub", llm_model_pinned="stub-test-model"),
+                settings=Settings(ocr_backend="stub", ocr_model="stub-test-model"),
                 audit_emitter=NullEmitter(),
             )
 

@@ -213,15 +213,15 @@ All settings are via environment variables (defaults are sensible):
 |----------|---------|-------------|
 | `ANTHROPIC_API_KEY` | — | Anthropic API key (**required**) |
 | `OPENAI_API_KEY` | — | OpenAI API key (**required** — grader simulation uses GPT-5.4 by default) |
-| `GR_LLM_BACKEND` | `anthropic` | LLM backend (`anthropic`, `openai`, `stub`) |
-| `GR_LLM_MODEL` | `claude-sonnet-4-20250514` | Model for grading, synthesis, planning |
-| `GR_LLM_MODEL_RUBRIC_DECOMPOSITION` | `claude-opus-4-6` | Model for rubric parsing (one-time) |
-| `GR_LLM_TEMPERATURE` | `0.7` | Default sampling temperature (gateway overrides to 0.0 when samples=1; simulation uses explicit per-call temperatures: 0.3 grading, 0.2 pairwise, 0.4 synthesis) |
-| `GR_ASSESS_LLM_BACKEND` | `openai` | Backend for grader simulation (assess + score stages) |
-| `GR_ASSESS_LLM_MODEL` | `gpt-5.4` | Model for grader simulation |
-| `GR_ASSESS_PANEL_SIZE` | `4` | Number of grader personas per response |
-| `GR_ASSESS_TARGET_RESPONSE_COUNT` | `10` | Total responses (real + synthetic) |
-| `GR_ASSESS_PAIRWISE_SAMPLE_SIZE` | `10` | Max pairwise comparisons per simulation |
+| `GR_OCR_BACKEND` | `anthropic` | OCR / text extraction backend (`anthropic`, `openai`, `stub`) |
+| `GR_OCR_MODEL` | `claude-sonnet-4-20250514` | Model for OCR and text extraction (parse stage) |
+| `GR_REASONING_MODEL` | `claude-opus-4-6` | Model for rubric decomposition + proposal generation |
+| `GR_SIMULATION_BACKEND` | `openai` | Backend for grader simulation (assess + score stages) |
+| `GR_SIMULATION_MODEL` | `gpt-5.4` | Model for grader simulation |
+| `GR_SIMULATION_PANEL_SIZE` | `4` | Number of grader personas per response |
+| `GR_SIMULATION_TARGET_RESPONSES` | `10` | Total responses (real + synthetic) |
+| `GR_SIMULATION_PAIRWISE_PAIRS` | `10` | Max pairwise comparisons per simulation |
+| `GR_SIMULATION_CONCURRENCY` | `4` | Max concurrent grading LLM calls |
 
 ## Tests
 

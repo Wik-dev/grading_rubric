@@ -121,7 +121,7 @@ class AnthropicBackend:
             except ImportError as e:
                 raise RuntimeError(
                     "anthropic SDK not installed; install `anthropic` or use a "
-                    "different backend (set Settings.llm_backend)."
+                    "different backend (set Settings.ocr_backend)."
                 ) from e
             if not self._api_key:
                 raise RuntimeError("ANTHROPIC_API_KEY is not set")
@@ -238,7 +238,7 @@ class OpenAIBackend:
             except ImportError as e:
                 raise RuntimeError(
                     "openai SDK not installed; install `openai` or use a "
-                    "different backend (set Settings.llm_backend)."
+                    "different backend (set Settings.ocr_backend)."
                 ) from e
             if not self._api_key:
                 raise RuntimeError("OPENAI_API_KEY is not set")
@@ -352,12 +352,12 @@ class OpenAIBackend:
 
 
 def make_backend(settings: Settings) -> LlmBackend:
-    """Build the backend selected by `Settings.llm_backend`."""
+    """Build the backend selected by `Settings.ocr_backend`."""
 
-    if settings.llm_backend == "stub":
+    if settings.ocr_backend == "stub":
         return StubBackend()
-    if settings.llm_backend == "anthropic":
+    if settings.ocr_backend == "anthropic":
         return AnthropicBackend(api_key=settings.anthropic_api_key)
-    if settings.llm_backend == "openai":
+    if settings.ocr_backend == "openai":
         return OpenAIBackend(api_key=settings.openai_api_key)
-    raise ValueError(f"unknown llm_backend {settings.llm_backend!r}")
+    raise ValueError(f"unknown ocr_backend {settings.ocr_backend!r}")
