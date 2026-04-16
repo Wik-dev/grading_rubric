@@ -13,13 +13,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-import tempfile
 from datetime import datetime
 from pathlib import Path
 from uuid import UUID
 
 from grading_rubric.audit.hashing import (
-    canonical,
     canonical_json,
     hash_file,
     hash_object,
@@ -59,7 +57,7 @@ class TestHashText:
     """DR-DAT-06 case (b): SHA-256 of UTF-8 encoding."""
 
     def test_known_content(self) -> None:
-        expected = hashlib.sha256("hello".encode("utf-8")).hexdigest()
+        expected = hashlib.sha256(b"hello").hexdigest()
         assert hash_text("hello") == expected
 
     def test_unicode(self) -> None:

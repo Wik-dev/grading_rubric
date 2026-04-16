@@ -14,7 +14,6 @@ from grading_rubric.models.findings import (
     Severity,
 )
 from grading_rubric.models.rubric import RubricFieldName, RubricTarget
-
 from tests.conftest import CRIT_A_ID, FINDING_1_ID, RUBRIC_ID
 
 

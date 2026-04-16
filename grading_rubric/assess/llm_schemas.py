@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # ── Output schemas (what the LLM returns) ────────────────────────────────
 
 

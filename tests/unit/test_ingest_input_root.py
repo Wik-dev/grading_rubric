@@ -14,7 +14,6 @@ from click.testing import CliRunner
 from grading_rubric.cli.main import _build_inputs_from_root, main
 from grading_rubric.parsers.models import IngestInputs
 
-
 # ── Fixtures ───────────────────────────────────────────────────────────────
 
 

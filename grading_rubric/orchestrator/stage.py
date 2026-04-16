@@ -21,19 +21,19 @@ from pydantic import BaseModel
 from grading_rubric.audit.emitter import AuditEmitter
 from grading_rubric.config.settings import Settings
 
-I = TypeVar("I", bound=BaseModel, contravariant=True)
-O = TypeVar("O", bound=BaseModel, covariant=True)
+In = TypeVar("In", bound=BaseModel, contravariant=True)
+Out = TypeVar("Out", bound=BaseModel, covariant=True)
 
 
-class Stage(Protocol, Generic[I, O]):
+class Stage(Protocol, Generic[In, Out]):
     """The shape every stage callable conforms to."""
 
     stage_id: str
 
     def __call__(
         self,
-        stage_inputs: I,
+        stage_inputs: In,
         *,
         settings: Settings,
         audit_emitter: AuditEmitter,
-    ) -> O: ...
+    ) -> Out: ...

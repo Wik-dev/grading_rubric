@@ -19,8 +19,8 @@ from grading_rubric.assess.llm_schemas import (
     GradingResult,
     PairwiseInputs,
     PairwiseVerdict,
-    SynthesizeInputs,
     SynthesizedResponseSet,
+    SynthesizeInputs,
 )
 from grading_rubric.audit.emitter import AuditEmitter
 from grading_rubric.config.settings import Settings

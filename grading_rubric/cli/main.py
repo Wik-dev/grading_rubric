@@ -42,7 +42,6 @@ from grading_rubric.parsers.parse_stage import parse_inputs_stage
 from grading_rubric.scorer.models import ScoreOutputs
 from grading_rubric.scorer.score_stage import score_stage
 
-
 # ── Helpers ──────────────────────────────────────────────────────────────
 
 
@@ -65,7 +64,7 @@ def _read_model(path: Path, model_cls: type[_M]) -> _M:
     except Exception as exc:  # noqa: BLE001
         raise click.ClickException(
             f"failed to parse {model_cls.__name__} from {path}: {exc}"
-        )
+        ) from exc
 
 
 def _write_json(path: Path, model: BaseModel) -> None:

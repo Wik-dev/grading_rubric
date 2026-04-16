@@ -17,8 +17,6 @@ from grading_rubric.models.rubric import EvidenceProfile, Rubric, RubricCriterio
 from grading_rubric.parsers.models import IngestInputs, IngestOutputs, ParsedInputs
 from grading_rubric.parsers.parse_stage import parse_inputs_stage
 
-from tests.conftest import RUBRIC_ID
-
 
 def _stub_settings() -> Settings:
     return Settings(ocr_backend="stub", ocr_model="stub-test-model")

@@ -58,12 +58,10 @@ class Settings(BaseModel):
             return False
         if self.ocr_backend == "anthropic" and not self.anthropic_api_key:
             return False
-        if self.ocr_backend == "openai" and not self.openai_api_key:
-            return False
-        return True
+        return not (self.ocr_backend == "openai" and not self.openai_api_key)
 
     @model_validator(mode="after")
-    def _check_pinned_model(self) -> "Settings":
+    def _check_pinned_model(self) -> Settings:
         if not self.ocr_model:
             raise ValueError("ocr_model must be set")
         if self.ocr_backend == "anthropic" and not self.ocr_model.startswith(
@@ -85,7 +83,7 @@ class Settings(BaseModel):
         return self
 
     @classmethod
-    def from_env(cls, env: dict[str, str] | None = None) -> "Settings":
+    def from_env(cls, env: dict[str, str] | None = None) -> Settings:
         """Build a `Settings` from a mapping (defaults to `os.environ`)."""
 
         e = env if env is not None else os.environ

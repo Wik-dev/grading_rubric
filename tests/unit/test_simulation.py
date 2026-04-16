@@ -24,7 +24,6 @@ from grading_rubric.config.settings import Settings
 from grading_rubric.gateway.backends import StubBackend
 from grading_rubric.gateway.gateway import Gateway
 from grading_rubric.models.findings import QualityCriterion, QualityMethod
-
 from tests.conftest import CRIT_A_ID, CRIT_B_ID, RUBRIC_ID
 
 

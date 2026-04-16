@@ -10,9 +10,9 @@ from grading_rubric.config.settings import Settings
 from grading_rubric.gateway.gateway import Gateway
 from grading_rubric.models.rubric import Rubric, RubricCriterion
 from grading_rubric.parsers.llm_schemas import (
-    DecomposeRubricInput,
     DecomposedCriterion,
     DecomposedRubric,
+    DecomposeRubricInput,
 )
 
 STAGE_ID = "parse-inputs"

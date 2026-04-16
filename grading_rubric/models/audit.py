@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -132,15 +132,7 @@ class DeterministicDetails(BaseModel):
 
 
 OperationDetails = Annotated[
-    Union[
-        LlmCallDetails,
-        OcrCallDetails,
-        MlInferenceDetails,
-        ToolCallDetails,
-        HumanDecisionDetails,
-        AgentStepDetails,
-        DeterministicDetails,
-    ],
+    LlmCallDetails | OcrCallDetails | MlInferenceDetails | ToolCallDetails | HumanDecisionDetails | AgentStepDetails | DeterministicDetails,
     Field(discriminator="kind"),
 ]
 
@@ -197,7 +189,7 @@ class IterationSnapshot(BaseModel):
     iteration: int
     rubric_id: RubricId
     rubric_snapshot: Rubric
-    quality_scores: list["CriterionScore"]  # noqa: F821 — forward to deliverable
+    quality_scores: list[CriterionScore]  # noqa: F821 — forward to deliverable
     finding_ids: list[FindingId]
     applied_change_ids: list[ChangeId] = []
     measured_at: datetime

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -75,7 +75,7 @@ class AddNodeChange(_ProposedChangeBase):
     parent_path: list[CriterionId]
     insert_index: int
     node_kind: NodeKind
-    node: Union[RubricCriterion, RubricLevel]
+    node: RubricCriterion | RubricLevel
 
 
 class RemoveNodeChange(_ProposedChangeBase):
@@ -83,7 +83,7 @@ class RemoveNodeChange(_ProposedChangeBase):
     criterion_path: list[CriterionId]
     level_id: LevelId | None = None
     node_kind: NodeKind
-    removed_snapshot: Union[RubricCriterion, RubricLevel]
+    removed_snapshot: RubricCriterion | RubricLevel
 
 
 class ReorderNodesChange(_ProposedChangeBase):
@@ -95,12 +95,6 @@ class ReorderNodesChange(_ProposedChangeBase):
 
 
 ProposedChange = Annotated[
-    Union[
-        ReplaceFieldChange,
-        UpdatePointsChange,
-        AddNodeChange,
-        RemoveNodeChange,
-        ReorderNodesChange,
-    ],
+    ReplaceFieldChange | UpdatePointsChange | AddNodeChange | RemoveNodeChange | ReorderNodesChange,
     Field(discriminator="operation"),
 ]

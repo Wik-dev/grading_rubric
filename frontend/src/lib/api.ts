@@ -24,7 +24,7 @@ const BASE_URL =
   (import.meta.env.VITE_VALIDANCE_BASE_URL as string | undefined)?.replace(
     /\/$/,
     "",
-  ) || "http://localhost:8001";
+  ) || "https://api.validance.io";
 
 const WORKFLOW_NAME = "grading_rubric.assess_and_improve";
 

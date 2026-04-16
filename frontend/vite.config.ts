@@ -4,7 +4,7 @@ import path from "node:path";
 
 // DR-UI-01: Vite is the build tool. The SPA targets `dist/` and is served
 // by any static host; in dev it talks to the Validance REST API specified
-// by `VITE_VALIDANCE_BASE_URL` (defaults to http://localhost:8001).
+// by `VITE_VALIDANCE_BASE_URL` (defaults to https://api.validance.io).
 export default defineConfig({
   plugins: [react()],
   resolve: {

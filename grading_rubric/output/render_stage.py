@@ -10,6 +10,7 @@ post-application per DR-IM-08.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 from datetime import UTC, datetime
@@ -110,10 +111,8 @@ def _atomic_write_json(path: Path, payload: dict) -> None:
     with open(tmp, "w", encoding="utf-8") as fh:
         fh.write(text)
         fh.flush()
-        try:
+        with contextlib.suppress(OSError):
             os.fsync(fh.fileno())
-        except OSError:
-            pass
     os.replace(tmp, path)
 
 
@@ -129,7 +128,6 @@ def render_stage(
     audit_emitter.stage_start(STAGE_ID)
 
     proposed = inputs.proposed
-    parsed = proposed.assessed.parsed
 
     explanation = _build_explanation(inputs)
 

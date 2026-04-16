@@ -11,20 +11,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from unittest.mock import patch
-from uuid import UUID
 
 import pytest
 
 from grading_rubric.audit.emitter import NullEmitter
 from grading_rubric.config.settings import Settings
 from grading_rubric.models.deliverable import ExplainedRubricFile
-from grading_rubric.models.findings import QualityCriterion, QualityMethod, Severity
+from grading_rubric.models.findings import QualityCriterion, Severity
 from grading_rubric.models.proposed_change import ApplicationStatus, TeacherDecision
 from grading_rubric.orchestrator.pipeline import PipelineInputs, run_pipeline
-
-from tests.integration.test_llm_e2e import SmartStubBackend
 from tests.conftest import CRIT_A_ID, CRIT_B_ID, LEVEL_A1_ID, LEVEL_A2_ID, RUBRIC_ID
-
+from tests.integration.test_llm_e2e import SmartStubBackend
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -185,7 +182,7 @@ class TestModifyExisting:
         rubric = _write_rubric_json(tmp_path)
         out = tmp_path / "output.json"
 
-        result = run_pipeline(
+        run_pipeline(
             pipeline_inputs=PipelineInputs(
                 exam_question_path=exam,
                 starting_rubric_path=rubric,
@@ -256,7 +253,7 @@ class TestGenerateFromScratch:
         exam = _write_exam(tmp_path)
         out = tmp_path / "output.json"
 
-        result = run_pipeline(
+        run_pipeline(
             pipeline_inputs=PipelineInputs(exam_question_path=exam),
             output_path=out,
             settings=_stub_settings(),
@@ -294,7 +291,7 @@ class TestEmptyImprovement:
         copies = _write_student_copies(tmp_path)
         out = tmp_path / "output.json"
 
-        result = run_pipeline(
+        run_pipeline(
             pipeline_inputs=PipelineInputs(
                 exam_question_path=exam,
                 starting_rubric_path=rubric,
@@ -336,7 +333,7 @@ class TestPartialEvidence:
         rubric = _write_rubric_json(tmp_path)
         out = tmp_path / "output.json"
 
-        result = run_pipeline(
+        run_pipeline(
             pipeline_inputs=PipelineInputs(
                 exam_question_path=exam,
                 starting_rubric_path=rubric,
@@ -375,7 +372,7 @@ class TestTeachingMaterialGrounding:
         teaching = _write_teaching_material(tmp_path)
         out = tmp_path / "output.json"
 
-        result = run_pipeline(
+        run_pipeline(
             pipeline_inputs=PipelineInputs(
                 exam_question_path=exam,
                 starting_rubric_path=rubric,
@@ -417,7 +414,7 @@ class TestPartialParsingFailure:
         # Pipeline should not crash — it processes what it can.
         # The corrupt file's text extraction will return empty/error text,
         # but the pipeline continues.
-        result = run_pipeline(
+        run_pipeline(
             pipeline_inputs=PipelineInputs(
                 exam_question_path=exam,
                 starting_rubric_path=rubric,
@@ -490,7 +487,7 @@ class TestSchemaValidation:
 
         # SR-OUT-04: raw JSON validates against the Pydantic model
         raw_text = out.read_text(encoding="utf-8")
-        erf = ExplainedRubricFile.model_validate_json(raw_text)
+        ExplainedRubricFile.model_validate_json(raw_text)
         raw_data = json.loads(raw_text)
 
         # Verify all documented top-level fields are present in the raw JSON

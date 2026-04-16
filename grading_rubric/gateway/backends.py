@@ -37,7 +37,7 @@ class MessageAttachment(BaseModel):
     media_type: str
 
     @classmethod
-    def from_path(cls, path: Path) -> "MessageAttachment":
+    def from_path(cls, path: Path) -> MessageAttachment:
         guessed = mimetypes.guess_type(path.name)[0]
         media_type = guessed or "application/octet-stream"
         if path.suffix.lower() == ".pdf":

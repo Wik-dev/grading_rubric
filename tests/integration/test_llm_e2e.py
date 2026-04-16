@@ -18,7 +18,6 @@ from grading_rubric.models.deliverable import ExplainedRubricFile
 from grading_rubric.models.findings import QualityCriterion, QualityMethod
 from grading_rubric.models.proposed_change import ApplicationStatus
 from grading_rubric.orchestrator.pipeline import PipelineInputs, run_pipeline
-
 from tests.conftest import CRIT_A_ID, CRIT_B_ID, LEVEL_A1_ID, LEVEL_A2_ID, RUBRIC_ID
 
 

@@ -10,6 +10,7 @@ parses the same stream and folds the events into the typed `AuditBundle` view.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sys
 import threading
@@ -99,10 +100,8 @@ class JsonLineEmitter:
             self.events.append(event)
             line = json.dumps(canonical(event.model_dump()), ensure_ascii=False)
             self._sink.write(line + "\n")
-            try:
+            with contextlib.suppress(AttributeError, ValueError):
                 self._sink.flush()
-            except (AttributeError, ValueError):
-                pass
 
 
 class NullEmitter:

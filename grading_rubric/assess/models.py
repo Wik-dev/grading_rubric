@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from grading_rubric.assess.simulation import SimulationEvidence
 from grading_rubric.models.deliverable import CriterionScore
 from grading_rubric.models.findings import AssessmentFinding
 from grading_rubric.models.rubric import EvidenceProfile, Rubric
 from grading_rubric.parsers.models import ParsedInputs
-from grading_rubric.assess.simulation import SimulationEvidence
 
 
 class AssessInputs(BaseModel):

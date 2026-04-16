@@ -53,7 +53,7 @@ class ConfidenceIndicator(BaseModel):
     rationale: str
 
     @model_validator(mode="after")
-    def _check_level(self) -> "ConfidenceIndicator":
+    def _check_level(self) -> ConfidenceIndicator:
         if not (0.0 <= self.score <= 1.0):
             raise ValueError(f"confidence score {self.score} not in [0, 1]")
         expected = _level_for_score(self.score)
@@ -65,7 +65,7 @@ class ConfidenceIndicator(BaseModel):
         return self
 
     @classmethod
-    def from_score(cls, score: float, rationale: str) -> "ConfidenceIndicator":
+    def from_score(cls, score: float, rationale: str) -> ConfidenceIndicator:
         """Convenience constructor that derives `level` from `score`."""
 
         return cls(score=score, level=_level_for_score(score), rationale=rationale)

@@ -57,7 +57,7 @@ class ExplainedRubricFile(BaseModel):
     evidence_profile: EvidenceProfile
 
     @model_validator(mode="after")
-    def _check_invariants(self) -> "ExplainedRubricFile":
+    def _check_invariants(self) -> ExplainedRubricFile:
         # quality_scores: exactly one entry per QualityCriterion.
         crits = {s.criterion for s in self.quality_scores}
         if crits != set(QualityCriterion):

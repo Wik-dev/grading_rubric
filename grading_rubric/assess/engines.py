@@ -670,7 +670,6 @@ def scores_from_simulation(
                 n_personas, n_responses,
             )
             if paired_deltas:
-                mean_delta = statistics.mean(paired_deltas)
                 # If paired evidence shows reduced disagreement (mean grades
                 # shift toward consensus), nudge α up proportionally.
                 # This cancels correlated persona/response noise.
@@ -706,10 +705,7 @@ def scores_from_simulation(
         }
         if len(means) >= 2:
             tier_sep = _tier_separation(means, sim)
-            if tier_sep is not None:
-                separation = tier_sep
-            else:
-                separation = max(means.values()) - min(means.values())
+            separation = tier_sep if tier_sep is not None else max(means.values()) - min(means.values())
         else:
             separation = 0.0
         calibration_score, ceiling_score, rank_score, ceiling_cap, _ = _synthetic_calibration(means, sim)
@@ -729,11 +725,7 @@ def scores_from_simulation(
             b_score = means[pair.response_b_idx]
             margin = 0.10
             winner = pair.winner.upper()
-            if winner == "A" and a_score > b_score + margin:
-                consistent += 1
-            elif winner == "B" and b_score > a_score + margin:
-                consistent += 1
-            elif winner in {"TIE", "EQUAL"} and abs(a_score - b_score) <= margin:
+            if winner == "A" and a_score > b_score + margin or winner == "B" and b_score > a_score + margin or winner in {"TIE", "EQUAL"} and abs(a_score - b_score) <= margin:
                 consistent += 1
         pairwise_consistency = consistent / total if total else 1.0
         if calibration_score is not None:

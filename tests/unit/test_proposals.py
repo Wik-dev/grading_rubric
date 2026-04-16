@@ -7,10 +7,6 @@ direction: approval resolution → TeacherDecision patching.
 
 from __future__ import annotations
 
-from uuid import uuid4
-
-import pytest
-
 from grading_rubric.models.findings import (
     ConfidenceIndicator,
     ConfidenceLevel,
@@ -23,7 +19,6 @@ from grading_rubric.models.proposed_change import (
     UpdatePointsChange,
 )
 from grading_rubric.models.rubric import RubricFieldName, RubricTarget
-
 from tests.conftest import CHANGE_1_ID, CHANGE_2_ID, CRIT_A_ID, FINDING_1_ID
 
 # Import L3 mapping module — the only place validance vocabulary appears.

@@ -1,9 +1,9 @@
-"""§ 3.4 System integration tests — Validance running (dev instance).
+"""§ 3.4 System integration tests — Validance running (production API).
 
-IT-SYS-01 through IT-SYS-08.  Exercises the grading_rubric workflow through
-the live Validance dev instance REST API.  Requires:
+IT-SYS-01 through IT-SYS-10.  Exercises the grading_rubric workflow through
+the Validance production REST API.  Requires:
 
-  - Validance dev API at http://localhost:8001  (healthy)
+  - Validance API at https://api.validance.io  (healthy)
   - ``grading_rubric.assess_and_improve`` workflow registered
   - ``grading-rubric:latest`` Docker image available locally
   - Test fixture files at ``/project/data/grading_rubric_fixtures/``
@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 
@@ -30,7 +31,7 @@ import requests
 
 # ── Configuration ──────────────────────────────────────────────────────────
 
-VALIDANCE_BASE = "http://localhost:8001"
+VALIDANCE_BASE = os.environ.get("VALIDANCE_BASE_URL", "https://api.validance.io")
 WORKFLOW_NAME = "grading_rubric.assess_and_improve"
 FIXTURES_DIR = Path("/home/Wik-dev/repos/validance-workflow/data/grading_rubric_fixtures")
 
@@ -42,10 +43,14 @@ POLL_INTERVAL = 2
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 
-def _is_validance_healthy() -> bool:
+def _is_validance_ready() -> bool:
+    """Check API is healthy AND the grading rubric workflow is registered."""
     try:
         r = requests.get(f"{VALIDANCE_BASE}/api/health", timeout=5)
-        return r.ok and r.json().get("status") == "healthy"
+        if not (r.ok and r.json().get("status") == "healthy"):
+            return False
+        w = requests.get(f"{VALIDANCE_BASE}/api/workflows/{WORKFLOW_NAME}", timeout=5)
+        return w.ok
     except Exception:
         return False
 
@@ -117,8 +122,8 @@ def _download_file(workflow_hash: str, task_name: str, file_name: str) -> dict:
 
 
 skip_if_no_validance = pytest.mark.skipif(
-    not _is_validance_healthy(),
-    reason="Validance dev instance not available at localhost:8001",
+    not _is_validance_ready(),
+    reason=f"Validance API not ready at {VALIDANCE_BASE} (unreachable or workflow not registered)",
 )
 
 pytestmark = [pytest.mark.system, skip_if_no_validance]

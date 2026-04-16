@@ -47,7 +47,7 @@ class Explanation(BaseModel):
     cross_cutting: list[CrossCuttingGroup] = []
 
     @model_validator(mode="after")
-    def _check_invariants(self) -> "Explanation":
+    def _check_invariants(self) -> Explanation:
         # § 4.7 invariant: by_criterion has exactly one entry per QualityCriterion.
         expected = set(QualityCriterion)
         if set(self.by_criterion.keys()) != expected:

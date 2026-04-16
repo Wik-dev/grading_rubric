@@ -6,7 +6,7 @@ any network access, LLM, or Validance instance.
 
 from __future__ import annotations
 
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -14,22 +14,18 @@ from pydantic import ValidationError
 from grading_rubric.models.deliverable import CriterionScore, ExplainedRubricFile
 from grading_rubric.models.explanation import CriterionSection, Explanation
 from grading_rubric.models.findings import (
-    AssessmentFinding,
     ConfidenceIndicator,
     ConfidenceLevel,
-    Measurement,
     QualityCriterion,
     QualityMethod,
-    Severity,
 )
 from grading_rubric.models.proposed_change import (
     AddNodeChange,
     ApplicationStatus,
     NodeKind,
     RemoveNodeChange,
-    ReplaceFieldChange,
     ReorderNodesChange,
-    TeacherDecision,
+    ReplaceFieldChange,
     UpdatePointsChange,
 )
 from grading_rubric.models.rubric import (
@@ -40,7 +36,6 @@ from grading_rubric.models.rubric import (
     RubricLevel,
     RubricTarget,
 )
-
 from tests.conftest import (
     CHANGE_1_ID,
     CRIT_A_ID,
@@ -50,7 +45,6 @@ from tests.conftest import (
     LEVEL_A2_ID,
     RUBRIC_ID,
 )
-
 
 # ── § 4.5 ConfidenceIndicator thresholds ─────────────────────────────────
 

@@ -6,7 +6,7 @@ reviewer can follow the V-shape traceability chain.
 
 from __future__ import annotations
 
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
 
@@ -21,14 +21,8 @@ from grading_rubric.models.findings import (
     Severity,
 )
 from grading_rubric.models.proposed_change import (
-    AddNodeChange,
     ApplicationStatus,
-    NodeKind,
-    RemoveNodeChange,
     ReplaceFieldChange,
-    ReorderNodesChange,
-    TeacherDecision,
-    UpdatePointsChange,
 )
 from grading_rubric.models.rubric import (
     EvidenceProfile,
@@ -38,7 +32,6 @@ from grading_rubric.models.rubric import (
     RubricLevel,
     RubricTarget,
 )
-
 
 # ── Deterministic UUIDs for test stability ────────────────────────────────
 

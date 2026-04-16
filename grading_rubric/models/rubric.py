@@ -35,7 +35,7 @@ class RubricCriterion(BaseModel):
     weight: float | None = None
     additive: bool = True
     levels: list[RubricLevel] = []
-    sub_criteria: list["RubricCriterion"] = []
+    sub_criteria: list[RubricCriterion] = []
 
 
 class Rubric(BaseModel):
@@ -52,7 +52,7 @@ class Rubric(BaseModel):
     metadata: dict[str, JsonValue] = {}
 
     @model_validator(mode="after")
-    def _check_invariants(self) -> "Rubric":
+    def _check_invariants(self) -> Rubric:
         # Check unique IDs and the additive-points invariant. § 4.2.
         seen_ids: set = set()
 
@@ -119,7 +119,7 @@ class RubricTarget(BaseModel):
     field: RubricFieldName
 
     @model_validator(mode="after")
-    def _check_invariants(self) -> "RubricTarget":
+    def _check_invariants(self) -> RubricTarget:
         if not self.criterion_path:
             raise ValueError("criterion_path must be non-empty")
         level_field = self.field in {

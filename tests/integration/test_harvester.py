@@ -8,15 +8,11 @@ collected in `bundle.errors` rather than raised.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
-import pytest
-
 from grading_rubric.models.audit import AuditBundle
-
-from validance_integration.harvester import ValidanceRunClient, harvest_audit_bundle
+from validance_integration.harvester import harvest_audit_bundle
 
 
 class StubValidanceClient:

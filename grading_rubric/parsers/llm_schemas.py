@@ -16,7 +16,7 @@ class DecomposedCriterion(BaseModel):
     points: float
     is_penalty: bool = False
     penalty_trigger: str = ""
-    sub_criteria: list["DecomposedCriterion"] = Field(default_factory=list)
+    sub_criteria: list[DecomposedCriterion] = Field(default_factory=list)
 
 
 class DecomposedRubric(BaseModel):
