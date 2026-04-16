@@ -16,14 +16,16 @@ ingest → parse → assess → propose → score → render → output.json
                    └───── iteration ────┘
 ```
 
-| Stage | What it does |
-|-------|-------------|
-| **Ingest** | Reads input files (PDF, DOCX, text), computes hashes, tags each input by role |
-| **Parse** | Extracts text (OCR for handwritten copies), decomposes the rubric into structured criteria using a one-time Opus call |
-| **Assess** | Synthesizes student responses to fill quality tiers, runs a 4-persona grader simulation (40 grading calls + 10 pairwise), computes before-scores, emits actionable findings |
-| **Propose** | LLM planner proposes rubric changes grounded in findings and evidence; three-step pipeline: conflict resolution → canonical ordering → apply-and-wrap |
-| **Score** | Re-runs the grader simulation on the improved rubric with the **same response set** (apples-to-apples), computes after-scores and deltas |
-| **Render** | Assembles the final JSON deliverable with starting rubric, improved rubric, changes, explanation, and quality scores |
+
+| Stage       | What it does                                                                                                                                                                |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Ingest**  | Reads input files (PDF, DOCX, text), computes hashes, tags each input by role                                                                                               |
+| **Parse**   | Extracts text (OCR for handwritten copies), decomposes the rubric into structured criteria using a one-time Opus call                                                       |
+| **Assess**  | Synthesizes student responses to fill quality tiers, runs a 4-persona grader simulation (40 grading calls + 10 pairwise), computes before-scores, emits actionable findings |
+| **Propose** | LLM planner proposes rubric changes grounded in findings and evidence; three-step pipeline: conflict resolution → canonical ordering → apply-and-wrap                       |
+| **Score**   | Re-runs the grader simulation on the improved rubric with the **same response set** (apples-to-apples), computes after-scores and deltas                                    |
+| **Render**  | Assembles the final JSON deliverable with starting rubric, improved rubric, changes, explanation, and quality scores                                                        |
+
 
 ### Quality criteria
 
@@ -32,16 +34,6 @@ Each criterion is scored 0–1, computed from simulation traces:
 - **Ambiguity** — Do graders agree? Measured via Krippendorff's α (ordinal) across a 4-persona grader panel. α ≥ 0.80 = good agreement, 0.67–0.80 = moderate, < 0.67 = poor. Score is the weighted average of per-criterion α values.
 - **Applicability** — Can graders apply every criterion? Measured via edge-case polarization rate and orphan detection. Score = `1 - weighted_problem_rate`. External dependencies (e.g. "check the cheatsheet") surface here.
 - **Discrimination Power** — Does the rubric separate strong from weak work? When synthetic calibration data is available: 4-component weighted average — calibration error (0.25), rank correlation (0.20), pairwise consistency (0.15), ceiling score (0.40). Hard cap of 0.60 when >50% of non-excellent synthetics score ≥ 0.90. Fallback (no calibration): `0.5 × separation + 0.5 × pairwise_consistency`.
-
-### Key design choices
-
-- **Grader personas, not quality judges** — 4 fixed personas (bottom-up strict, top-down generous, rubric-literal, student-intent). The LLM grades student work; Python measures rubric quality from traces.
-- **Stratified pairwise sampling** — High-contrast pairs, borderline pairs, then random. Prioritises the most informative comparisons.
-- **Difficulty weighting** — `max(0, min(1, 1 - |2 × mean_grade - 1|))`. Borderline responses (mean ≈ 0.5) influence ambiguity and applicability more than trivial floor/ceiling cases.
-- **Penalties as metadata** — Penalties are parsed into `metadata["penalizations"]`, not as negative-point criteria. Prevents the simulation from grading deduction rules as dimensions.
-- **Leaf-only grading** — Only leaf criteria are graded, avoiding double-counting parent + child scores.
-- **Deterministic calls** — Temperature 0.3 for grading calls, 0.2 for pairwise comparisons, 0.4 for synthesis. Single-sample non-simulation calls use temperature 0.0.
-- **Three-model split** — Claude Opus 4.6 for rubric decomposition and proposal generation; Claude Sonnet 4 for OCR; GPT-5.4 for grader simulation (~100 calls: grading, pairwise, synthesis).
 
 ## Installation
 
@@ -68,17 +60,19 @@ pip install ".[dev]"
 
 Installed automatically via `pip install .`:
 
-| Package | Purpose |
-|---------|---------|
-| `anthropic` | LLM backend (Claude API) |
-| `openai` | Optional alternative LLM backend |
-| `pydantic` | Data models and schema validation |
-| `krippendorff` | Inter-rater agreement statistics |
-| `pypdf`, `pdfplumber` | PDF text extraction |
-| `python-docx` | DOCX text extraction |
-| `Pillow` | Image handling for OCR |
-| `PyYAML` | Prompt front-matter parsing |
-| `click` | CLI framework |
+
+| Package               | Purpose                           |
+| --------------------- | --------------------------------- |
+| `anthropic`           | LLM backend (Claude API)          |
+| `openai`              | Optional alternative LLM backend  |
+| `pydantic`            | Data models and schema validation |
+| `krippendorff`        | Inter-rater agreement statistics  |
+| `pypdf`, `pdfplumber` | PDF text extraction               |
+| `python-docx`         | DOCX text extraction              |
+| `Pillow`              | Image handling for OCR            |
+| `PyYAML`              | Prompt front-matter parsing       |
+| `click`               | CLI framework                     |
+
 
 ## Usage
 
@@ -100,14 +94,16 @@ grading-rubric-cli run-pipeline \
 
 Only `--exam-question` is required. All other inputs are optional:
 
-| Flag | Description |
-|------|-------------|
-| `--exam-question` | Exam question (PDF, DOCX, or text file). **Required.** |
-| `--teaching-material` | Teaching material for grounding (repeatable) |
-| `--starting-rubric` | Existing rubric to improve (PDF, DOCX, or text) |
-| `--starting-rubric-inline` | Existing rubric as inline text or JSON |
-| `--student-copy` | Student response for discrimination analysis (repeatable) |
-| `--output` | Output path (default: stdout) |
+
+| Flag                       | Description                                               |
+| -------------------------- | --------------------------------------------------------- |
+| `--exam-question`          | Exam question (PDF, DOCX, or text file). **Required.**    |
+| `--teaching-material`      | Teaching material for grounding (repeatable)              |
+| `--starting-rubric`        | Existing rubric to improve (PDF, DOCX, or text)           |
+| `--starting-rubric-inline` | Existing rubric as inline text or JSON                    |
+| `--student-copy`           | Student response for discrimination analysis (repeatable) |
+| `--output`                 | Output path (default: stdout)                             |
+
 
 ### Running individual stages
 
@@ -122,18 +118,46 @@ grading-rubric-cli score        --input propose_outputs.json      --output score
 grading-rubric-cli render       --input score_outputs.json        --output explained_rubric.json
 ```
 
-### Docker
+### Docker (optional)
+
+Build the image locally (on macOS, Docker Desktop must be running):
 
 ```bash
+make images
+# or manually:
 docker build -t grading-rubric:latest -f docker/grading-rubric/Dockerfile .
+```
 
-docker run -e ANTHROPIC_API_KEY \
+Run the pipeline in a container:
+
+```bash
+docker run -e ANTHROPIC_API_KEY -e OPENAI_API_KEY \
     -v "$(pwd)":/work \
     grading-rubric:latest \
     grading-rubric-cli run-pipeline \
         --exam-question project_materials/exam_question/ExamQuestionAndRubric.pdf \
         --output result.json
 ```
+
+### Validance integration (optional)
+
+The pipeline can be orchestrated by a [Validance](https://validance.io) instance, adding audit trails, human approval gates, and retry orchestration.
+
+**Install the Validance SDK:**
+
+```bash
+git clone git@github.com:validance-io/sdk-python.git
+cd sdk-python && pip install -e . && cd ..
+```
+
+**Register workflows:**
+
+```bash
+VALIDANCE_BASE_URL=https://api.validance.io python -m validance_integration.register
+# or: make register
+```
+
+**Monitor, audit, and retry** via the Validance REST API: [https://api.validance.io/docs#/](https://api.validance.io/docs#/)
 
 ## Expected output
 
@@ -198,35 +222,52 @@ The output is a single JSON file with the following structure:
 
 On a 3-point Bad Actors Modeling rubric (SmartCity case study) with 3 real student copies and 7 synthetic responses:
 
-| Metric | Before | After | Delta |
-|--------|--------|-------|-------|
-| Ambiguity | 0.762 | 0.788 | +0.026 |
-| Applicability | 0.344 | 0.734 | **+0.391** |
-| Discrimination | 0.735 | 0.764 | +0.028 |
+
+| Metric         | Before | After | Delta      |
+| -------------- | ------ | ----- | ---------- |
+| Ambiguity      | 0.762  | 0.788 | +0.026     |
+| Applicability  | 0.344  | 0.734 | **+0.391** |
+| Discrimination | 0.735  | 0.764 | +0.028     |
+
 
 The largest improvement was applicability (+0.39): the original rubric referenced an unavailable cheatsheet, which the system detected through grader simulation (personas couldn't apply the criterion) and resolved by inlining explicit category definitions.
+
+### Web UI (Validance-orchestrated)
+
+A browser-based interface is available at **[https://api.validance.io](https://api.validance.io)**. It runs the same six-stage pipeline orchestrated by a Validance instance with an approval gate — the teacher reviews and accepts/rejects each proposed change before scoring.
+
+1. Open [https://api.validance.io](https://api.validance.io)
+2. Upload your exam question, teaching materials, student copies, and (optionally) a starting rubric
+3. Click **Start** — the pipeline runs server-side
+4. When the approval gate fires, review each proposed change and accept or reject it
+5. The final explained rubric appears in the Results screen
+
+This path requires no local installation — files are uploaded to the Validance instance and tasks run in Docker containers on the server.
 
 ## Configuration
 
 All settings are via environment variables (defaults are sensible):
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | — | Anthropic API key (**required**) |
-| `OPENAI_API_KEY` | — | OpenAI API key (**required** — grader simulation uses GPT-5.4 by default) |
-| `GR_OCR_BACKEND` | `anthropic` | OCR / text extraction backend (`anthropic`, `openai`, `stub`) |
-| `GR_OCR_MODEL` | `claude-sonnet-4-20250514` | Model for OCR and text extraction (parse stage) |
-| `GR_REASONING_MODEL` | `claude-opus-4-6` | Model for rubric decomposition + proposal generation |
-| `GR_SIMULATION_BACKEND` | `openai` | Backend for grader simulation (assess + score stages) |
-| `GR_SIMULATION_MODEL` | `gpt-5.4` | Model for grader simulation |
-| `GR_SIMULATION_PANEL_SIZE` | `4` | Number of grader personas per response |
-| `GR_SIMULATION_TARGET_RESPONSES` | `10` | Total responses (real + synthetic) |
-| `GR_SIMULATION_PAIRWISE_PAIRS` | `10` | Max pairwise comparisons per simulation |
-| `GR_SIMULATION_CONCURRENCY` | `4` | Max concurrent grading LLM calls |
+
+| Variable                         | Default                    | Description                                                               |
+| -------------------------------- | -------------------------- | ------------------------------------------------------------------------- |
+| `ANTHROPIC_API_KEY`              | —                          | Anthropic API key (**required**)                                          |
+| `OPENAI_API_KEY`                 | —                          | OpenAI API key (**required** — grader simulation uses GPT-5.4 by default) |
+| `GR_OCR_BACKEND`                 | `anthropic`                | OCR / text extraction backend (`anthropic`, `openai`, `stub`)             |
+| `GR_OCR_MODEL`                   | `claude-sonnet-4-20250514` | Model for OCR and text extraction (parse stage)                           |
+| `GR_REASONING_MODEL`             | `claude-opus-4-6`          | Model for rubric decomposition + proposal generation                      |
+| `GR_SIMULATION_BACKEND`          | `openai`                   | Backend for grader simulation (assess + score stages)                     |
+| `GR_SIMULATION_MODEL`            | `gpt-5.4`                  | Model for grader simulation                                               |
+| `GR_SIMULATION_PANEL_SIZE`       | `4`                        | Number of grader personas per response                                    |
+| `GR_SIMULATION_TARGET_RESPONSES` | `10`                       | Total responses (real + synthetic)                                        |
+| `GR_SIMULATION_PAIRWISE_PAIRS`   | `10`                       | Max pairwise comparisons per simulation                                   |
+| `GR_SIMULATION_CONCURRENCY`      | `4`                        | Max concurrent grading LLM calls                                          |
+
 
 ## Tests
 
 ```bash
+# 161 tests run
 pip install ".[dev]"
 pytest
 ```
@@ -237,3 +278,4 @@ pytest
 - [Requirements](docs/requirements.md) — User needs, user requirements, system requirements
 - [Design](docs/design.md) — Architecture, data models, design requirements
 - [Verification Plan](docs/verification-plan.md) — Test strategy and procedures
+
