@@ -2,6 +2,8 @@
 
 An AI-powered pipeline that assesses and improves the quality of grading rubrics for large-class exams. Given an exam question and (optionally) teaching materials, an existing rubric, and student copies, the system produces an improved rubric with a teacher-facing explanation of every change, scored against three quality criteria: **Ambiguity**, **Applicability**, and **Discrimination Power**.
 
+![Grading Rubric Studio — Input screen](docs/ui-screen.png)
+
 ## Approach
 
 ### Core idea
