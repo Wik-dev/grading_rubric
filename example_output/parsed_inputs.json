@@ -1,0 +1,159 @@
+{
+  "ingest": {
+    "input_provenance": {
+      "exam_question": {
+        "kind": "file",
+        "path": "inputs/exam_question/ExamQuestionAndRubric.pdf",
+        "marker": null,
+        "hash": "358673b2f50ee4dcefbd3550d9a4b7fdd2f1975dd64787eba7540038ab848994"
+      },
+      "teaching_material": [
+        {
+          "kind": "file",
+          "path": "inputs/teaching_material/TeachingResource-BAD_ACTORS_STRATEGY.pdf",
+          "marker": null,
+          "hash": "34684440832fbab491a4cbee7ddff59ef9ab70df13841b08d8f6146f4d910778"
+        }
+      ],
+      "starting_rubric": {
+        "kind": "file",
+        "path": "inputs/starting_rubric/starting_rubric.inline.txt",
+        "marker": null,
+        "hash": "cd22ee1af5a2979451f0029653b9df3246171307831955cdd9d442a5129ba0dc"
+      },
+      "student_copies": [
+        {
+          "kind": "file",
+          "path": "inputs/student_copy/StudentAnswer-Student1.pdf",
+          "marker": null,
+          "hash": "a5d5b27463c72a71fb72eb3b66ff69ea9ba4d1d4687a73931b018966a80588da"
+        },
+        {
+          "kind": "file",
+          "path": "inputs/student_copy/StudentAnswer-Student2.pdf",
+          "marker": null,
+          "hash": "297b754f009d3b627fa35337b6b9404ee394fa783be0ef2e95f09bef16d59f40"
+        },
+        {
+          "kind": "file",
+          "path": "inputs/student_copy/StudentAnswer-Student3.pdf",
+          "marker": null,
+          "hash": "8f8a6da6489d4086e9930800e692e752a13e32c33b9ba40dea047176daefa49b"
+        }
+      ]
+    },
+    "evidence_profile": {
+      "starting_rubric_present": true,
+      "exam_question_present": true,
+      "teaching_material_present": true,
+      "teaching_material_count": 1,
+      "student_copies_present": true,
+      "student_copies_count": 3,
+      "student_copies_pages_total": 0,
+      "starting_rubric_hash": "cd22ee1af5a2979451f0029653b9df3246171307831955cdd9d442a5129ba0dc",
+      "exam_question_hash": "358673b2f50ee4dcefbd3550d9a4b7fdd2f1975dd64787eba7540038ab848994",
+      "teaching_material_hashes": [
+        "34684440832fbab491a4cbee7ddff59ef9ab70df13841b08d8f6146f4d910778"
+      ],
+      "student_copies_hashes": [
+        "a5d5b27463c72a71fb72eb3b66ff69ea9ba4d1d4687a73931b018966a80588da",
+        "297b754f009d3b627fa35337b6b9404ee394fa783be0ef2e95f09bef16d59f40",
+        "8f8a6da6489d4086e9930800e692e752a13e32c33b9ba40dea047176daefa49b"
+      ],
+      "synthetic_responses_used": false,
+      "notes": []
+    },
+    "inputs": {
+      "exam_question_path": "inputs/exam_question/ExamQuestionAndRubric.pdf",
+      "teaching_material_paths": [
+        "inputs/teaching_material/TeachingResource-BAD_ACTORS_STRATEGY.pdf"
+      ],
+      "starting_rubric_path": "inputs/starting_rubric/starting_rubric.inline.txt",
+      "starting_rubric_inline": null,
+      "student_copy_paths": [
+        "inputs/student_copy/StudentAnswer-Student1.pdf",
+        "inputs/student_copy/StudentAnswer-Student2.pdf",
+        "inputs/student_copy/StudentAnswer-Student3.pdf"
+      ]
+    }
+  },
+  "exam_question_text": "Exam question\nCase study (3 points): In this exercise, your task is to apply the Bad Actors Modeling strategy to the\nSmartCity solution described in the scenario below:\n• Choose 3 different categories among the five in the Bad Actors Modeling strategy (money,\npolitics, entertainment, ideas, self-interest).\n• Then for each of the categories you have chosen: identify and describe one harmful action a\nbad actor could take and how it could negatively impact stakeholders (1-2 sentences for\neach). Actions must be different from each other.\nScenario: The Swiss company SmartCity wants to help local authorities to better manage city\ninfrastructures and resources by deploying a solution based on the Internet of Things (IoT) - a\nnetwork of objects with computing capabilities connected to the Internet through Wi-Fi or 5G. The\nsolution proposed by SmartCity uses a range of connected devices to monitor waste-bins, traffic flow\nas well as weather conditions throughout a city. Level monitoring sensors on waste-bins allow waste\ncollection services to optimize their routes. Cameras on major roads and intersections are connected\nto machine learning models to analyze real-time traffic data and dynamically adjust green light times.\nUsing real-time weather data, indoor ventilation and temperature are automatically adjusted to keep\nbuilding occupants comfortable while minimizing energy use. Weather data is also used in predictive\nanalytics to identify health risks and aggregated information is communicated to local communities in\na public app, for instance in case of air pollution or heatwave. Staff from the city authorities can\nmonitor and control the system remotely from a centralized dashboard. SmartCity plans to roll out its\nsolution in a number of European countries with large cities, including France, Germany, Italy and\nSpain.\nGrading rubric\n1 point per bad actor action (total = 3 points)\n• 0.5 the action described corresponds to the category (check the cheatsheet)\n• 0.5 the description makes clear how the action is harmful / negatively impacts stakeholders\nand is specific to SmartCity (i.e. adapted to the scenario)\nPenalizations:\n• -0.5 if two actions are too similar to each other\n• -0.25 if negative impact is not sufficiently described",
+  "teaching_material_text": "Responsible Software 2025/2026\n\nStrategy : Bad Actors Modelling\n\nFundamentals of the strategy\n\nWhat is the goal of this strategy ?\nMinimize vulnerabilities from the beginning of software design through risk assessment and mitigation.\n\nWhen to use it ?\nThis strategy can be applied during the software design phase, prior to any updates, during audits and inspections, as part of incident response, and while improving the software.\n\nWhat is a Bad actor ?\n\nA \"bad actor\" or \"threat actor\" is a person or group that will try to exploit a system to achieve their own personal goals.\n\nThere are several types of bad actors, each driven by different motivations. A useful tool to understand and categorize these motivations are the Bad Actors Motivation Categories below.\n\nAssessment questions\n\nWho would like to use my software in a malicious way or in a way I didn't create it for ?\n\nWhat would be the consequences ?\n\nHow could I prevent these negative consequences ?\n\n[DIAGRAM: Five overlapping circles showing Bad Actors Motivation Categories]\n\nMoney:\n- Companies, hackers, scammers, competitors, criminal infrastructure providers, big game hunters\n- Data theft, ransomware, sabotage by competitor\n\nPolitics:\n- Nation state actors, political candidates, governmental intelligence agencies  \n- Data disclosure, disinformation spreading, strategic sabotage, infrastructure attacks\n\nIdeas:\n- Extremists, religious persons, hacktivists, terrorists, conspiracy theorists\n- Personal belief information spreading, discrediting of other groups, DoS attacks, data leaks, website defacement\n\nSelf-Interest:\n- Revenge seeker, self-promoting person, obsessive person, insider\n- Harassing messages, communication monitoring, location tracking, grade changing\n\nEntertainment:\n- Trolls, thrill seekers\n- Look up celebrity's medical record, browse personal photo, attacks on random systems, misinformation spreading\n\nCategories of motivation overlap and it is not always clear how to classify some types of actions, but it is not really important, the goal is to identify a range of possible scenarios that could create threats for your system (security) and for your users (safety).\n\nThis work is licensed under CC BY 4.0",
+  "starting_rubric": {
+    "id": "f4cb908f-9697-41c9-9cdd-cda38a5e9125",
+    "schema_version": "1.0.0",
+    "title": "Bad Actors Modeling - SmartCity Case Study",
+    "exam_question_ref": null,
+    "total_points": 3.0,
+    "criteria": [
+      {
+        "id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b",
+        "slug": null,
+        "name": "Bad Actor Actions",
+        "description": "1 point per bad actor action (total = 3 points)",
+        "scoring_guidance": "Each of the 3 actions is worth 1 point, broken into two 0.5-point sub-criteria below.\n\nPenalizations: Actions too similar: Two actions are too similar to each other Trigger: Two actions are too similar to each other Deduction: -0.5. Negative impact insufficiently described: Negative impact is not sufficiently described Trigger: Negative impact is not sufficiently described Deduction: -0.25.",
+        "points": 3.0,
+        "weight": null,
+        "additive": true,
+        "levels": [],
+        "sub_criteria": [
+          {
+            "id": "1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+            "slug": null,
+            "name": "Action corresponds to category",
+            "description": "The action described corresponds to the category (check the cheatsheet)",
+            "scoring_guidance": "0.5 points per action (×3 actions = 1.5 total). Check the cheatsheet to verify the action fits the chosen Bad Actors Motivation Category.",
+            "points": 1.5,
+            "weight": null,
+            "additive": true,
+            "levels": [],
+            "sub_criteria": []
+          },
+          {
+            "id": "22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+            "slug": null,
+            "name": "Harmful impact specific to SmartCity",
+            "description": "The description makes clear how the action is harmful / negatively impacts stakeholders and is specific to SmartCity (i.e. adapted to the scenario)",
+            "scoring_guidance": "0.5 points per action (×3 actions = 1.5 total). The description must clearly convey harm or negative impact on stakeholders and must be adapted to the SmartCity scenario.",
+            "points": 1.5,
+            "weight": null,
+            "additive": true,
+            "levels": [],
+            "sub_criteria": []
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "structured_from_free_text": true,
+      "parsing_notes": "The rubric defines 1 point per bad actor action (3 actions = 3 points total), with each action scored on two 0.5-point dimensions. This is modeled as one 3-point parent criterion with two 1.5-point sub-criteria (each representing 0.5 × 3 actions). The first sub-criterion references an external \"cheatsheet\" for verifying that actions correspond to their chosen category; this dependency is preserved as-is and not resolved from the teaching material. The penalizations are listed separately as conditional deductions. It is somewhat ambiguous whether the -0.25 penalty for insufficient negative impact description applies per action or globally; the rubric does not specify, so it is preserved as written.",
+      "penalizations": [
+        {
+          "name": "Actions too similar",
+          "description": "Two actions are too similar to each other",
+          "scoring_guidance": "",
+          "points": -0.5,
+          "is_penalty": true,
+          "penalty_trigger": "Two actions are too similar to each other",
+          "sub_criteria": []
+        },
+        {
+          "name": "Negative impact insufficiently described",
+          "description": "Negative impact is not sufficiently described",
+          "scoring_guidance": "",
+          "points": -0.25,
+          "is_penalty": true,
+          "penalty_trigger": "Negative impact is not sufficiently described",
+          "sub_criteria": []
+        }
+      ]
+    }
+  },
+  "starting_rubric_raw_text": "Grading rubric\n1 point per bad actor action (total = 3 points)\n• 0.5 the action described corresponds to the category (check the cheatsheet)\n• 0.5 the description makes clear how the action is harmful / negatively impacts stakeholders\nand is specific to SmartCity (i.e. adapted to the scenario)\nPenalizations:\n• -0.5 if two actions are too similar to each other\n• -0.25 if negative impact is not sufficiently described",
+  "synthetic_rubric_for_from_scratch": null,
+  "student_copies_text": [
+    "Politics: Intelligence agencies can use this tool when SmartCity is installed in other countries to gain information about them. Then countries and their population will no longer have privacy and security.\n\nMoney: Robbers can take this valuable installed materials - sensors, cameras, routers and others to sell them or use them. It will cost money to reinstall those materials.\n\nEntertainment: Some bad actors can troll the waste collection services by manipulating the sensors to make the waste collection redirect the collectors to the same localisation several times.",
+    "- Category: Money\n\nVery expensive. The realization of this software is a really good idea that it might require a lot of money to build it or even in using it since it might need some resources to be useful. Or it can encourage the local authorities to spend a lot of money\n\n- Category: Self-interest\n\nSome people might use it for disinformation, since it can possibly use it for harm. They could probably harm people who didn't do anything who respected the laws and follow the rules and they get in trouble because of some sort of disinformation that could harm like for example: a person who might have come slightly above the street by accident and then just realize that it was actually a red light instead of a green and then get into trouble for nothing.\n\n- Category: Ideas\n\nSome people might not agree to each other for some circumstances like for example ventilation and temperature being adjusted automatically with dependence on the weather outside or the environment. Because some people people are probably more sensitive to heat or cold than others and may be more uncomfortable with the automation adjusted than other and this could probably lead to unfairness between people which could probably not be satisfied with these conditions.",
+    "Money: A competitor of the company SmartCity can hack the centralized monitoring system, this would lead to a mess with the traffic and the bins. The company SmartCity would be negatively impacted in their reputation and this would lead to the loss of money by not signing contract with other European countries. The motivation for the competitor is the money they gain some part of the market.\n\nPolitics: A competitor of the current \"maire (chef de la ville)\" can disturb the sensors or divert-him, the harm would be that citizens couldn't be happy anymore with the council of the city because there would be bins everywhere due to the disruption of the sensors. The motivation for the competitor would be to be elected in the next elections.\n\nIdeas: A group of people pro-privacy can destroy/cover the cameras used to analyze the real-time traffic arguing that it is not in their ideology to be looked after by ML augmented cameras. The stakeholders harmed would be all the users of the road. They wouldn't have any information about traffic jams anymore. And the traffic light can malfunction due to the loss of information."
+  ]
+}

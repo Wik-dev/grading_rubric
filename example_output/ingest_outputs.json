@@ -1,0 +1,78 @@
+{
+  "input_provenance": {
+    "exam_question": {
+      "kind": "file",
+      "path": "inputs/exam_question/ExamQuestionAndRubric.pdf",
+      "marker": null,
+      "hash": "358673b2f50ee4dcefbd3550d9a4b7fdd2f1975dd64787eba7540038ab848994"
+    },
+    "teaching_material": [
+      {
+        "kind": "file",
+        "path": "inputs/teaching_material/TeachingResource-BAD_ACTORS_STRATEGY.pdf",
+        "marker": null,
+        "hash": "34684440832fbab491a4cbee7ddff59ef9ab70df13841b08d8f6146f4d910778"
+      }
+    ],
+    "starting_rubric": {
+      "kind": "file",
+      "path": "inputs/starting_rubric/starting_rubric.inline.txt",
+      "marker": null,
+      "hash": "cd22ee1af5a2979451f0029653b9df3246171307831955cdd9d442a5129ba0dc"
+    },
+    "student_copies": [
+      {
+        "kind": "file",
+        "path": "inputs/student_copy/StudentAnswer-Student1.pdf",
+        "marker": null,
+        "hash": "a5d5b27463c72a71fb72eb3b66ff69ea9ba4d1d4687a73931b018966a80588da"
+      },
+      {
+        "kind": "file",
+        "path": "inputs/student_copy/StudentAnswer-Student2.pdf",
+        "marker": null,
+        "hash": "297b754f009d3b627fa35337b6b9404ee394fa783be0ef2e95f09bef16d59f40"
+      },
+      {
+        "kind": "file",
+        "path": "inputs/student_copy/StudentAnswer-Student3.pdf",
+        "marker": null,
+        "hash": "8f8a6da6489d4086e9930800e692e752a13e32c33b9ba40dea047176daefa49b"
+      }
+    ]
+  },
+  "evidence_profile": {
+    "starting_rubric_present": true,
+    "exam_question_present": true,
+    "teaching_material_present": true,
+    "teaching_material_count": 1,
+    "student_copies_present": true,
+    "student_copies_count": 3,
+    "student_copies_pages_total": 0,
+    "starting_rubric_hash": "cd22ee1af5a2979451f0029653b9df3246171307831955cdd9d442a5129ba0dc",
+    "exam_question_hash": "358673b2f50ee4dcefbd3550d9a4b7fdd2f1975dd64787eba7540038ab848994",
+    "teaching_material_hashes": [
+      "34684440832fbab491a4cbee7ddff59ef9ab70df13841b08d8f6146f4d910778"
+    ],
+    "student_copies_hashes": [
+      "a5d5b27463c72a71fb72eb3b66ff69ea9ba4d1d4687a73931b018966a80588da",
+      "297b754f009d3b627fa35337b6b9404ee394fa783be0ef2e95f09bef16d59f40",
+      "8f8a6da6489d4086e9930800e692e752a13e32c33b9ba40dea047176daefa49b"
+    ],
+    "synthetic_responses_used": false,
+    "notes": []
+  },
+  "inputs": {
+    "exam_question_path": "inputs/exam_question/ExamQuestionAndRubric.pdf",
+    "teaching_material_paths": [
+      "inputs/teaching_material/TeachingResource-BAD_ACTORS_STRATEGY.pdf"
+    ],
+    "starting_rubric_path": "inputs/starting_rubric/starting_rubric.inline.txt",
+    "starting_rubric_inline": null,
+    "student_copy_paths": [
+      "inputs/student_copy/StudentAnswer-Student1.pdf",
+      "inputs/student_copy/StudentAnswer-Student2.pdf",
+      "inputs/student_copy/StudentAnswer-Student3.pdf"
+    ]
+  }
+}

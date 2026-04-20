@@ -1,0 +1,1603 @@
+{
+  "parsed": {
+    "ingest": {
+      "input_provenance": {
+        "exam_question": {
+          "kind": "file",
+          "path": "inputs/exam_question/ExamQuestionAndRubric.pdf",
+          "marker": null,
+          "hash": "358673b2f50ee4dcefbd3550d9a4b7fdd2f1975dd64787eba7540038ab848994"
+        },
+        "teaching_material": [
+          {
+            "kind": "file",
+            "path": "inputs/teaching_material/TeachingResource-BAD_ACTORS_STRATEGY.pdf",
+            "marker": null,
+            "hash": "34684440832fbab491a4cbee7ddff59ef9ab70df13841b08d8f6146f4d910778"
+          }
+        ],
+        "starting_rubric": {
+          "kind": "file",
+          "path": "inputs/starting_rubric/starting_rubric.inline.txt",
+          "marker": null,
+          "hash": "cd22ee1af5a2979451f0029653b9df3246171307831955cdd9d442a5129ba0dc"
+        },
+        "student_copies": [
+          {
+            "kind": "file",
+            "path": "inputs/student_copy/StudentAnswer-Student1.pdf",
+            "marker": null,
+            "hash": "a5d5b27463c72a71fb72eb3b66ff69ea9ba4d1d4687a73931b018966a80588da"
+          },
+          {
+            "kind": "file",
+            "path": "inputs/student_copy/StudentAnswer-Student2.pdf",
+            "marker": null,
+            "hash": "297b754f009d3b627fa35337b6b9404ee394fa783be0ef2e95f09bef16d59f40"
+          },
+          {
+            "kind": "file",
+            "path": "inputs/student_copy/StudentAnswer-Student3.pdf",
+            "marker": null,
+            "hash": "8f8a6da6489d4086e9930800e692e752a13e32c33b9ba40dea047176daefa49b"
+          }
+        ]
+      },
+      "evidence_profile": {
+        "starting_rubric_present": true,
+        "exam_question_present": true,
+        "teaching_material_present": true,
+        "teaching_material_count": 1,
+        "student_copies_present": true,
+        "student_copies_count": 3,
+        "student_copies_pages_total": 0,
+        "starting_rubric_hash": "cd22ee1af5a2979451f0029653b9df3246171307831955cdd9d442a5129ba0dc",
+        "exam_question_hash": "358673b2f50ee4dcefbd3550d9a4b7fdd2f1975dd64787eba7540038ab848994",
+        "teaching_material_hashes": [
+          "34684440832fbab491a4cbee7ddff59ef9ab70df13841b08d8f6146f4d910778"
+        ],
+        "student_copies_hashes": [
+          "a5d5b27463c72a71fb72eb3b66ff69ea9ba4d1d4687a73931b018966a80588da",
+          "297b754f009d3b627fa35337b6b9404ee394fa783be0ef2e95f09bef16d59f40",
+          "8f8a6da6489d4086e9930800e692e752a13e32c33b9ba40dea047176daefa49b"
+        ],
+        "synthetic_responses_used": false,
+        "notes": []
+      },
+      "inputs": {
+        "exam_question_path": "inputs/exam_question/ExamQuestionAndRubric.pdf",
+        "teaching_material_paths": [
+          "inputs/teaching_material/TeachingResource-BAD_ACTORS_STRATEGY.pdf"
+        ],
+        "starting_rubric_path": "inputs/starting_rubric/starting_rubric.inline.txt",
+        "starting_rubric_inline": null,
+        "student_copy_paths": [
+          "inputs/student_copy/StudentAnswer-Student1.pdf",
+          "inputs/student_copy/StudentAnswer-Student2.pdf",
+          "inputs/student_copy/StudentAnswer-Student3.pdf"
+        ]
+      }
+    },
+    "exam_question_text": "Exam question\nCase study (3 points): In this exercise, your task is to apply the Bad Actors Modeling strategy to the\nSmartCity solution described in the scenario below:\n• Choose 3 different categories among the five in the Bad Actors Modeling strategy (money,\npolitics, entertainment, ideas, self-interest).\n• Then for each of the categories you have chosen: identify and describe one harmful action a\nbad actor could take and how it could negatively impact stakeholders (1-2 sentences for\neach). Actions must be different from each other.\nScenario: The Swiss company SmartCity wants to help local authorities to better manage city\ninfrastructures and resources by deploying a solution based on the Internet of Things (IoT) - a\nnetwork of objects with computing capabilities connected to the Internet through Wi-Fi or 5G. The\nsolution proposed by SmartCity uses a range of connected devices to monitor waste-bins, traffic flow\nas well as weather conditions throughout a city. Level monitoring sensors on waste-bins allow waste\ncollection services to optimize their routes. Cameras on major roads and intersections are connected\nto machine learning models to analyze real-time traffic data and dynamically adjust green light times.\nUsing real-time weather data, indoor ventilation and temperature are automatically adjusted to keep\nbuilding occupants comfortable while minimizing energy use. Weather data is also used in predictive\nanalytics to identify health risks and aggregated information is communicated to local communities in\na public app, for instance in case of air pollution or heatwave. Staff from the city authorities can\nmonitor and control the system remotely from a centralized dashboard. SmartCity plans to roll out its\nsolution in a number of European countries with large cities, including France, Germany, Italy and\nSpain.\nGrading rubric\n1 point per bad actor action (total = 3 points)\n• 0.5 the action described corresponds to the category (check the cheatsheet)\n• 0.5 the description makes clear how the action is harmful / negatively impacts stakeholders\nand is specific to SmartCity (i.e. adapted to the scenario)\nPenalizations:\n• -0.5 if two actions are too similar to each other\n• -0.25 if negative impact is not sufficiently described",
+    "teaching_material_text": "Responsible Software 2025/2026\n\nStrategy : Bad Actors Modelling\n\nFundamentals of the strategy\n\nWhat is the goal of this strategy ?\nMinimize vulnerabilities from the beginning of software design through risk assessment and mitigation.\n\nWhen to use it ?\nThis strategy can be applied during the software design phase, prior to any updates, during audits and inspections, as part of incident response, and while improving the software.\n\nWhat is a Bad actor ?\n\nA \"bad actor\" or \"threat actor\" is a person or group that will try to exploit a system to achieve their own personal goals.\n\nThere are several types of bad actors, each driven by different motivations. A useful tool to understand and categorize these motivations are the Bad Actors Motivation Categories below.\n\nAssessment questions\n\nWho would like to use my software in a malicious way or in a way I didn't create it for ?\n\nWhat would be the consequences ?\n\nHow could I prevent these negative consequences ?\n\n[DIAGRAM: Five overlapping circles showing Bad Actors Motivation Categories]\n\nMoney:\n- Companies, hackers, scammers, competitors, criminal infrastructure providers, big game hunters\n- Data theft, ransomware, sabotage by competitor\n\nPolitics:\n- Nation state actors, political candidates, governmental intelligence agencies  \n- Data disclosure, disinformation spreading, strategic sabotage, infrastructure attacks\n\nIdeas:\n- Extremists, religious persons, hacktivists, terrorists, conspiracy theorists\n- Personal belief information spreading, discrediting of other groups, DoS attacks, data leaks, website defacement\n\nSelf-Interest:\n- Revenge seeker, self-promoting person, obsessive person, insider\n- Harassing messages, communication monitoring, location tracking, grade changing\n\nEntertainment:\n- Trolls, thrill seekers\n- Look up celebrity's medical record, browse personal photo, attacks on random systems, misinformation spreading\n\nCategories of motivation overlap and it is not always clear how to classify some types of actions, but it is not really important, the goal is to identify a range of possible scenarios that could create threats for your system (security) and for your users (safety).\n\nThis work is licensed under CC BY 4.0",
+    "starting_rubric": {
+      "id": "f4cb908f-9697-41c9-9cdd-cda38a5e9125",
+      "schema_version": "1.0.0",
+      "title": "Bad Actors Modeling - SmartCity Case Study",
+      "exam_question_ref": null,
+      "total_points": 3.0,
+      "criteria": [
+        {
+          "id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b",
+          "slug": null,
+          "name": "Bad Actor Actions",
+          "description": "1 point per bad actor action (total = 3 points)",
+          "scoring_guidance": "Each of the 3 actions is worth 1 point, broken into two 0.5-point sub-criteria below.\n\nPenalizations: Actions too similar: Two actions are too similar to each other Trigger: Two actions are too similar to each other Deduction: -0.5. Negative impact insufficiently described: Negative impact is not sufficiently described Trigger: Negative impact is not sufficiently described Deduction: -0.25.",
+          "points": 3.0,
+          "weight": null,
+          "additive": true,
+          "levels": [],
+          "sub_criteria": [
+            {
+              "id": "1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+              "slug": null,
+              "name": "Action corresponds to category",
+              "description": "The action described corresponds to the category (check the cheatsheet)",
+              "scoring_guidance": "0.5 points per action (×3 actions = 1.5 total). Check the cheatsheet to verify the action fits the chosen Bad Actors Motivation Category.",
+              "points": 1.5,
+              "weight": null,
+              "additive": true,
+              "levels": [],
+              "sub_criteria": []
+            },
+            {
+              "id": "22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+              "slug": null,
+              "name": "Harmful impact specific to SmartCity",
+              "description": "The description makes clear how the action is harmful / negatively impacts stakeholders and is specific to SmartCity (i.e. adapted to the scenario)",
+              "scoring_guidance": "0.5 points per action (×3 actions = 1.5 total). The description must clearly convey harm or negative impact on stakeholders and must be adapted to the SmartCity scenario.",
+              "points": 1.5,
+              "weight": null,
+              "additive": true,
+              "levels": [],
+              "sub_criteria": []
+            }
+          ]
+        }
+      ],
+      "metadata": {
+        "structured_from_free_text": true,
+        "parsing_notes": "The rubric defines 1 point per bad actor action (3 actions = 3 points total), with each action scored on two 0.5-point dimensions. This is modeled as one 3-point parent criterion with two 1.5-point sub-criteria (each representing 0.5 × 3 actions). The first sub-criterion references an external \"cheatsheet\" for verifying that actions correspond to their chosen category; this dependency is preserved as-is and not resolved from the teaching material. The penalizations are listed separately as conditional deductions. It is somewhat ambiguous whether the -0.25 penalty for insufficient negative impact description applies per action or globally; the rubric does not specify, so it is preserved as written.",
+        "penalizations": [
+          {
+            "name": "Actions too similar",
+            "description": "Two actions are too similar to each other",
+            "scoring_guidance": "",
+            "points": -0.5,
+            "is_penalty": true,
+            "penalty_trigger": "Two actions are too similar to each other",
+            "sub_criteria": []
+          },
+          {
+            "name": "Negative impact insufficiently described",
+            "description": "Negative impact is not sufficiently described",
+            "scoring_guidance": "",
+            "points": -0.25,
+            "is_penalty": true,
+            "penalty_trigger": "Negative impact is not sufficiently described",
+            "sub_criteria": []
+          }
+        ]
+      }
+    },
+    "starting_rubric_raw_text": "Grading rubric\n1 point per bad actor action (total = 3 points)\n• 0.5 the action described corresponds to the category (check the cheatsheet)\n• 0.5 the description makes clear how the action is harmful / negatively impacts stakeholders\nand is specific to SmartCity (i.e. adapted to the scenario)\nPenalizations:\n• -0.5 if two actions are too similar to each other\n• -0.25 if negative impact is not sufficiently described",
+    "synthetic_rubric_for_from_scratch": null,
+    "student_copies_text": [
+      "Politics: Intelligence agencies can use this tool when SmartCity is installed in other countries to gain information about them. Then countries and their population will no longer have privacy and security.\n\nMoney: Robbers can take this valuable installed materials - sensors, cameras, routers and others to sell them or use them. It will cost money to reinstall those materials.\n\nEntertainment: Some bad actors can troll the waste collection services by manipulating the sensors to make the waste collection redirect the collectors to the same localisation several times.",
+      "- Category: Money\n\nVery expensive. The realization of this software is a really good idea that it might require a lot of money to build it or even in using it since it might need some resources to be useful. Or it can encourage the local authorities to spend a lot of money\n\n- Category: Self-interest\n\nSome people might use it for disinformation, since it can possibly use it for harm. They could probably harm people who didn't do anything who respected the laws and follow the rules and they get in trouble because of some sort of disinformation that could harm like for example: a person who might have come slightly above the street by accident and then just realize that it was actually a red light instead of a green and then get into trouble for nothing.\n\n- Category: Ideas\n\nSome people might not agree to each other for some circumstances like for example ventilation and temperature being adjusted automatically with dependence on the weather outside or the environment. Because some people people are probably more sensitive to heat or cold than others and may be more uncomfortable with the automation adjusted than other and this could probably lead to unfairness between people which could probably not be satisfied with these conditions.",
+      "Money: A competitor of the company SmartCity can hack the centralized monitoring system, this would lead to a mess with the traffic and the bins. The company SmartCity would be negatively impacted in their reputation and this would lead to the loss of money by not signing contract with other European countries. The motivation for the competitor is the money they gain some part of the market.\n\nPolitics: A competitor of the current \"maire (chef de la ville)\" can disturb the sensors or divert-him, the harm would be that citizens couldn't be happy anymore with the council of the city because there would be bins everywhere due to the disruption of the sensors. The motivation for the competitor would be to be elected in the next elections.\n\nIdeas: A group of people pro-privacy can destroy/cover the cameras used to analyze the real-time traffic arguing that it is not in their ideology to be looked after by ML augmented cameras. The stakeholders harmed would be all the users of the road. They wouldn't have any information about traffic jams anymore. And the traffic light can malfunction due to the loss of information."
+    ]
+  },
+  "rubric_under_assessment": {
+    "id": "f4cb908f-9697-41c9-9cdd-cda38a5e9125",
+    "schema_version": "1.0.0",
+    "title": "Bad Actors Modeling - SmartCity Case Study",
+    "exam_question_ref": null,
+    "total_points": 3.0,
+    "criteria": [
+      {
+        "id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b",
+        "slug": null,
+        "name": "Bad Actor Actions",
+        "description": "1 point per bad actor action (total = 3 points)",
+        "scoring_guidance": "Each of the 3 actions is worth 1 point, broken into two 0.5-point sub-criteria below.\n\nPenalizations: Actions too similar: Two actions are too similar to each other Trigger: Two actions are too similar to each other Deduction: -0.5. Negative impact insufficiently described: Negative impact is not sufficiently described Trigger: Negative impact is not sufficiently described Deduction: -0.25.",
+        "points": 3.0,
+        "weight": null,
+        "additive": true,
+        "levels": [],
+        "sub_criteria": [
+          {
+            "id": "1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+            "slug": null,
+            "name": "Action corresponds to category",
+            "description": "The action described corresponds to the category (check the cheatsheet)",
+            "scoring_guidance": "0.5 points per action (×3 actions = 1.5 total). Check the cheatsheet to verify the action fits the chosen Bad Actors Motivation Category.",
+            "points": 1.5,
+            "weight": null,
+            "additive": true,
+            "levels": [],
+            "sub_criteria": []
+          },
+          {
+            "id": "22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+            "slug": null,
+            "name": "Harmful impact specific to SmartCity",
+            "description": "The description makes clear how the action is harmful / negatively impacts stakeholders and is specific to SmartCity (i.e. adapted to the scenario)",
+            "scoring_guidance": "0.5 points per action (×3 actions = 1.5 total). The description must clearly convey harm or negative impact on stakeholders and must be adapted to the SmartCity scenario.",
+            "points": 1.5,
+            "weight": null,
+            "additive": true,
+            "levels": [],
+            "sub_criteria": []
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "structured_from_free_text": true,
+      "parsing_notes": "The rubric defines 1 point per bad actor action (3 actions = 3 points total), with each action scored on two 0.5-point dimensions. This is modeled as one 3-point parent criterion with two 1.5-point sub-criteria (each representing 0.5 × 3 actions). The first sub-criterion references an external \"cheatsheet\" for verifying that actions correspond to their chosen category; this dependency is preserved as-is and not resolved from the teaching material. The penalizations are listed separately as conditional deductions. It is somewhat ambiguous whether the -0.25 penalty for insufficient negative impact description applies per action or globally; the rubric does not specify, so it is preserved as written.",
+      "penalizations": [
+        {
+          "name": "Actions too similar",
+          "description": "Two actions are too similar to each other",
+          "scoring_guidance": "",
+          "points": -0.5,
+          "is_penalty": true,
+          "penalty_trigger": "Two actions are too similar to each other",
+          "sub_criteria": []
+        },
+        {
+          "name": "Negative impact insufficiently described",
+          "description": "Negative impact is not sufficiently described",
+          "scoring_guidance": "",
+          "points": -0.25,
+          "is_penalty": true,
+          "penalty_trigger": "Negative impact is not sufficiently described",
+          "sub_criteria": []
+        }
+      ]
+    }
+  },
+  "findings": [
+    {
+      "id": "f4d6843d-cbef-4bfa-8840-c236951d8ca1",
+      "criterion": "ambiguity",
+      "severity": "high",
+      "target": {
+        "criterion_path": [
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b",
+          "22f62c9d-13dd-4ac6-8d35-facb2c6a4910"
+        ],
+        "level_id": null,
+        "field": "description"
+      },
+      "observation": "Inter-rater agreement on criterion a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910 is weak (α=0.65). Graders frequently disagree. The rubric language needs clarification.",
+      "evidence": "response=0, mean=0.87, stdev=0.08, extremity=0.75: \n  persona=0, grade=0.83: Harm specific to SmartCity: Politics—mentions SmartCity installed in other countries and loss of privacy/security, which is harmful and scenario-linked (0.5/0.5). Money—mentions se\n  persona=1, grade=1.00: Each action includes a harmful impact tied to the SmartCity scenario: surveillance harms privacy/security of countries and populations; theft of sensors/cameras/routers causes repl\nresponse=1, mean=0.33, stdev=0.24, extremity=0.33: midscale disagreement stdev=0.24, extremity=0.33\n  persona=0, grade=0.00: Out of 1.5 pts total (0.5 per action), two items do not describe a clear harmful bad-actor impact specific to SmartCity: the Money item is about expense, and the Ideas item is abou\n  persona=1, grade=0.50: This criterion is 0.5 per action for clearly described harmful SmartCity-specific impact (1.5 total). The Self-interest action gives a reasonably specific SmartCity-type harm: disi\nresponse=2, mean=0.67, stdev=0.45, extremity=0.33: bimodal edge grades floor=1, ceiling=1\n  persona=0, grade=0.83: Harm specific to SmartCity: Money action gives SmartCity-specific harms ('traffic and bins' disruption, reputational and contract loss) = 0.5/0.5. Politics action gives SmartCity-s\n  persona=1, grade=0.00: placeholder\nresponse=3, mean=0.00, stdev=0.00, extremity=1.00: \n  persona=0, grade=0.00: The response does not describe any harmful impact, stakeholders, or any SmartCity-specific component or scenario. With no explicit harmful SmartCity impact for any action, this ear\n  persona=1, grade=0.00: The response gives no harmful impacts, stakeholders, or SmartCity-specific consequences. Because no negative impact is described for any action, this earns 0/1.5 on harmful impact \nresponse=4, mean=0.00, stdev=0.00, extremity=1.00: \n  persona=0, grade=0.00: The response gives no harmful impacts and nothing specific to the SmartCity scenario. Because no negative impact on stakeholders is explicitly described, this earns 0; the rubric-w\n  persona=1, grade=0.00: No harmful impacts are described, and nothing is made specific to the SmartCity scenario. Because the response gives no action-impact descriptions, it earns 0/1.5 on this criterion\nresponse=5, mean=0.21, stdev=0.16, extremity=0.59: grey-zone disagreement stdev=0.16, extremity=0.59\n  persona=0, grade=0.00: The response does not clearly describe three harmful impacts tied to explicit bad actor actions. Phrases like 'negative for people' and 'stakeholders are not comfortable' are vague\n  persona=1, grade=0.33: There is some SmartCity-specific context: the answer references heatwave alerts, connected cameras, green lights, authorities’ dashboards, and 5G/resources, which suggests possible",
+      "measurement": {
+        "method": "llm_panel_agreement",
+        "samples": 40,
+        "agreement": 0.6543155781846667
+      },
+      "confidence": {
+        "score": 0.6543155781846667,
+        "level": "medium",
+        "rationale": "Krippendorff's α=0.65 (weak)"
+      },
+      "measured_against_rubric_id": "f4cb908f-9697-41c9-9cdd-cda38a5e9125",
+      "iteration": 0,
+      "source_operations": [
+        "c6b746d4-aa94-4ba2-9551-b86576dc6c71",
+        "fde10d02-ed79-4bcf-b8b4-3e97b8e9cb4b",
+        "2de775c3-67be-472d-aa1a-93acfe0f0377",
+        "1b8f0e15-2220-4d90-80dc-a8f2766b40b9",
+        "17aacd62-03ce-40ec-b6c2-474b4c342712",
+        "1dbaa573-ab90-47af-9619-2207ca964361",
+        "dfb450b9-a4e2-4440-a25b-7adf9111427c",
+        "05bde26c-8fed-4608-9261-8aade4239e91",
+        "5adc72ee-f6c9-4b91-ae93-4b8fdd67b060",
+        "65cb5dca-7bf5-40a0-953c-c331d4c4cb23",
+        "c17c59c5-ae08-4171-9b68-fc4a3b452c06",
+        "3a38dae5-aecd-4aae-82e3-c9583f043d87",
+        "4f924249-1a1d-477e-ba89-c50a363b3283",
+        "b3ee6815-227d-4b07-b4c5-e486b68fa5b1",
+        "fafb6d6e-8925-41f1-9338-6c1aeb5b659a",
+        "a0843434-f679-45c0-b61e-f0a8412bc1a1",
+        "cfb26539-c655-494a-be38-279fefae1f8b",
+        "e5c8753e-bbbe-4fc8-bf07-d3e2ffb88c71",
+        "fc9cd046-c949-4ad7-9d4f-072a087d3d68",
+        "9291fffb-4388-426a-ae41-d059e201f826",
+        "398cd6a4-60b7-4f36-a07d-c1eb66b5d394",
+        "805c3f73-a87c-4e0b-b5b6-921443abaa9f",
+        "79a37c72-f2d2-4af0-85b0-7d8117e37bc6",
+        "ca1d06af-1697-4fb2-b7d2-d5a365bec2a9",
+        "93e66570-ffc3-4ed2-9da4-528ebcd3b795",
+        "da610a82-7246-4ec2-af16-2309aad7223a",
+        "8cd709ef-6ef3-456e-bfb6-3c68e9cb05f5",
+        "8758ce27-ec52-4ed5-bf95-d9cc83c13fed",
+        "deb70f7c-d7e3-4fc7-8ee7-47f431821d5c",
+        "c6a67d21-296d-4296-b2bc-407e6170ba6f",
+        "c923dfb4-0555-4961-815a-05fa1b41ad91",
+        "f4fb9449-935e-4725-9c1a-966ab1c48329",
+        "1170e1c2-f69a-469c-a276-5822d8d7b9e8",
+        "bc4490b2-0a3d-4141-b766-38e59bad53fb",
+        "4aa9f144-34ec-41d4-8da4-a49fc23c4cf8",
+        "ccf7b4a1-71d1-42c9-b3bf-c83944831976",
+        "1f33c0a0-0a17-454b-b3b9-61ee27ab7e94",
+        "ca8edb0f-56b2-4b83-b521-b04c3872d641",
+        "fec62417-243f-4c5e-8dc9-e6da3cb84715",
+        "5938b9fb-e301-44bc-a81e-7dd408e2e252",
+        "2ee7d891-8925-4005-81f2-7e68f23de399",
+        "8fa5a339-a6bd-4fbf-81f9-e6a16c156677",
+        "14bf0b7d-fb6b-4cfc-98fc-209956dd0d2e",
+        "2bb24073-f3fe-47f8-9bdd-7aa90e9c3a07",
+        "64a4222a-32e5-415c-8c29-4b64df350c70",
+        "d1bb2cb8-4b46-4103-9cb8-517167834ae9",
+        "845aa9cd-67c4-41d1-8f2d-5688fa0d4f0e",
+        "1f8bfb5d-064f-4d92-8704-ff514e4ea296",
+        "019852ac-1591-4a8c-bbb0-827df732335d",
+        "8f54d997-e0e6-4a84-8d4a-04857d3977d0",
+        "d389c73b-4707-4a32-8112-ce6888e8649f"
+      ],
+      "linked_finding_ids": []
+    },
+    {
+      "id": "6625d131-08b4-4125-9188-c7c34f85ed00",
+      "criterion": "applicability",
+      "severity": "medium",
+      "target": {
+        "criterion_path": [
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b",
+          "1b277fd0-98d7-42c7-8cc6-56788c953a4b"
+        ],
+        "level_id": null,
+        "field": "description"
+      },
+      "observation": "Grade matrix suggests an applicability gap on rubric criterion a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b; applicability_gap_signal=0.25.",
+      "evidence": "response=0, mean=0.83, stdev=0.14, extremity=0.67: edge disagreement stdev=0.14, extremity=0.67\n  persona=0, grade=0.83: Action/category fit: Politics—'intelligence agencies ... gain information' matches political/nation-state intelligence use (0.5/0.5). Money—stealing SmartCity hardware to sell for \n  persona=1, grade=1.00: All three actions reasonably fit their stated motivation categories: intelligence agencies gathering information aligns with Politics; stealing installed SmartCity hardware for res\nresponse=1, mean=0.17, stdev=0.19, extremity=0.67: edge disagreement stdev=0.19, extremity=0.67\n  persona=0, grade=0.00: Out of 1.5 pts total (0.5 per action), only the Self-interest action is explicitly tied to a plausible self-interest-type misuse (using disinformation to get another person in trou\n  persona=1, grade=0.33: This criterion is 0.5 per action for category fit (1.5 total). The Self-interest example plausibly fits misuse harming others for personal reasons, so it earns full credit for 1 ac\nresponse=7, mean=0.25, stdev=0.17, extremity=0.50: grey-zone disagreement stdev=0.17, extremity=0.50\n  persona=0, grade=0.00: Initializing grading result.\n  persona=1, grade=0.33: There are three attempted actions, worth 0.5 each. Only one clearly matches its stated category: changing the public app to spread beliefs fits Ideas/hacktivist behavior, but it wa",
+      "measurement": {
+        "method": "synthetic_coverage",
+        "samples": 38,
+        "agreement": null
+      },
+      "confidence": {
+        "score": 0.75,
+        "level": "high",
+        "rationale": "inferred from edge polarization and criterion-response orphaning"
+      },
+      "measured_against_rubric_id": "f4cb908f-9697-41c9-9cdd-cda38a5e9125",
+      "iteration": 0,
+      "source_operations": [
+        "c6b746d4-aa94-4ba2-9551-b86576dc6c71",
+        "fde10d02-ed79-4bcf-b8b4-3e97b8e9cb4b",
+        "2de775c3-67be-472d-aa1a-93acfe0f0377",
+        "1b8f0e15-2220-4d90-80dc-a8f2766b40b9",
+        "17aacd62-03ce-40ec-b6c2-474b4c342712",
+        "1dbaa573-ab90-47af-9619-2207ca964361",
+        "dfb450b9-a4e2-4440-a25b-7adf9111427c",
+        "05bde26c-8fed-4608-9261-8aade4239e91",
+        "5adc72ee-f6c9-4b91-ae93-4b8fdd67b060",
+        "65cb5dca-7bf5-40a0-953c-c331d4c4cb23",
+        "c17c59c5-ae08-4171-9b68-fc4a3b452c06",
+        "3a38dae5-aecd-4aae-82e3-c9583f043d87",
+        "4f924249-1a1d-477e-ba89-c50a363b3283",
+        "b3ee6815-227d-4b07-b4c5-e486b68fa5b1",
+        "fafb6d6e-8925-41f1-9338-6c1aeb5b659a",
+        "a0843434-f679-45c0-b61e-f0a8412bc1a1",
+        "cfb26539-c655-494a-be38-279fefae1f8b",
+        "e5c8753e-bbbe-4fc8-bf07-d3e2ffb88c71",
+        "fc9cd046-c949-4ad7-9d4f-072a087d3d68",
+        "9291fffb-4388-426a-ae41-d059e201f826",
+        "398cd6a4-60b7-4f36-a07d-c1eb66b5d394",
+        "805c3f73-a87c-4e0b-b5b6-921443abaa9f",
+        "79a37c72-f2d2-4af0-85b0-7d8117e37bc6",
+        "ca1d06af-1697-4fb2-b7d2-d5a365bec2a9",
+        "93e66570-ffc3-4ed2-9da4-528ebcd3b795",
+        "da610a82-7246-4ec2-af16-2309aad7223a",
+        "8cd709ef-6ef3-456e-bfb6-3c68e9cb05f5",
+        "8758ce27-ec52-4ed5-bf95-d9cc83c13fed",
+        "deb70f7c-d7e3-4fc7-8ee7-47f431821d5c",
+        "c6a67d21-296d-4296-b2bc-407e6170ba6f",
+        "c923dfb4-0555-4961-815a-05fa1b41ad91",
+        "f4fb9449-935e-4725-9c1a-966ab1c48329",
+        "1170e1c2-f69a-469c-a276-5822d8d7b9e8",
+        "bc4490b2-0a3d-4141-b766-38e59bad53fb",
+        "4aa9f144-34ec-41d4-8da4-a49fc23c4cf8",
+        "ccf7b4a1-71d1-42c9-b3bf-c83944831976",
+        "1f33c0a0-0a17-454b-b3b9-61ee27ab7e94",
+        "ca8edb0f-56b2-4b83-b521-b04c3872d641",
+        "fec62417-243f-4c5e-8dc9-e6da3cb84715",
+        "5938b9fb-e301-44bc-a81e-7dd408e2e252",
+        "2ee7d891-8925-4005-81f2-7e68f23de399",
+        "8fa5a339-a6bd-4fbf-81f9-e6a16c156677",
+        "14bf0b7d-fb6b-4cfc-98fc-209956dd0d2e",
+        "2bb24073-f3fe-47f8-9bdd-7aa90e9c3a07",
+        "64a4222a-32e5-415c-8c29-4b64df350c70",
+        "d1bb2cb8-4b46-4103-9cb8-517167834ae9",
+        "845aa9cd-67c4-41d1-8f2d-5688fa0d4f0e",
+        "1f8bfb5d-064f-4d92-8704-ff514e4ea296",
+        "019852ac-1591-4a8c-bbb0-827df732335d",
+        "8f54d997-e0e6-4a84-8d4a-04857d3977d0",
+        "d389c73b-4707-4a32-8112-ce6888e8649f"
+      ],
+      "linked_finding_ids": []
+    },
+    {
+      "id": "7629a349-e4ad-4cc1-928b-f22f4ddf2f4b",
+      "criterion": "applicability",
+      "severity": "medium",
+      "target": {
+        "criterion_path": [
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b",
+          "22f62c9d-13dd-4ac6-8d35-facb2c6a4910"
+        ],
+        "level_id": null,
+        "field": "description"
+      },
+      "observation": "Grade matrix suggests an applicability gap on rubric criterion a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910; applicability_gap_signal=0.30.",
+      "evidence": "response=2, mean=0.67, stdev=0.45, extremity=0.33: bimodal edge grades floor=1, ceiling=1\n  persona=0, grade=0.83: Harm specific to SmartCity: Money action gives SmartCity-specific harms ('traffic and bins' disruption, reputational and contract loss) = 0.5/0.5. Politics action gives SmartCity-s\n  persona=1, grade=0.00: placeholder\nresponse=5, mean=0.21, stdev=0.16, extremity=0.59: grey-zone disagreement stdev=0.16, extremity=0.59\n  persona=0, grade=0.00: The response does not clearly describe three harmful impacts tied to explicit bad actor actions. Phrases like 'negative for people' and 'stakeholders are not comfortable' are vague\n  persona=1, grade=0.33: There is some SmartCity-specific context: the answer references heatwave alerts, connected cameras, green lights, authorities’ dashboards, and 5G/resources, which suggests possible\nresponse=6, mean=0.17, stdev=0.13, extremity=0.67: edge disagreement stdev=0.13, extremity=0.67\n  persona=0, grade=0.00: The response gives only vague harms such as inefficiency and people complaining, and these are not clearly linked to explicit bad actor actions. The impacts are not sufficiently de\n  persona=1, grade=0.33: There is some attempt to describe negative impact in the SmartCity context (system inefficiency, danger for the city, public complaints), so limited credit is warranted. However, t\nresponse=7, mean=0.29, stdev=0.21, extremity=0.42: grey-zone disagreement stdev=0.21, extremity=0.42\n  persona=0, grade=0.00: Initializing grading result.\n  persona=1, grade=0.50: The response gives some SmartCity-specific context (public app, traffic system, weather sensors, city budget, trust), so there is partial scenario adaptation. However, harmful impa",
+      "measurement": {
+        "method": "synthetic_coverage",
+        "samples": 40,
+        "agreement": null
+      },
+      "confidence": {
+        "score": 0.7,
+        "level": "medium",
+        "rationale": "inferred from edge polarization and criterion-response orphaning"
+      },
+      "measured_against_rubric_id": "f4cb908f-9697-41c9-9cdd-cda38a5e9125",
+      "iteration": 0,
+      "source_operations": [
+        "c6b746d4-aa94-4ba2-9551-b86576dc6c71",
+        "fde10d02-ed79-4bcf-b8b4-3e97b8e9cb4b",
+        "2de775c3-67be-472d-aa1a-93acfe0f0377",
+        "1b8f0e15-2220-4d90-80dc-a8f2766b40b9",
+        "17aacd62-03ce-40ec-b6c2-474b4c342712",
+        "1dbaa573-ab90-47af-9619-2207ca964361",
+        "dfb450b9-a4e2-4440-a25b-7adf9111427c",
+        "05bde26c-8fed-4608-9261-8aade4239e91",
+        "5adc72ee-f6c9-4b91-ae93-4b8fdd67b060",
+        "65cb5dca-7bf5-40a0-953c-c331d4c4cb23",
+        "c17c59c5-ae08-4171-9b68-fc4a3b452c06",
+        "3a38dae5-aecd-4aae-82e3-c9583f043d87",
+        "4f924249-1a1d-477e-ba89-c50a363b3283",
+        "b3ee6815-227d-4b07-b4c5-e486b68fa5b1",
+        "fafb6d6e-8925-41f1-9338-6c1aeb5b659a",
+        "a0843434-f679-45c0-b61e-f0a8412bc1a1",
+        "cfb26539-c655-494a-be38-279fefae1f8b",
+        "e5c8753e-bbbe-4fc8-bf07-d3e2ffb88c71",
+        "fc9cd046-c949-4ad7-9d4f-072a087d3d68",
+        "9291fffb-4388-426a-ae41-d059e201f826",
+        "398cd6a4-60b7-4f36-a07d-c1eb66b5d394",
+        "805c3f73-a87c-4e0b-b5b6-921443abaa9f",
+        "79a37c72-f2d2-4af0-85b0-7d8117e37bc6",
+        "ca1d06af-1697-4fb2-b7d2-d5a365bec2a9",
+        "93e66570-ffc3-4ed2-9da4-528ebcd3b795",
+        "da610a82-7246-4ec2-af16-2309aad7223a",
+        "8cd709ef-6ef3-456e-bfb6-3c68e9cb05f5",
+        "8758ce27-ec52-4ed5-bf95-d9cc83c13fed",
+        "deb70f7c-d7e3-4fc7-8ee7-47f431821d5c",
+        "c6a67d21-296d-4296-b2bc-407e6170ba6f",
+        "c923dfb4-0555-4961-815a-05fa1b41ad91",
+        "f4fb9449-935e-4725-9c1a-966ab1c48329",
+        "1170e1c2-f69a-469c-a276-5822d8d7b9e8",
+        "bc4490b2-0a3d-4141-b766-38e59bad53fb",
+        "4aa9f144-34ec-41d4-8da4-a49fc23c4cf8",
+        "ccf7b4a1-71d1-42c9-b3bf-c83944831976",
+        "1f33c0a0-0a17-454b-b3b9-61ee27ab7e94",
+        "ca8edb0f-56b2-4b83-b521-b04c3872d641",
+        "fec62417-243f-4c5e-8dc9-e6da3cb84715",
+        "5938b9fb-e301-44bc-a81e-7dd408e2e252",
+        "2ee7d891-8925-4005-81f2-7e68f23de399",
+        "8fa5a339-a6bd-4fbf-81f9-e6a16c156677",
+        "14bf0b7d-fb6b-4cfc-98fc-209956dd0d2e",
+        "2bb24073-f3fe-47f8-9bdd-7aa90e9c3a07",
+        "64a4222a-32e5-415c-8c29-4b64df350c70",
+        "d1bb2cb8-4b46-4103-9cb8-517167834ae9",
+        "845aa9cd-67c4-41d1-8f2d-5688fa0d4f0e",
+        "1f8bfb5d-064f-4d92-8704-ff514e4ea296",
+        "019852ac-1591-4a8c-bbb0-827df732335d",
+        "8f54d997-e0e6-4a84-8d4a-04857d3977d0",
+        "d389c73b-4707-4a32-8112-ce6888e8649f"
+      ],
+      "linked_finding_ids": []
+    },
+    {
+      "id": "54018c72-7119-4d1e-8e28-1dbc7d803bc2",
+      "criterion": "discrimination_power",
+      "severity": "medium",
+      "target": {
+        "criterion_path": [
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b",
+          "1b277fd0-98d7-42c7-8cc6-56788c953a4b"
+        ],
+        "level_id": null,
+        "field": "description"
+      },
+      "observation": "Pairwise comparison found a winner for responses 8 and 9, but criterion a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b gave near-equal scores.",
+      "evidence": "winner=B, confidence=0.92, a_score=0.67, b_score=0.75; Response B is stronger overall on the rubric. For action-category fit, B has three distinct actions that better match the motivation categories: ransom attack for Money, politically motivated traffic disruption for Politics, and anti-smart-tech belief-driven opposition for Ideas. In A, the Entertainment action repeats the dashboard-locking idea from Money, triggering the 'actions too similar' concern, and its harms are vaguer. For SmartCity-specific harmful impact, B gives clearer scenario-adapted consequences (service disruption, blocked emergency vehicles, trust damage), while A’s impacts are less specific and one action is explicitly uncertain. B’s Ideas example is weaker because it is more like online complaining than a concrete malicious action, but B still outperforms A across the criteria.",
+      "measurement": {
+        "method": "pairwise_consistency",
+        "samples": 1,
+        "agreement": null
+      },
+      "confidence": {
+        "score": 0.6,
+        "level": "medium",
+        "rationale": "pairwise comparison against simulated criterion scores"
+      },
+      "measured_against_rubric_id": "f4cb908f-9697-41c9-9cdd-cda38a5e9125",
+      "iteration": 0,
+      "source_operations": [
+        "8fa5a339-a6bd-4fbf-81f9-e6a16c156677"
+      ],
+      "linked_finding_ids": []
+    },
+    {
+      "id": "25d3c02a-1e7f-487e-8203-a7875dc095bf",
+      "criterion": "discrimination_power",
+      "severity": "medium",
+      "target": {
+        "criterion_path": [
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b",
+          "1b277fd0-98d7-42c7-8cc6-56788c953a4b"
+        ],
+        "level_id": null,
+        "field": "description"
+      },
+      "observation": "Pairwise comparison found a winner for responses 0 and 2, but criterion a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b gave near-equal scores.",
+      "evidence": "winner=B, confidence=0.89, a_score=0.83, b_score=0.89; Response B is stronger overall on both rubric subcriteria. Its three actions more clearly match motivation categories (money/competitor sabotage for market gain, politics/election-motivated disruption, ideas/privacy-motivated camera interference) and it gives more SmartCity-specific harms to stakeholders (traffic disruption, overflowing bins, traffic-light malfunction, reputational and financial damage). Response A has one clearly fitting action (politics/intelligence gathering) and one plausible entertainment action, but the money example focuses on stealing physical equipment rather than malicious use of the software/system, and several harms are generic or underdeveloped. B also provides more scenario-adapted impacts across all three actions.",
+      "measurement": {
+        "method": "pairwise_consistency",
+        "samples": 1,
+        "agreement": null
+      },
+      "confidence": {
+        "score": 0.6,
+        "level": "medium",
+        "rationale": "pairwise comparison against simulated criterion scores"
+      },
+      "measured_against_rubric_id": "f4cb908f-9697-41c9-9cdd-cda38a5e9125",
+      "iteration": 0,
+      "source_operations": [
+        "d1bb2cb8-4b46-4103-9cb8-517167834ae9"
+      ],
+      "linked_finding_ids": []
+    },
+    {
+      "id": "9bbf330d-402a-46fe-9dcb-7f84182cd687",
+      "criterion": "discrimination_power",
+      "severity": "medium",
+      "target": {
+        "criterion_path": [
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b",
+          "1b277fd0-98d7-42c7-8cc6-56788c953a4b"
+        ],
+        "level_id": null,
+        "field": "description"
+      },
+      "observation": "Pairwise comparison found a winner for responses 3 and 4, but criterion a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b gave near-equal scores.",
+      "evidence": "winner=B, confidence=0.97, a_score=0.00, b_score=0.00; Response B is slightly stronger because it at least references relevant bad-actor motivation categories ('hackers', 'money', 'politics'), whereas Response A is entirely nonsensical and unrelated to the SmartCity bad-actor task. However, neither response provides three valid actions or SmartCity-specific harmful impacts, so both fail criterion a8a95866-fc85-4e83-ad6d-0a59f4e6204b and its subcriteria. The distinction is based on minimal topical relevance rather than substantive rubric fulfillment.",
+      "measurement": {
+        "method": "pairwise_consistency",
+        "samples": 1,
+        "agreement": null
+      },
+      "confidence": {
+        "score": 0.6,
+        "level": "medium",
+        "rationale": "pairwise comparison against simulated criterion scores"
+      },
+      "measured_against_rubric_id": "f4cb908f-9697-41c9-9cdd-cda38a5e9125",
+      "iteration": 0,
+      "source_operations": [
+        "845aa9cd-67c4-41d1-8f2d-5688fa0d4f0e"
+      ],
+      "linked_finding_ids": []
+    },
+    {
+      "id": "de8ff228-1471-40d5-85a7-f85ecb481519",
+      "criterion": "discrimination_power",
+      "severity": "medium",
+      "target": {
+        "criterion_path": [
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b",
+          "22f62c9d-13dd-4ac6-8d35-facb2c6a4910"
+        ],
+        "level_id": null,
+        "field": "description"
+      },
+      "observation": "Pairwise comparison found a winner for responses 3 and 4, but criterion a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910 gave near-equal scores.",
+      "evidence": "winner=B, confidence=0.97, a_score=0.00, b_score=0.00; Response B is slightly stronger because it at least references relevant bad-actor motivation categories ('hackers', 'money', 'politics'), whereas Response A is entirely nonsensical and unrelated to the SmartCity bad-actor task. However, neither response provides three valid actions or SmartCity-specific harmful impacts, so both fail criterion a8a95866-fc85-4e83-ad6d-0a59f4e6204b and its subcriteria. The distinction is based on minimal topical relevance rather than substantive rubric fulfillment.",
+      "measurement": {
+        "method": "pairwise_consistency",
+        "samples": 1,
+        "agreement": null
+      },
+      "confidence": {
+        "score": 0.6,
+        "level": "medium",
+        "rationale": "pairwise comparison against simulated criterion scores"
+      },
+      "measured_against_rubric_id": "f4cb908f-9697-41c9-9cdd-cda38a5e9125",
+      "iteration": 0,
+      "source_operations": [
+        "845aa9cd-67c4-41d1-8f2d-5688fa0d4f0e"
+      ],
+      "linked_finding_ids": []
+    },
+    {
+      "id": "4528cfa7-d242-44e2-bb5a-1127530b77ed",
+      "criterion": "discrimination_power",
+      "severity": "medium",
+      "target": {
+        "criterion_path": [
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b",
+          "1b277fd0-98d7-42c7-8cc6-56788c953a4b"
+        ],
+        "level_id": null,
+        "field": "description"
+      },
+      "observation": "Pairwise comparison found a winner for responses 4 and 5, but criterion a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b gave near-equal scores.",
+      "evidence": "winner=B, confidence=0.95, a_score=0.00, b_score=0.03; Response B is clearly stronger. Response A does not provide three bad actor actions, does not map actions to motivation categories, and gives no SmartCity-specific harmful impacts, failing both subcriteria under the bad actor actions rubric. Response B is poorly written but at least references SmartCity elements (weather, traffic, waste-bins, dashboard, authorities, 5G, cameras, green lights) and implies some harmful impacts on stakeholders, so it better addresses the SmartCity-specific harm criterion, even though it still lacks three clear, well-categorized actions.",
+      "measurement": {
+        "method": "pairwise_consistency",
+        "samples": 1,
+        "agreement": null
+      },
+      "confidence": {
+        "score": 0.6,
+        "level": "medium",
+        "rationale": "pairwise comparison against simulated criterion scores"
+      },
+      "measured_against_rubric_id": "f4cb908f-9697-41c9-9cdd-cda38a5e9125",
+      "iteration": 0,
+      "source_operations": [
+        "1f8bfb5d-064f-4d92-8704-ff514e4ea296"
+      ],
+      "linked_finding_ids": []
+    },
+    {
+      "id": "1ff18126-98ba-4242-8dd3-1d52576839cc",
+      "criterion": "discrimination_power",
+      "severity": "medium",
+      "target": {
+        "criterion_path": [
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b",
+          "22f62c9d-13dd-4ac6-8d35-facb2c6a4910"
+        ],
+        "level_id": null,
+        "field": "description"
+      },
+      "observation": "Pairwise comparison found a winner for responses 0 and 8, but criterion a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910 gave near-equal scores.",
+      "evidence": "winner=A, confidence=0.84, a_score=0.87, b_score=0.79; Response A is stronger overall on the rubric. It provides three distinct actions that mostly fit their motivation categories and are adapted to the SmartCity scenario, with clearer stakeholder harm for each (foreign intelligence surveillance; theft of city infrastructure hardware; sensor manipulation disrupting waste collection). Response B has one solid Money action and one plausible Politics action, but its Entertainment action repeats the dashboard-locking idea from Money, triggering the 'actions too similar' concern, and its harms are described more vaguely. Thus A performs better on both category fit and SmartCity-specific harmful impact.",
+      "measurement": {
+        "method": "pairwise_consistency",
+        "samples": 1,
+        "agreement": null
+      },
+      "confidence": {
+        "score": 0.6,
+        "level": "medium",
+        "rationale": "pairwise comparison against simulated criterion scores"
+      },
+      "measured_against_rubric_id": "f4cb908f-9697-41c9-9cdd-cda38a5e9125",
+      "iteration": 0,
+      "source_operations": [
+        "019852ac-1591-4a8c-bbb0-827df732335d"
+      ],
+      "linked_finding_ids": []
+    }
+  ],
+  "evidence_profile": {
+    "starting_rubric_present": true,
+    "exam_question_present": true,
+    "teaching_material_present": true,
+    "teaching_material_count": 1,
+    "student_copies_present": true,
+    "student_copies_count": 3,
+    "student_copies_pages_total": 0,
+    "starting_rubric_hash": "cd22ee1af5a2979451f0029653b9df3246171307831955cdd9d442a5129ba0dc",
+    "exam_question_hash": "358673b2f50ee4dcefbd3550d9a4b7fdd2f1975dd64787eba7540038ab848994",
+    "teaching_material_hashes": [
+      "34684440832fbab491a4cbee7ddff59ef9ab70df13841b08d8f6146f4d910778"
+    ],
+    "student_copies_hashes": [
+      "a5d5b27463c72a71fb72eb3b66ff69ea9ba4d1d4687a73931b018966a80588da",
+      "297b754f009d3b627fa35337b6b9404ee394fa783be0ef2e95f09bef16d59f40",
+      "8f8a6da6489d4086e9930800e692e752a13e32c33b9ba40dea047176daefa49b"
+    ],
+    "synthetic_responses_used": true,
+    "notes": []
+  },
+  "quality_scores": [
+    {
+      "criterion": "ambiguity",
+      "score": 0.7551728941194752,
+      "confidence": {
+        "score": 0.7551728941194752,
+        "level": "high",
+        "rationale": "Krippendorff's α=0.76 (moderate). Graders disagree often enough that some students would get different grades depending on who marks them."
+      },
+      "method": "grader_simulation",
+      "source_operation_id": "c6b746d4-aa94-4ba2-9551-b86576dc6c71"
+    },
+    {
+      "criterion": "applicability",
+      "score": 0.725,
+      "confidence": {
+        "score": 0.7,
+        "level": "medium",
+        "rationale": "computed from edge polarization and criterion-response orphaning"
+      },
+      "method": "grader_simulation",
+      "source_operation_id": "c6b746d4-aa94-4ba2-9551-b86576dc6c71"
+    },
+    {
+      "criterion": "discrimination_power",
+      "score": 0.8732799124536872,
+      "confidence": {
+        "score": 0.7,
+        "level": "medium",
+        "rationale": "computed from score separation and pairwise consistency"
+      },
+      "method": "grader_simulation",
+      "source_operation_id": "c6b746d4-aa94-4ba2-9551-b86576dc6c71"
+    }
+  ],
+  "simulation_summary": "responses=10\npersonas=4\ngrade_entries=78\npairwise_results=10\ncriterion a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b: mean_grade=0.35, min=0.00, max=1.00, response_count=10\n  response_grade_spread: r0=mean:0.83/stdev:0.14, r1=mean:0.17/stdev:0.19, r2=mean:0.89/stdev:0.10, r3=mean:0.00/stdev:0.00, r4=mean:0.00/stdev:0.00, r5=mean:0.03/stdev:0.07, r6=mean:0.00/stdev:0.00, r7=mean:0.25/stdev:0.17, r8=mean:0.67/stdev:0.14, r9=mean:0.75/stdev:0.10\ncriterion a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910: mean_grade=0.40, min=0.00, max=1.00, response_count=10\n  response_grade_spread: r0=mean:0.87/stdev:0.08, r1=mean:0.33/stdev:0.24, r2=mean:0.67/stdev:0.45, r3=mean:0.00/stdev:0.00, r4=mean:0.00/stdev:0.00, r5=mean:0.21/stdev:0.16, r6=mean:0.17/stdev:0.13, r7=mean:0.29/stdev:0.21, r8=mean:0.79/stdev:0.08, r9=mean:0.62/stdev:0.16\npairwise comparisons:\n  r8 vs r9: winner=B, confidence=0.92, ambiguity_attributed=False, affected_criteria=[]; Response B is stronger overall on the rubric. For action-category fit, B has three distinct actions that better match the motivation categories: ransom attack for Money, politically motivated traffic disruption for Politics, and anti-smart-tech belief-driven o\n  r6 vs r7: winner=B, confidence=0.88, ambiguity_attributed=False, affected_criteria=['a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b', 'a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910']; Response B is stronger overall because it at least attempts three bad-actor actions tied to motivation categories (Money, Entertainment, Politics), whereas Response A mostly lists operational/project problems rather than malicious bad-actor actions. Under the \n  r7 vs r8: winner=B, confidence=0.94, ambiguity_attributed=False, affected_criteria=[]; Response B is clearly stronger on both sub-criteria under Bad Actor Actions. Its actions better match the stated motivation categories (Money: ransomware/extortion; Politics: surveillance by a government actor; Entertainment: misuse for fun), whereas Response \n  r0 vs r1: winner=A, confidence=0.95, ambiguity_attributed=False, affected_criteria=['a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b', 'a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910']; Response A is clearly stronger on both rubric subcriteria. It provides three recognizable bad-actor actions tied to categories (Politics: intelligence gathering; Money: theft of installed equipment; Entertainment: trolling/manipulating waste sensors) and each \n  r0 vs r2: winner=B, confidence=0.89, ambiguity_attributed=False, affected_criteria=[]; Response B is stronger overall on both rubric subcriteria. Its three actions more clearly match motivation categories (money/competitor sabotage for market gain, politics/election-motivated disruption, ideas/privacy-motivated camera interference) and it gives \n  r3 vs r4: winner=B, confidence=0.97, ambiguity_attributed=False, affected_criteria=['a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b', 'a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910']; Response B is slightly stronger because it at least references relevant bad-actor motivation categories ('hackers', 'money', 'politics'), whereas Response A is entirely nonsensical and unrelated to the SmartCity bad-actor task. However, neither response provid\n  r4 vs r5: winner=B, confidence=0.95, ambiguity_attributed=False, affected_criteria=[]; Response B is clearly stronger. Response A does not provide three bad actor actions, does not map actions to motivation categories, and gives no SmartCity-specific harmful impacts, failing both subcriteria under the bad actor actions rubric. Response B is poor\n  r0 vs r8: winner=A, confidence=0.84, ambiguity_attributed=False, affected_criteria=['a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b', 'a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910']; Response A is stronger overall on the rubric. It provides three distinct actions that mostly fit their motivation categories and are adapted to the SmartCity scenario, with clearer stakeholder harm for each (foreign intelligence surveillance; theft of city inf\n  r1 vs r8: winner=B, confidence=0.93, ambiguity_attributed=False, affected_criteria=['a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b', 'a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910']; Response B is clearly stronger on both rubric subcriteria. Its actions mostly match bad-actor motivation categories (Money: ransomware-like dashboard lock; Politics: surveillance via road cameras; Entertainment: random disruptive misuse), and each includes Sma\n  r2 vs r8: winner=A, confidence=0.95, ambiguity_attributed=False, affected_criteria=['a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b', 'a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910']; Response A is clearly stronger on both rubric subcriteria. It provides three distinct actions that mostly fit their motivation categories and gives SmartCity-specific harms for each (traffic disruption, bin sensor disruption affecting citizens and elections, c",
+  "simulation_evidence": {
+    "rubric_id": "f4cb908f-9697-41c9-9cdd-cda38a5e9125",
+    "response_set": [
+      {
+        "text": "Politics: Intelligence agencies can use this tool when SmartCity is installed in other countries to gain information about them. Then countries and their population will no longer have privacy and security.\n\nMoney: Robbers can take this valuable installed materials - sensors, cameras, routers and others to sell them or use them. It will cost money to reinstall those materials.\n\nEntertainment: Some bad actors can troll the waste collection services by manipulating the sensors to make the waste collection redirect the collectors to the same localisation several times.",
+        "source": "real",
+        "quality_tier": "",
+        "intended_score": null
+      },
+      {
+        "text": "- Category: Money\n\nVery expensive. The realization of this software is a really good idea that it might require a lot of money to build it or even in using it since it might need some resources to be useful. Or it can encourage the local authorities to spend a lot of money\n\n- Category: Self-interest\n\nSome people might use it for disinformation, since it can possibly use it for harm. They could probably harm people who didn't do anything who respected the laws and follow the rules and they get in trouble because of some sort of disinformation that could harm like for example: a person who might have come slightly above the street by accident and then just realize that it was actually a red light instead of a green and then get into trouble for nothing.\n\n- Category: Ideas\n\nSome people might not agree to each other for some circumstances like for example ventilation and temperature being adjusted automatically with dependence on the weather outside or the environment. Because some people people are probably more sensitive to heat or cold than others and may be more uncomfortable with the automation adjusted than other and this could probably lead to unfairness between people which could probably not be satisfied with these conditions.",
+        "source": "real",
+        "quality_tier": "",
+        "intended_score": null
+      },
+      {
+        "text": "Money: A competitor of the company SmartCity can hack the centralized monitoring system, this would lead to a mess with the traffic and the bins. The company SmartCity would be negatively impacted in their reputation and this would lead to the loss of money by not signing contract with other European countries. The motivation for the competitor is the money they gain some part of the market.\n\nPolitics: A competitor of the current \"maire (chef de la ville)\" can disturb the sensors or divert-him, the harm would be that citizens couldn't be happy anymore with the council of the city because there would be bins everywhere due to the disruption of the sensors. The motivation for the competitor would be to be elected in the next elections.\n\nIdeas: A group of people pro-privacy can destroy/cover the cameras used to analyze the real-time traffic arguing that it is not in their ideology to be looked after by ML augmented cameras. The stakeholders harmed would be all the users of the road. They wouldn't have any information about traffic jams anymore. And the traffic light can malfunction due to the loss of information.",
+        "source": "real",
+        "quality_tier": "",
+        "intended_score": null
+      },
+      {
+        "text": "Blue pancakes run under the violin while Tuesday sings loudly about seven oranges and a sleepy mountain.",
+        "source": "synthetic",
+        "quality_tier": "very_weak",
+        "intended_score": 0.02
+      },
+      {
+        "text": "hackers money politics yes",
+        "source": "synthetic",
+        "quality_tier": "weak",
+        "intended_score": 0.05
+      },
+      {
+        "text": "SmartCity is smart for city and the bad actor maybe use weather and traffic because Europe countries have waste-bins and dashboard with authorities, so the harmful thing is resources and 5G can be negative for people if the app says heatwave and cameras are connected to green lights and then stakeholders are not comfortable and machine learning is important in society.",
+        "source": "synthetic",
+        "quality_tier": "below_average",
+        "intended_score": 0.1
+      },
+      {
+        "text": "The main bad thing for SmartCity is maybe the project costs too much money and the local authorities cannot manage all the devices well. Another problem could be cameras breaking in rain or workers not liking the dashboard, which is dangerous for the city because then the system is not efficient and people complain in France, Germany and other places.",
+        "source": "synthetic",
+        "quality_tier": "average",
+        "intended_score": 0.25
+      },
+      {
+        "text": "I think one category is Money, where maybe activists change the public app to spread their belief about pollution, which is bad because people are affected. Another could be Entertainment because some people maybe look at the traffic thing and make jokes online, so this is a problem. Also Politics could be when the weather sensors are expensive and the city loses budget. I am not fully sure but it could hurt trust and make the SmartCity system bad.",
+        "source": "synthetic",
+        "quality_tier": "above_average",
+        "intended_score": 0.4
+      },
+      {
+        "text": "Money: a hacker could maybe lock the city dashboard and ask for payment. This is bad because the authority staff cannot control the system and there may be delays.\n\nPolitics: a government actor could use the road cameras to watch people moving around the city. I think this affects privacy and trust, although I am not sure how much the system stores.\n\nEntertainment: someone for fun could also lock the dashboard again or press random settings in buildings. That would annoy people and make problems. So there are different bad actors but some are similar.",
+        "source": "synthetic",
+        "quality_tier": "strong",
+        "intended_score": 0.55
+      },
+      {
+        "text": "Money: criminals could hack the centralized dashboard and demand ransom to give back access. If city staff cannot monitor waste bins or traffic controls, services may be disrupted and residents are affected.\n\nPolitics: a state-linked actor could alter traffic camera data to create congestion during a political event, which could block emergency vehicles and damage trust in the authorities.\n\nIdeas: people with strong beliefs might dislike smart technology and complain online that it is evil. This is harmful because it creates negativity around SmartCity.",
+        "source": "synthetic",
+        "quality_tier": "excellent",
+        "intended_score": 0.7
+      }
+    ],
+    "personas_used": [
+      "Start every criterion at 0 points. Add credit ONLY for elements you can explicitly verify in the response text. If the rubric says 'specific to SmartCity' and the response says 'harmful to people' without naming a SmartCity component, award 0 for that element. Partial credit is 0 unless the rubric defines a partial level. When uncertain, round DOWN.",
+      "Start every criterion at full credit. Subtract ONLY for elements that are clearly missing or demonstrably wrong. If the response addresses the spirit of a criterion but misses a detail, keep full credit. Give benefit of the doubt on borderline cases. When uncertain, round UP.",
+      "Grade exactly and only what the rubric text says. If the rubric references a document you don't have, mark the criterion as partially applicable. If the rubric says '0.5 points' with no partial level, award either 0.5 or 0. Do not infer criteria the rubric does not state. Do not reward qualities the rubric does not ask for.",
+      "Try to understand what the student meant, not just what they wrote. If the student clearly understands the concept but expresses it poorly, give substantial credit. If the student uses the wrong terminology but describes the right mechanism, treat it as correct. Penalise only when the student's understanding is genuinely wrong, not when their writing is unclear."
+    ],
+    "criterion_path_index": {
+      "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b": [
+        "a8a95866-fc85-4e83-ad6d-0a59f4e6204b",
+        "1b277fd0-98d7-42c7-8cc6-56788c953a4b"
+      ],
+      "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910": [
+        "a8a95866-fc85-4e83-ad6d-0a59f4e6204b",
+        "22f62c9d-13dd-4ac6-8d35-facb2c6a4910"
+      ]
+    },
+    "grade_entries": [
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 0,
+        "persona_idx": 0,
+        "grade": 0.8333333333,
+        "justification": "Action/category fit: Politics—'intelligence agencies ... gain information' matches political/nation-state intelligence use (0.5/0.5). Money—stealing SmartCity hardware to sell for profit fits money motivation (0.5/0.5). Entertainment—trolling waste collection by manipulating sensors fits entertainment/troll behavior (0.5/0.5). Total 1.5/1.5. Applied rubric penalty for two actions being too similar: no. Normalized grade 1.0.",
+        "source_operation_id": "fde10d02-ed79-4bcf-b8b4-3e97b8e9cb4b"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 0,
+        "persona_idx": 0,
+        "grade": 0.8333333333,
+        "justification": "Harm specific to SmartCity: Politics—mentions SmartCity installed in other countries and loss of privacy/security, which is harmful and scenario-linked (0.5/0.5). Money—mentions sensors/cameras/routers being stolen and replacement cost, specific to SmartCity infrastructure (0.5/0.5). Entertainment—manipulating waste sensors to redirect collectors repeatedly is clearly SmartCity-specific, but the harmful impact on stakeholders is only implicit and not fully described; award 0.25/0.5 for this action and apply the rubric's insufficient negative-impact deduction here. Total 1.25/1.5, normalized 0.8333.",
+        "source_operation_id": "fde10d02-ed79-4bcf-b8b4-3e97b8e9cb4b"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 0,
+        "persona_idx": 1,
+        "grade": 1.0,
+        "justification": "All three actions reasonably fit their stated motivation categories: intelligence agencies gathering information aligns with Politics; stealing installed SmartCity hardware for resale aligns with Money; trolling waste collection by manipulating sensors aligns with Entertainment. The actions are distinct enough from each other, so no similarity deduction applies. This earns 1.5/1.5 points, normalized to 1.0.",
+        "source_operation_id": "2de775c3-67be-472d-aa1a-93acfe0f0377"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 0,
+        "persona_idx": 1,
+        "grade": 1.0,
+        "justification": "Each action includes a harmful impact tied to the SmartCity scenario: surveillance harms privacy/security of countries and populations; theft of sensors/cameras/routers causes replacement costs and loss of infrastructure; sensor manipulation disrupts waste collection by repeatedly redirecting collectors. The impacts are specific to SmartCity systems and stakeholders. While brief, they address the spirit of the criterion, so no negative-impact deduction is applied. This earns 1.5/1.5 points, normalized to 1.0.",
+        "source_operation_id": "2de775c3-67be-472d-aa1a-93acfe0f0377"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 0,
+        "persona_idx": 2,
+        "grade": 0.6667,
+        "justification": "There are 3 actions. Politics/intelligence agencies gaining information fits the Politics category (0.5/0.5). Entertainment/trolling waste collection by manipulating sensors fits Entertainment (0.5/0.5). Money/robbers stealing installed materials to sell is not clearly supported by the provided cheatsheet examples for Money, which focus on exploiting the software/system (e.g., data theft, ransomware, sabotage), so this action is only partially applicable under the rubric reference to the cheatsheet and earns 0/0.5. Total 1.0/1.5 = 0.6667.",
+        "source_operation_id": "1b8f0e15-2220-4d90-80dc-a8f2766b40b9"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 0,
+        "persona_idx": 2,
+        "grade": 0.8333,
+        "justification": "All 3 actions include harmful impact tied to SmartCity: loss of privacy/security for countries and populations from intelligence use; financial cost to reinstall stolen SmartCity materials; and waste collection disruption from manipulated sensors redirecting collectors. However, the first action's impact is somewhat generic and the third could describe stakeholder harm more explicitly, so applying the rubric's negative-impact insufficiency deduction once (-0.25) to this criterion is appropriate. Raw score 1.5/1.5 minus 0.25 = 1.25/1.5 = 0.8333.",
+        "source_operation_id": "1b8f0e15-2220-4d90-80dc-a8f2766b40b9"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 0,
+        "persona_idx": 3,
+        "grade": 0.8333333333,
+        "justification": "Category fit is strong for all three actions: intelligence agencies gathering information fits Politics; stealing installed SmartCity equipment for resale fits Money; trolling by manipulating waste sensors fits Entertainment. However, the Money action is somewhat less aligned with software misuse than the others because it is primarily physical theft of infrastructure rather than malicious use of the SmartCity system itself, so I award 2.5/3 of the available subpoints = 1.25/1.5, normalized to 0.83.",
+        "source_operation_id": "17aacd62-03ce-40ec-b6c2-474b4c342712"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 0,
+        "persona_idx": 3,
+        "grade": 0.8333333333,
+        "justification": "The student gives SmartCity-specific harms for each action: surveillance/privacy loss for cross-country deployment, replacement costs from stolen sensors/cameras/routers, and waste-collection disruption from manipulated sensors. These are adapted to the scenario and identify stakeholders harmed. Still, the first impact is somewhat generic ('privacy and security') and the second focuses mainly on cost without much broader stakeholder impact, so I award 2.5/3 subpoints = 1.25/1.5, normalized to 0.83.",
+        "source_operation_id": "17aacd62-03ce-40ec-b6c2-474b4c342712"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 1,
+        "persona_idx": 0,
+        "grade": 0.0,
+        "justification": "Out of 1.5 pts total (0.5 per action), only the Self-interest action is explicitly tied to a plausible self-interest-type misuse (using disinformation to get another person in trouble), earning 0.5/1.5 = 0.33. The Money item describes cost/expense of building or using the software, not a bad-actor action motivated by money. The Ideas item describes user discomfort/unfairness from automation, not a malicious action motivated by ideas. No additional category credit can be verified from the text.",
+        "source_operation_id": "1dbaa573-ab90-47af-9619-2207ca964361"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 1,
+        "persona_idx": 0,
+        "grade": 0.0,
+        "justification": "Out of 1.5 pts total (0.5 per action), two items do not describe a clear harmful bad-actor impact specific to SmartCity: the Money item is about expense, and the Ideas item is about comfort preferences. The Self-interest item gives some harm (an innocent person gets in trouble due to disinformation) and is somewhat adapted to a SmartCity traffic-light/enforcement context, so it earns 0.5/1.5 = 0.33. However, the overall negative impact is often vague, and the rubric's 'negative impact insufficiently described' penalty applies most naturally here; rounding down under the stated grading philosophy yields 0.0 normalized.",
+        "source_operation_id": "1dbaa573-ab90-47af-9619-2207ca964361"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 1,
+        "persona_idx": 1,
+        "grade": 0.3333333333,
+        "justification": "This criterion is 0.5 per action for category fit (1.5 total). The Self-interest example plausibly fits misuse harming others for personal reasons, so it earns full credit for 1 action. The Money example mainly describes the system being expensive to build/use or causing authorities to spend money, which is not really a bad-actor action motivated by money, so no credit there. The Ideas example focuses on disagreement and discomfort with automated temperature/ventilation settings, but does not clearly describe a malicious action motivated by ideology/ideas, so no credit there. No additional 'too similar' penalty applied because the actions are not similar. Total about 0.5/1.5 = 0.33.",
+        "source_operation_id": "dfb450b9-a4e2-4440-a25b-7adf9111427c"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 1,
+        "persona_idx": 1,
+        "grade": 0.5,
+        "justification": "This criterion is 0.5 per action for clearly described harmful SmartCity-specific impact (1.5 total). The Self-interest action gives a reasonably specific SmartCity-type harm: disinformation or misuse around traffic/rule enforcement causing an innocent person to get in trouble, so that earns credit. The Money action mentions high cost/resource use and local authority spending, which is somewhat scenario-related but does not clearly describe a malicious harmful impact by a bad actor; with benefit of the doubt it shows some negative impact but insufficiently. The Ideas action mentions unfair or uncomfortable automated environmental settings, which is scenario-related but the harmful impact is weak and not clearly tied to a bad actor action. Applying the rubric's 'negative impact insufficiently described' issue to this criterion, only one action is clearly strong and the other two are partial at best. Total about 0.75/1.5 = 0.50.",
+        "source_operation_id": "dfb450b9-a4e2-4440-a25b-7adf9111427c"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 1,
+        "persona_idx": 2,
+        "grade": 0.0,
+        "justification": "Money: the response describes cost/expense of building or using the software, not a bad actor action motivated by money. Self-interest: the action is disinformation, which aligns more with Politics/Ideas than the provided Self-Interest examples. Ideas: discomfort/unfairness from automatic ventilation/temperature adjustment is not a bad actor action and does not fit the Ideas category. Thus 0/1.5 on category correspondence.",
+        "source_operation_id": "05bde26c-8fed-4608-9261-8aade4239e91"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 1,
+        "persona_idx": 2,
+        "grade": 0.3333333333333333,
+        "justification": "Only the Self-interest example gives a somewhat scenario-adapted harmful impact: disinformation could wrongly get a person in trouble in a SmartCity traffic-enforcement context, earning about 0.5/1.5. The Money response discusses expense rather than harm from a bad actor action, and the Ideas response discusses user discomfort/fairness rather than a malicious action harming SmartCity stakeholders. Because negative impacts are insufficiently described for multiple actions, this criterion remains low.",
+        "source_operation_id": "05bde26c-8fed-4608-9261-8aade4239e91"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 1,
+        "persona_idx": 3,
+        "grade": 0.33,
+        "justification": "About 0.5/1.5 points. Of the three proposed actions, only the Self-interest example can be read as a plausible misuse by an individual for personal motives (roughly 0.5). The Money item mainly describes the software being expensive to build/use, which is not a bad-actor action in the Money category. The Ideas item describes disagreement or discomfort with automation settings, not a malicious action driven by ideology. No similarity penalty applied because the actions are not duplicates; the main issue is category mismatch.",
+        "source_operation_id": "5adc72ee-f6c9-4b91-ae93-4b8fdd67b060"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 1,
+        "persona_idx": 3,
+        "grade": 0.5,
+        "justification": "About 0.75/1.5 points. The Self-interest example gives a somewhat SmartCity-specific harm scenario: disinformation or system misuse leading to an innocent person being wrongly penalized in a traffic/light context (about 0.5). The Money example mentions high cost for authorities, which is a weak fit as harmful impact from a bad actor action and is not clearly tied to malicious misuse (0). The Ideas example suggests unfair or uncomfortable automated temperature/ventilation settings, which is somewhat scenario-specific but the harmful action and stakeholder impact are only loosely described (about 0.25). A negative-impact-insufficiently-described deduction is effectively reflected here through partial credit rather than a separate subtraction.",
+        "source_operation_id": "5adc72ee-f6c9-4b91-ae93-4b8fdd67b060"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 2,
+        "persona_idx": 0,
+        "grade": 0.8333333333,
+        "justification": "Action/category fit: Money action fits (competitor hacks system for market/money gain) = 0.5/0.5. Politics action fits only partially but still explicitly aims to influence elections/political standing, so award 0.5/0.5. Ideas action fits (pro-privacy group disables cameras due to ideology) = 0.5/0.5. However, the Money and Politics actions are too similar because both use a 'competitor' disrupting SmartCity systems for advantage, so apply the rubric-wide -0.5 similarity deduction here. Total 1.5 - 0.5 = 1.0 out of 1.5, normalized to 0.67.",
+        "source_operation_id": "65cb5dca-7bf5-40a0-953c-c331d4c4cb23"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 2,
+        "persona_idx": 0,
+        "grade": 0.8333333333,
+        "justification": "Harm specific to SmartCity: Money action gives SmartCity-specific harms ('traffic and bins' disruption, reputational and contract loss) = 0.5/0.5. Politics action gives SmartCity-specific harm (sensor disruption causing bins everywhere and citizen dissatisfaction) = 0.5/0.5. Ideas action gives SmartCity-specific harm (loss of traffic information, possible traffic-light malfunction affecting road users) = 0.5/0.5. No negative-impact deduction applied because each action explicitly states a harmful effect on SmartCity stakeholders/components. Total 1.5/1.5, normalized to 1.0.",
+        "source_operation_id": "65cb5dca-7bf5-40a0-953c-c331d4c4cb23"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 2,
+        "persona_idx": 1,
+        "grade": 0.0,
+        "justification": "placeholder",
+        "source_operation_id": "c17c59c5-ae08-4171-9b68-fc4a3b452c06"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 2,
+        "persona_idx": 2,
+        "grade": 0.8333333333,
+        "justification": "Three actions are given. Money: competitor hacking SmartCity monitoring for market gain fits the Money category (0.5/0.5). Politics: political rival disrupting sensors to hurt the mayor and win election fits Politics (0.5/0.5). Ideas: pro-privacy group covering/destroying cameras for ideological reasons fits Ideas (0.5/0.5). However, the Money and Politics actions are quite similar in structure (both competitors sabotaging city systems), so applying the rubric’s 'actions too similar' deduction of -0.5 to this criterion gives 1.0/1.5 total, normalized to 0.67. Balancing that the categories themselves are still distinguishable, I award 1.25/1.5 = 0.83.",
+        "source_operation_id": "3a38dae5-aecd-4aae-82e3-c9583f043d87"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 2,
+        "persona_idx": 2,
+        "grade": 0.8333333333,
+        "justification": "All three actions describe harmful impacts tied to SmartCity systems: traffic/bins disruption harming reputation and contracts; sensor disruption causing overflowing bins and citizen dissatisfaction; camera sabotage harming road users and traffic-light operation. These are scenario-specific and identify stakeholders. But some impacts are described vaguely ('lead to a mess', 'citizens couldn't be happy anymore'), so I apply the rubric’s negative-impact-insufficiently-described deduction of -0.25 to this criterion. That yields 1.25/1.5, normalized to 0.83.",
+        "source_operation_id": "3a38dae5-aecd-4aae-82e3-c9583f043d87"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 2,
+        "persona_idx": 3,
+        "grade": 1.0,
+        "justification": "All three actions fit their stated motivation categories well enough: competitor sabotage for market gain fits Money; a political rival disrupting city services to hurt the mayor and win election fits Politics; pro-privacy activists disabling cameras based on ideology fits Ideas. The actions are distinct enough, so no similarity penalty applies. This earns 1.5/1.5 on this criterion.",
+        "source_operation_id": "4f924249-1a1d-477e-ba89-c50a363b3283"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 2,
+        "persona_idx": 3,
+        "grade": 1.0,
+        "justification": "Each action includes a SmartCity-specific harmful impact: disruption of centralized monitoring affecting traffic and bins plus reputational/contract loss; sensor disruption causing overflowing bins and citizen dissatisfaction with city council; camera interference harming traffic information and potentially traffic-light operation. The impacts are scenario-specific and sufficiently described, so this earns 1.5/1.5.",
+        "source_operation_id": "4f924249-1a1d-477e-ba89-c50a363b3283"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 3,
+        "persona_idx": 0,
+        "grade": 0.0,
+        "justification": "The response contains no identifiable bad actor actions and does not describe any action that could be matched to a motivation category. Starting from 0 and adding credit only for explicit evidence, this earns 0/1.5, so normalized grade = 0.0.",
+        "source_operation_id": "b3ee6815-227d-4b07-b4c5-e486b68fa5b1"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 3,
+        "persona_idx": 0,
+        "grade": 0.0,
+        "justification": "The response does not describe any harmful impact, stakeholders, or any SmartCity-specific component or scenario. With no explicit harmful SmartCity impact for any action, this earns 0/1.5, so normalized grade = 0.0.",
+        "source_operation_id": "b3ee6815-227d-4b07-b4c5-e486b68fa5b1"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 3,
+        "persona_idx": 1,
+        "grade": 0.0,
+        "justification": "The response is nonsensical and does not describe any bad actor actions or motivation categories from the rubric. No identifiable actions are present, so none of the 3 action/category matches earn credit (0/1.5).",
+        "source_operation_id": "fafb6d6e-8925-41f1-9338-6c1aeb5b659a"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 3,
+        "persona_idx": 1,
+        "grade": 0.0,
+        "justification": "The response gives no harmful impacts, stakeholders, or SmartCity-specific consequences. Because no negative impact is described for any action, this earns 0/1.5 on harmful impact specific to SmartCity.",
+        "source_operation_id": "fafb6d6e-8925-41f1-9338-6c1aeb5b659a"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 3,
+        "persona_idx": 2,
+        "grade": 0.0,
+        "justification": "The response does not describe any bad actor actions or motivation categories. Because no identifiable actions are present, none of the 3 required action-category matches earn credit (0/1.5).",
+        "source_operation_id": "a0843434-f679-45c0-b61e-f0a8412bc1a1"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 3,
+        "persona_idx": 2,
+        "grade": 0.0,
+        "justification": "The response does not describe any harmful action, stakeholders, or SmartCity-specific impact. Therefore no action earns the 0.5-point harmful-impact subcriterion, and there is no basis for SmartCity adaptation or negative-impact description (0/1.5).",
+        "source_operation_id": "a0843434-f679-45c0-b61e-f0a8412bc1a1"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 3,
+        "persona_idx": 3,
+        "grade": 0.0,
+        "justification": "The response is nonsensical and does not describe any bad actor actions, motivations, or categories from the rubric. No identifiable actions correspond to a bad actor motivation category, so 0/1.5 points.",
+        "source_operation_id": "cfb26539-c655-494a-be38-279fefae1f8b"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 3,
+        "persona_idx": 3,
+        "grade": 0.0,
+        "justification": "The response gives no discernible harmful actions, no stakeholders, and no SmartCity-specific impact. Negative impact is entirely absent, so 0/1.5 points.",
+        "source_operation_id": "cfb26539-c655-494a-be38-279fefae1f8b"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 4,
+        "persona_idx": 0,
+        "grade": 0.0,
+        "justification": "The response does not describe any bad actor actions. It only lists fragments ('hackers money politics yes') without three identifiable actions tied to motivation categories. Starting from 0 and adding credit only for explicit, verifiable elements, no action-category matches can be awarded.",
+        "source_operation_id": "e5c8753e-bbbe-4fc8-bf07-d3e2ffb88c71"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 4,
+        "persona_idx": 0,
+        "grade": 0.0,
+        "justification": "The response gives no harmful impacts and nothing specific to the SmartCity scenario. Because no negative impact on stakeholders is explicitly described, this earns 0; the rubric-wide issue of insufficiently described impact also supports no credit here.",
+        "source_operation_id": "e5c8753e-bbbe-4fc8-bf07-d3e2ffb88c71"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 4,
+        "persona_idx": 1,
+        "grade": 0.0,
+        "justification": "The response does not actually describe any bad actor actions. It only lists fragments ('hackers money politics yes'), so none of the three required actions can be checked against a motivation category. Earns 0/1.5 on this criterion.",
+        "source_operation_id": "fc9cd046-c949-4ad7-9d4f-072a087d3d68"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 4,
+        "persona_idx": 1,
+        "grade": 0.0,
+        "justification": "No harmful impacts are described, and nothing is made specific to the SmartCity scenario. Because the response gives no action-impact descriptions, it earns 0/1.5 on this criterion.",
+        "source_operation_id": "fc9cd046-c949-4ad7-9d4f-072a087d3d68"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 4,
+        "persona_idx": 2,
+        "grade": 0.0,
+        "justification": "The response does not describe any bad actor actions. It only lists fragments ('hackers money politics yes') without three actions that can be checked against motivation categories. Therefore 0/1.5 on this criterion.",
+        "source_operation_id": "9291fffb-4388-426a-ae41-d059e201f826"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 4,
+        "persona_idx": 2,
+        "grade": 0.0,
+        "justification": "No harmful impacts are described, and nothing is made specific to the SmartCity scenario. Under the rubric, the required per-action harmful impact descriptions are missing, so this earns 0/1.5.",
+        "source_operation_id": "9291fffb-4388-426a-ae41-d059e201f826"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 4,
+        "persona_idx": 3,
+        "grade": 0.0,
+        "justification": "No harmful impacts are described, and nothing is made specific to the SmartCity scenario. Because there are no action-impact descriptions, the criterion earns 0/1.5.",
+        "source_operation_id": "398cd6a4-60b7-4f36-a07d-c1eb66b5d394"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 5,
+        "persona_idx": 0,
+        "grade": 0.0,
+        "justification": "The response does not clearly identify three bad actor actions or tie any action to a motivation category. It mentions weather, traffic, waste-bins, dashboard, 5G, cameras, and green lights, but these are system components rather than explicit bad-actor actions matched to a category. Starting from 0 and adding credit only for explicit, verifiable elements, no sub-criterion earns credit.",
+        "source_operation_id": "805c3f73-a87c-4e0b-b5b6-921443abaa9f"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 5,
+        "persona_idx": 0,
+        "grade": 0.0,
+        "justification": "The response does not clearly describe three harmful impacts tied to explicit bad actor actions. Phrases like 'negative for people' and 'stakeholders are not comfortable' are vague, and the SmartCity-specific harm is not clearly explained per action. Under the rubric, vague impact descriptions earn no credit; the negative-impact insufficiency also supports 0 here.",
+        "source_operation_id": "805c3f73-a87c-4e0b-b5b6-921443abaa9f"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 5,
+        "persona_idx": 1,
+        "grade": 0.0,
+        "justification": "The response does not present three identifiable bad actor actions or link them to any motivation category. It mentions weather, traffic, waste-bins, dashboards, 5G, cameras, and green lights, but these are system elements rather than clearly described actions corresponding to a bad actor category. With no clear category-aligned actions, this criterion earns 0/1.5.",
+        "source_operation_id": "79a37c72-f2d2-4af0-85b0-7d8117e37bc6"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 5,
+        "persona_idx": 1,
+        "grade": 0.33,
+        "justification": "There is some SmartCity-specific context: the answer references heatwave alerts, connected cameras, green lights, authorities’ dashboards, and 5G/resources, which suggests possible city-system harms. However, the harmful impact on stakeholders is vague ('negative for people,' 'stakeholders are not comfortable') and does not clearly describe three distinct harmful impacts. Giving benefit of the doubt, this earns about 0.5/1.5, normalized to 0.33.",
+        "source_operation_id": "79a37c72-f2d2-4af0-85b0-7d8117e37bc6"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 5,
+        "persona_idx": 2,
+        "grade": 0.0,
+        "justification": "The response does not identify three distinct bad actor actions or tie any action to a stated bad actor motivation category from the cheatsheet. It mentions weather, traffic, waste-bins, dashboards, cameras, green lights, and 5G, but these are system elements rather than clearly described bad actor actions corresponding to a category. With no clear category mapping, no sub-criterion credit can be awarded.",
+        "source_operation_id": "ca1d06af-1697-4fb2-b7d2-d5a365bec2a9"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 5,
+        "persona_idx": 2,
+        "grade": 0.16666666666666666,
+        "justification": "There is only minimal SmartCity-specific harm described. The response vaguely suggests that false heatwave information, connected cameras/green lights, and resource issues could be negative for people and make stakeholders uncomfortable, which gives limited evidence of one harmful impact adapted to a SmartCity context. However, it does not clearly present three actions with stakeholder-specific harms, and the negative impact is insufficiently described, so most credit is not earned. This corresponds to about 0.25/1.5 after applying the rubric's insufficient-impact concern to this criterion.",
+        "source_operation_id": "ca1d06af-1697-4fb2-b7d2-d5a365bec2a9"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 5,
+        "persona_idx": 3,
+        "grade": 0.13,
+        "justification": "The response hints at possible actions involving weather, traffic, dashboards, cameras, and green lights, but it does not clearly identify three distinct bad actor actions or tie them to any motivation category from the rubric. Giving limited credit for partial implied actions in the SmartCity context: about 0.2/1.5 points.",
+        "source_operation_id": "93e66570-ffc3-4ed2-9da4-528ebcd3b795"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 5,
+        "persona_idx": 3,
+        "grade": 0.33,
+        "justification": "There is some SmartCity-specific harm implied: false heatwave information, connected cameras/traffic lights, and negative effects on resources/people. However, the harmful impacts on stakeholders are vague and not clearly developed for three actions. This earns about 0.5/1.5 points, with the insufficiently described impact reflected here.",
+        "source_operation_id": "93e66570-ffc3-4ed2-9da4-528ebcd3b795"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 6,
+        "persona_idx": 0,
+        "grade": 0.0,
+        "justification": "The response does not identify any bad actor actions tied to a motivation category from the cheatsheet. It mentions project cost, device management difficulty, cameras breaking in rain, and workers disliking the dashboard, which are operational/project issues rather than malicious actions by bad actors. Starting from 0 and adding only explicit credit, this earns 0/1.5.",
+        "source_operation_id": "da610a82-7246-4ec2-af16-2309aad7223a"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 6,
+        "persona_idx": 0,
+        "grade": 0.0,
+        "justification": "The response gives only vague harms such as inefficiency and people complaining, and these are not clearly linked to explicit bad actor actions. The impacts are not sufficiently described as harmful stakeholder impacts specific to a SmartCity threat scenario. Starting from 0 and adding only explicit credit, this earns 0/1.5.",
+        "source_operation_id": "da610a82-7246-4ec2-af16-2309aad7223a"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 6,
+        "persona_idx": 1,
+        "grade": 0.0,
+        "justification": "The response does not identify bad actor actions tied to any motivation category; it discusses project cost, device management, weather-related camera failure, and worker dashboard dislike, which are operational/usability issues rather than malicious actions by bad actors. No valid category-corresponding actions are present, so 0/1.5.",
+        "source_operation_id": "8cd709ef-6ef3-456e-bfb6-3c68e9cb05f5"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 6,
+        "persona_idx": 1,
+        "grade": 0.33,
+        "justification": "There is some attempt to describe negative impact in the SmartCity context (system inefficiency, danger for the city, public complaints), so limited credit is warranted. However, the harms are vague and mostly tied to non-malicious operational problems rather than clearly described bad-actor actions affecting SmartCity stakeholders. This earns about 0.5/1.5, normalized to 0.33.",
+        "source_operation_id": "8cd709ef-6ef3-456e-bfb6-3c68e9cb05f5"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 6,
+        "persona_idx": 2,
+        "grade": 0.0,
+        "justification": "The response does not present bad actor actions tied to any motivation category from the teaching material. It discusses project cost, device management, weather-related camera failure, and worker dislike of the dashboard, which are operational/usability issues rather than malicious actions by bad actors. Therefore none of the three expected actions earns the 0.5-point sub-credit for corresponding to a category (0/1.5).",
+        "source_operation_id": "8758ce27-ec52-4ed5-bf95-d9cc83c13fed"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 6,
+        "persona_idx": 2,
+        "grade": 0.1666666667,
+        "justification": "The response gives some negative consequences ('system is not efficient' and 'people complain'), which are loosely related to a SmartCity context, but it does not describe harmful impacts arising from bad actor actions and the impacts are vague. Under the rubric, this criterion expects three action-specific harmful impacts adapted to SmartCity; at most one weakly scenario-specific impact is present (about 0.25/1.5 after applying the rubric-wide issue that negative impact is insufficiently described to this criterion).",
+        "source_operation_id": "8758ce27-ec52-4ed5-bf95-d9cc83c13fed"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 6,
+        "persona_idx": 3,
+        "grade": 0.0,
+        "justification": "The response does not actually describe bad actor actions motivated by one of the rubric’s categories. It mentions project cost, device management difficulty, cameras breaking in rain, and workers disliking the dashboard—these are operational/usability problems, not malicious actions by threat actors. So none of the three expected actions earns the 0.5 category-match credit.",
+        "source_operation_id": "deb70f7c-d7e3-4fc7-8ee7-47f431821d5c"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 6,
+        "persona_idx": 3,
+        "grade": 0.17,
+        "justification": "There is some attempt to describe negative consequences in the SmartCity context: the system becomes inefficient, authorities cannot manage devices well, and people complain. That shows limited understanding of harm in a city-system scenario, so minimal partial credit is warranted. However, the harms are vague, mostly operational rather than stakeholder-specific, and not tied to bad actor actions. Applying the rubric’s harmful-impact standard, this is only about 0.25/1.5 total credit.",
+        "source_operation_id": "deb70f7c-d7e3-4fc7-8ee7-47f431821d5c"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 7,
+        "persona_idx": 0,
+        "grade": 0.0,
+        "justification": "Initializing grading result.",
+        "source_operation_id": "c6a67d21-296d-4296-b2bc-407e6170ba6f"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 7,
+        "persona_idx": 0,
+        "grade": 0.0,
+        "justification": "Initializing grading result.",
+        "source_operation_id": "c6a67d21-296d-4296-b2bc-407e6170ba6f"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 7,
+        "persona_idx": 1,
+        "grade": 0.3333333333,
+        "justification": "There are three attempted actions, worth 0.5 each. Only one clearly matches its stated category: changing the public app to spread beliefs fits Ideas/hacktivist behavior, but it was labeled Money, so that action does not correspond to category. Looking at traffic data and making jokes online fits Entertainment. The Politics example about weather sensors being expensive and the city losing budget does not describe a political bad-actor action. Thus about 0.5/1.5 earned.",
+        "source_operation_id": "c923dfb4-0555-4961-815a-05fa1b41ad91"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 7,
+        "persona_idx": 1,
+        "grade": 0.5,
+        "justification": "The response gives some SmartCity-specific context (public app, traffic system, weather sensors, city budget, trust), so there is partial scenario adaptation. However, harmful impact is vague for all three actions: 'people are affected,' 'this is a problem,' and 'could hurt trust' do not clearly explain stakeholder harm. With benefit of the doubt, this earns partial credit overall, about 0.75/1.5.",
+        "source_operation_id": "c923dfb4-0555-4961-815a-05fa1b41ad91"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 7,
+        "persona_idx": 2,
+        "grade": 0.3333333333,
+        "justification": "There are 3 proposed actions, but only 1 clearly matches its stated category: 'Entertainment' with people looking at the traffic system and making jokes online loosely fits troll/thrill-seeker misuse (0.5/0.5). 'Money' paired with activists spreading beliefs about pollution does not fit the Money category; it aligns more with Ideas (0/0.5). 'Politics' paired with expensive weather sensors/city losing budget is not an actor action corresponding to the Politics category (0/0.5). Total 0.5/1.5 = 0.33 normalized.",
+        "source_operation_id": "f4fb9449-935e-4725-9c1a-966ab1c48329"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 7,
+        "persona_idx": 2,
+        "grade": 0.3333333333,
+        "justification": "Only one action has a minimally stated harmful impact somewhat adapted to SmartCity: changing the public app about pollution affects people, but the harm is vague and not sufficiently described; this earns limited credit for SmartCity-specific context. The traffic/jokes example does not clearly explain stakeholder harm in the SmartCity scenario, and the weather sensors/budget example is not a clear bad-actor action with specific harm. Applying the rubric's negative-impact insufficiency to this criterion, the response earns about 0.5/1.5 total = 0.33 normalized.",
+        "source_operation_id": "f4fb9449-935e-4725-9c1a-966ab1c48329"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 7,
+        "persona_idx": 3,
+        "grade": 0.3333333333,
+        "justification": "Out of 1.5 pts total for three actions, the response earns about 0.5/1.5. 'Entertainment' with people looking at traffic data and making jokes loosely fits troll/thrill-seeker misuse, but the action is weakly malicious. The 'Money' example does not fit: activists spreading beliefs about pollution aligns much more with Ideas/activism than Money. The 'Politics' example about weather sensors being expensive and the city losing budget is not really a bad-actor action tied to a political motivation. No similarity penalty applied because the actions are distinct.",
+        "source_operation_id": "1170e1c2-f69a-469c-a276-5822d8d7b9e8"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 7,
+        "persona_idx": 3,
+        "grade": 0.3333333333,
+        "justification": "Out of 1.5 pts total for three actions, the response earns about 0.5/1.5. There is some SmartCity-specific context (public app, traffic system, weather sensors), and the student mentions effects on people, trust, and the city. However, the harmful impacts are mostly vague and not clearly tied to stakeholders for each action. Applying the rubric's negative-impact-insufficiently-described deduction here is appropriate, since most impacts are underexplained.",
+        "source_operation_id": "1170e1c2-f69a-469c-a276-5822d8d7b9e8"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 8,
+        "persona_idx": 0,
+        "grade": 0.5,
+        "justification": "Action/category fit: Money—'lock the city dashboard and ask for payment' fits money/ransomware (0.5). Politics—'use the road cameras to watch people moving around the city' fits political surveillance/infrastructure misuse (0.5). Entertainment—'lock the dashboard again' overlaps strongly with the Money action, so despite 'press random settings in buildings' suggesting fun/thrill-seeking, the response presents two similar actions; applying the rubric's -0.5 deduction here. Total 1.0/1.5, normalized 0.67, rounded down to 0.5 due to uncertainty and strict grading.",
+        "source_operation_id": "bc4490b2-0a3d-4141-b766-38e59bad53fb"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 8,
+        "persona_idx": 0,
+        "grade": 0.67,
+        "justification": "Harm specific to SmartCity: Money action gives SmartCity-specific harm ('authority staff cannot control the system' and delays from locking the city dashboard) (0.5). Politics action names road cameras and privacy/trust impacts, which is SmartCity-specific enough (0.5). Entertainment action mentions 'press random settings in buildings' and 'annoy people and make problems,' but the negative impact is vague and not sufficiently described; award 0 for that action and apply the rubric's -0.25 insufficient-impact deduction to this criterion. Total 0.75/1.5, normalized 0.5; some SmartCity specificity exists, so partial credit retained.",
+        "source_operation_id": "bc4490b2-0a3d-4141-b766-38e59bad53fb"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 8,
+        "persona_idx": 1,
+        "grade": 0.8333333333,
+        "justification": "Starts from full credit: all three actions generally fit their stated categories (Money: ransomware/extortion; Politics: surveillance by a government actor; Entertainment: random misuse for fun). However, the Money and Entertainment actions are too similar because both include locking the dashboard, so I apply the rubric’s -0.5 deduction to this criterion. Raw points: 1.5/1.5 minus 0.5 = 1.0/1.5, normalized to 0.67; giving benefit of the doubt because the Entertainment action also mentions pressing random building settings, I award partial recovery to 1.25/1.5 = 0.83.",
+        "source_operation_id": "4aa9f144-34ec-41d4-8da4-a49fc23c4cf8"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 8,
+        "persona_idx": 1,
+        "grade": 0.8333333333,
+        "justification": "The response gives SmartCity-specific harms for each action: city staff cannot control the system causing delays; road-camera surveillance harms privacy/trust; random building settings would annoy people and create problems. These are adapted to the scenario. One impact description is somewhat weak/vague for the Entertainment action ('annoy people and make problems'), so I apply the rubric’s -0.25 insufficient-impact deduction here. Raw points: 1.5/1.5 minus 0.25 = 1.25/1.5, normalized to 0.83.",
+        "source_operation_id": "4aa9f144-34ec-41d4-8da4-a49fc23c4cf8"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 8,
+        "persona_idx": 2,
+        "grade": 0.6666666667,
+        "justification": "Action/category fit: Money—locking the city dashboard for payment fits the Money category (0.5/0.5). Politics—using road cameras to watch people moving around the city fits Politics via surveillance by a government actor (0.5/0.5). Entertainment—the response gives two possibilities, one of which repeats locking the dashboard, making actions too similar; applying the rubric’s -0.5 deduction at the category/action criterion yields 1.0/1.5 total, normalized to 0.67.",
+        "source_operation_id": "ccf7b4a1-71d1-42c9-b3bf-c83944831976"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 8,
+        "persona_idx": 2,
+        "grade": 0.8333333333,
+        "justification": "Harm specific to SmartCity: Money—staff cannot control the system and city delays is a clear SmartCity-specific harm (0.5/0.5). Politics—privacy/trust harm from road-camera surveillance is scenario-specific enough, though somewhat tentative (0.5/0.5). Entertainment—‘annoy people and make problems’ for random building settings is SmartCity-related but weakly described; applying the rubric’s -0.25 penalty for insufficiently described negative impact here gives 1.25/1.5 total, normalized to 0.83.",
+        "source_operation_id": "ccf7b4a1-71d1-42c9-b3bf-c83944831976"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 8,
+        "persona_idx": 3,
+        "grade": 0.6667,
+        "justification": "Category fit is mostly correct for all three actions: Money/ransom of the city dashboard fits well (0.5/0.5), Politics/use of road cameras for surveillance fits well (0.5/0.5), and Entertainment/fun-driven misuse can fit random tampering, but the student repeats dashboard locking, making two actions too similar. Applying the rubric’s -0.5 deduction for two actions being too similar to this criterion gives 1.0/1.5 total, normalized to 0.6667.",
+        "source_operation_id": "1f33c0a0-0a17-454b-b3b9-61ee27ab7e94"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 8,
+        "persona_idx": 3,
+        "grade": 0.8333,
+        "justification": "The harmful impacts are generally specific to the SmartCity scenario: locking the dashboard prevents authority staff from controlling city systems and causes delays (0.5/0.5), camera surveillance harms residents’ privacy and trust in the city system (0.5/0.5), and random building-setting changes would annoy people and cause operational problems in smart buildings (0.5/0.5). However, the third impact is described vaguely ('annoy people and make problems'), so I apply the rubric’s -0.25 deduction for insufficiently described negative impact here. Total 1.25/1.5, normalized to 0.8333.",
+        "source_operation_id": "1f33c0a0-0a17-454b-b3b9-61ee27ab7e94"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 9,
+        "persona_idx": 0,
+        "grade": 0.6666666667,
+        "justification": "Action/category fit: Money—'hack the centralized dashboard and demand ransom' matches the Money category (0.5/0.5). Politics—'state-linked actor could alter traffic camera data to create congestion during a political event' matches the Politics category (0.5/0.5). Ideas—'people with strong beliefs might dislike smart technology and complain online that it is evil' does not clearly match the teaching-material examples of malicious misuse against the system; it is mostly opinion/complaint rather than a concrete bad-actor action against SmartCity, so 0/0.5. Total 1.0/1.5, normalized 0.67. No similarity penalty applied.",
+        "source_operation_id": "ca8edb0f-56b2-4b83-b521-b04c3872d641"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 9,
+        "persona_idx": 0,
+        "grade": 0.5,
+        "justification": "Harmful impact specific to SmartCity: Money action clearly states SmartCity-specific harm—loss of monitoring of waste bins or traffic controls disrupting services and affecting residents (0.5/0.5). Politics action clearly states SmartCity-specific harm—congestion blocking emergency vehicles and damaging trust in authorities (0.5/0.5). Ideas action says only that complaints create 'negativity around SmartCity'; this is not a clear, sufficiently described harmful impact on stakeholders, so 0/0.5. Applying the rubric-wide negative-impact-insufficiently-described deduction to this criterion is consistent with that missing specificity, but the action already earns 0 for that subpart. Total 1.0/1.5, normalized 0.50.",
+        "source_operation_id": "ca8edb0f-56b2-4b83-b521-b04c3872d641"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 9,
+        "persona_idx": 1,
+        "grade": 0.8333333333,
+        "justification": "This criterion is worth 1.5 points total (0.5 per action). Money: ransomware against the centralized dashboard clearly fits the Money category (0.5/0.5). Politics: altering traffic camera data to disrupt a political event fits Politics/strategic sabotage (0.5/0.5). Ideas: 'complain online that it is evil' is only a weak fit for the Ideas category because it is more expression/opinion than a clearly malicious bad-actor action like disinformation, DoS, leaks, or defacement; with benefit of the doubt it earns partial credit (0.25/0.5). Total 1.25/1.5 = 0.8333.",
+        "source_operation_id": "fec62417-243f-4c5e-8dc9-e6da3cb84715"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 9,
+        "persona_idx": 1,
+        "grade": 0.8333333333,
+        "justification": "This criterion is worth 1.5 points total (0.5 per action). Money: the response explains SmartCity-specific harm—loss of monitoring for waste bins or traffic controls disrupting city services and affecting residents (0.5/0.5). Politics: it clearly states SmartCity-specific harm—congestion during a political event, blocked emergency vehicles, and reduced trust in authorities (0.5/0.5). Ideas: the harm is vague and only says it 'creates negativity around SmartCity,' which is not a sufficiently specific harmful impact on stakeholders; applying the rubric's negative-impact insufficiency to this action yields partial credit (0.25/0.5). Total 1.25/1.5 = 0.8333.",
+        "source_operation_id": "fec62417-243f-4c5e-8dc9-e6da3cb84715"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 9,
+        "persona_idx": 2,
+        "grade": 0.6666666667,
+        "justification": "Three actions are given. Money: hacking the dashboard for ransom fits the Money category (0.5/0.5). Politics: altering traffic camera data to disrupt a political event fits Politics/strategic sabotage (0.5/0.5). Ideas: 'complain online that it is evil' is not clearly a malicious use of the software and only weakly matches the Ideas category examples, so no credit for that action (0/0.5). Total 1.0/1.5, normalized to 0.67.",
+        "source_operation_id": "5938b9fb-e301-44bc-a81e-7dd408e2e252"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 9,
+        "persona_idx": 2,
+        "grade": 0.5,
+        "justification": "Money: the harm is specific to SmartCity because loss of dashboard access disrupts monitoring of waste bins and traffic controls, affecting residents (0.5/0.5). Politics: blocking emergency vehicles and undermining trust is a clear SmartCity-specific harm (0.5/0.5). Ideas: 'creates negativity around SmartCity' is vague and insufficiently describes stakeholder harm; under the rubric's negative-impact guidance, this action earns no harmful-impact credit (0/0.5). Total 0.75/1.5 after applying a 0.25 deduction for insufficiently described negative impact on the weak Ideas action, normalized to 0.50.",
+        "source_operation_id": "5938b9fb-e301-44bc-a81e-7dd408e2e252"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+        "response_idx": 9,
+        "persona_idx": 3,
+        "grade": 0.8333333333,
+        "justification": "This criterion is worth 1.5 total (0.5 per action). Money: ransomware against the dashboard clearly fits the Money category (0.5/0.5). Politics: altering traffic camera data to disrupt a political event fits Politics/strategic sabotage (0.5/0.5). Ideas: the student identifies belief-driven opposition to smart technology, which aligns with Ideas motivation, but the action is mostly 'complain online' rather than a clearly malicious exploit or attack from the cheatsheet, so only partial credit (0.25/0.5). Total 1.25/1.5 = 0.8333.",
+        "source_operation_id": "2ee7d891-8925-4005-81f2-7e68f23de399"
+      },
+      {
+        "criterion_id": "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910",
+        "response_idx": 9,
+        "persona_idx": 3,
+        "grade": 0.6666666667,
+        "justification": "This criterion is worth 1.5 total (0.5 per action). Money: the harm is specific to SmartCity operations—loss of monitoring for waste bins/traffic controls disrupting city services and affecting residents—so full credit (0.5/0.5). Politics: the impact is clearly adapted to SmartCity, with congestion, blocked emergency vehicles, and reduced trust in authorities (0.5/0.5). Ideas: 'creates negativity around SmartCity' is only weakly harmful and not sufficiently specific about stakeholder impact; under the rubric's penalty for insufficiently described negative impact, this action earns no credit here (0.0/0.5). Total 1.0/1.5 = 0.6667.",
+        "source_operation_id": "2ee7d891-8925-4005-81f2-7e68f23de399"
+      }
+    ],
+    "pairwise_results": [
+      {
+        "response_a_idx": 8,
+        "response_b_idx": 9,
+        "winner": "B",
+        "confidence": 0.92,
+        "reason": "Response B is stronger overall on the rubric. For action-category fit, B has three distinct actions that better match the motivation categories: ransom attack for Money, politically motivated traffic disruption for Politics, and anti-smart-tech belief-driven opposition for Ideas. In A, the Entertainment action repeats the dashboard-locking idea from Money, triggering the 'actions too similar' concern, and its harms are vaguer. For SmartCity-specific harmful impact, B gives clearer scenario-adapted consequences (service disruption, blocked emergency vehicles, trust damage), while A’s impacts are less specific and one action is explicitly uncertain. B’s Ideas example is weaker because it is more like online complaining than a concrete malicious action, but B still outperforms A across the criteria.",
+        "ambiguity_attributed": false,
+        "affected_criterion_ids": [],
+        "source_operation_id": "8fa5a339-a6bd-4fbf-81f9-e6a16c156677"
+      },
+      {
+        "response_a_idx": 6,
+        "response_b_idx": 7,
+        "winner": "B",
+        "confidence": 0.88,
+        "reason": "Response B is stronger overall because it at least attempts three bad-actor actions tied to motivation categories (Money, Entertainment, Politics), whereas Response A mostly lists operational/project problems rather than malicious bad-actor actions. Under the rubric, B performs better on 'Action corresponds to category' and is slightly better on SmartCity-specific harmful impact, though both responses are weak and B still has mismatches and vague harms.",
+        "ambiguity_attributed": false,
+        "affected_criterion_ids": [
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910"
+        ],
+        "source_operation_id": "14bf0b7d-fb6b-4cfc-98fc-209956dd0d2e"
+      },
+      {
+        "response_a_idx": 7,
+        "response_b_idx": 8,
+        "winner": "B",
+        "confidence": 0.94,
+        "reason": "Response B is clearly stronger on both sub-criteria under Bad Actor Actions. Its actions better match the stated motivation categories (Money: ransomware/extortion; Politics: surveillance by a government actor; Entertainment: misuse for fun), whereas Response A often mismatches categories (e.g., activists spreading beliefs under Money) or gives impacts that are not really actions. B also gives more SmartCity-specific harms, such as locking the city dashboard and misusing road cameras, with clearer stakeholder impact. Although B repeats a similar dashboard-locking idea for Money and Entertainment, making two actions somewhat similar, it still outperforms A overall.",
+        "ambiguity_attributed": false,
+        "affected_criterion_ids": [],
+        "source_operation_id": "2bb24073-f3fe-47f8-9bdd-7aa90e9c3a07"
+      },
+      {
+        "response_a_idx": 0,
+        "response_b_idx": 1,
+        "winner": "A",
+        "confidence": 0.95,
+        "reason": "Response A is clearly stronger on both rubric subcriteria. It provides three recognizable bad-actor actions tied to categories (Politics: intelligence gathering; Money: theft of installed equipment; Entertainment: trolling/manipulating waste sensors) and each includes a SmartCity-specific harmful impact. Response B mostly describes costs, vague misuse, or user discomfort rather than clear bad-actor actions that fit the stated categories, and its harms are less specific to malicious actions in the SmartCity scenario.",
+        "ambiguity_attributed": false,
+        "affected_criterion_ids": [
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910"
+        ],
+        "source_operation_id": "64a4222a-32e5-415c-8c29-4b64df350c70"
+      },
+      {
+        "response_a_idx": 0,
+        "response_b_idx": 2,
+        "winner": "B",
+        "confidence": 0.89,
+        "reason": "Response B is stronger overall on both rubric subcriteria. Its three actions more clearly match motivation categories (money/competitor sabotage for market gain, politics/election-motivated disruption, ideas/privacy-motivated camera interference) and it gives more SmartCity-specific harms to stakeholders (traffic disruption, overflowing bins, traffic-light malfunction, reputational and financial damage). Response A has one clearly fitting action (politics/intelligence gathering) and one plausible entertainment action, but the money example focuses on stealing physical equipment rather than malicious use of the software/system, and several harms are generic or underdeveloped. B also provides more scenario-adapted impacts across all three actions.",
+        "ambiguity_attributed": false,
+        "affected_criterion_ids": [],
+        "source_operation_id": "d1bb2cb8-4b46-4103-9cb8-517167834ae9"
+      },
+      {
+        "response_a_idx": 3,
+        "response_b_idx": 4,
+        "winner": "B",
+        "confidence": 0.97,
+        "reason": "Response B is slightly stronger because it at least references relevant bad-actor motivation categories ('hackers', 'money', 'politics'), whereas Response A is entirely nonsensical and unrelated to the SmartCity bad-actor task. However, neither response provides three valid actions or SmartCity-specific harmful impacts, so both fail criterion a8a95866-fc85-4e83-ad6d-0a59f4e6204b and its subcriteria. The distinction is based on minimal topical relevance rather than substantive rubric fulfillment.",
+        "ambiguity_attributed": false,
+        "affected_criterion_ids": [
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910"
+        ],
+        "source_operation_id": "845aa9cd-67c4-41d1-8f2d-5688fa0d4f0e"
+      },
+      {
+        "response_a_idx": 4,
+        "response_b_idx": 5,
+        "winner": "B",
+        "confidence": 0.95,
+        "reason": "Response B is clearly stronger. Response A does not provide three bad actor actions, does not map actions to motivation categories, and gives no SmartCity-specific harmful impacts, failing both subcriteria under the bad actor actions rubric. Response B is poorly written but at least references SmartCity elements (weather, traffic, waste-bins, dashboard, authorities, 5G, cameras, green lights) and implies some harmful impacts on stakeholders, so it better addresses the SmartCity-specific harm criterion, even though it still lacks three clear, well-categorized actions.",
+        "ambiguity_attributed": false,
+        "affected_criterion_ids": [],
+        "source_operation_id": "1f8bfb5d-064f-4d92-8704-ff514e4ea296"
+      },
+      {
+        "response_a_idx": 0,
+        "response_b_idx": 8,
+        "winner": "A",
+        "confidence": 0.84,
+        "reason": "Response A is stronger overall on the rubric. It provides three distinct actions that mostly fit their motivation categories and are adapted to the SmartCity scenario, with clearer stakeholder harm for each (foreign intelligence surveillance; theft of city infrastructure hardware; sensor manipulation disrupting waste collection). Response B has one solid Money action and one plausible Politics action, but its Entertainment action repeats the dashboard-locking idea from Money, triggering the 'actions too similar' concern, and its harms are described more vaguely. Thus A performs better on both category fit and SmartCity-specific harmful impact.",
+        "ambiguity_attributed": false,
+        "affected_criterion_ids": [
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910"
+        ],
+        "source_operation_id": "019852ac-1591-4a8c-bbb0-827df732335d"
+      },
+      {
+        "response_a_idx": 1,
+        "response_b_idx": 8,
+        "winner": "B",
+        "confidence": 0.93,
+        "reason": "Response B is clearly stronger on both rubric subcriteria. Its actions mostly match bad-actor motivation categories (Money: ransomware-like dashboard lock; Politics: surveillance via road cameras; Entertainment: random disruptive misuse), and each includes SmartCity-specific harms such as loss of city control, privacy/trust impacts, and disruption in buildings. Response A often does not describe malicious bad-actor actions at all: the Money item is about software cost rather than an attack, the Ideas item is about user discomfort with automation rather than a bad actor, and only the Self-interest item partially gestures at misuse. B does repeat a similar locking action for Money and Entertainment, which could merit the similarity deduction, but it still substantially outperforms A overall.",
+        "ambiguity_attributed": false,
+        "affected_criterion_ids": [
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910"
+        ],
+        "source_operation_id": "8f54d997-e0e6-4a84-8d4a-04857d3977d0"
+      },
+      {
+        "response_a_idx": 2,
+        "response_b_idx": 8,
+        "winner": "A",
+        "confidence": 0.95,
+        "reason": "Response A is clearly stronger on both rubric subcriteria. It provides three distinct actions that mostly fit their motivation categories and gives SmartCity-specific harms for each (traffic disruption, bin sensor disruption affecting citizens and elections, camera sabotage affecting traffic information and lights). Response B has one reasonably fitting money action, but its politics example is less clearly an action against SmartCity operations and its entertainment action repeats the dashboard-locking idea, triggering the 'too similar' concern. B’s harms are also more generic and less adapted to the SmartCity scenario.",
+        "ambiguity_attributed": false,
+        "affected_criterion_ids": [
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+          "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910"
+        ],
+        "source_operation_id": "d389c73b-4707-4a32-8112-ce6888e8649f"
+      }
+    ],
+    "source_operations": [
+      "c6b746d4-aa94-4ba2-9551-b86576dc6c71",
+      "fde10d02-ed79-4bcf-b8b4-3e97b8e9cb4b",
+      "2de775c3-67be-472d-aa1a-93acfe0f0377",
+      "1b8f0e15-2220-4d90-80dc-a8f2766b40b9",
+      "17aacd62-03ce-40ec-b6c2-474b4c342712",
+      "1dbaa573-ab90-47af-9619-2207ca964361",
+      "dfb450b9-a4e2-4440-a25b-7adf9111427c",
+      "05bde26c-8fed-4608-9261-8aade4239e91",
+      "5adc72ee-f6c9-4b91-ae93-4b8fdd67b060",
+      "65cb5dca-7bf5-40a0-953c-c331d4c4cb23",
+      "c17c59c5-ae08-4171-9b68-fc4a3b452c06",
+      "3a38dae5-aecd-4aae-82e3-c9583f043d87",
+      "4f924249-1a1d-477e-ba89-c50a363b3283",
+      "b3ee6815-227d-4b07-b4c5-e486b68fa5b1",
+      "fafb6d6e-8925-41f1-9338-6c1aeb5b659a",
+      "a0843434-f679-45c0-b61e-f0a8412bc1a1",
+      "cfb26539-c655-494a-be38-279fefae1f8b",
+      "e5c8753e-bbbe-4fc8-bf07-d3e2ffb88c71",
+      "fc9cd046-c949-4ad7-9d4f-072a087d3d68",
+      "9291fffb-4388-426a-ae41-d059e201f826",
+      "398cd6a4-60b7-4f36-a07d-c1eb66b5d394",
+      "805c3f73-a87c-4e0b-b5b6-921443abaa9f",
+      "79a37c72-f2d2-4af0-85b0-7d8117e37bc6",
+      "ca1d06af-1697-4fb2-b7d2-d5a365bec2a9",
+      "93e66570-ffc3-4ed2-9da4-528ebcd3b795",
+      "da610a82-7246-4ec2-af16-2309aad7223a",
+      "8cd709ef-6ef3-456e-bfb6-3c68e9cb05f5",
+      "8758ce27-ec52-4ed5-bf95-d9cc83c13fed",
+      "deb70f7c-d7e3-4fc7-8ee7-47f431821d5c",
+      "c6a67d21-296d-4296-b2bc-407e6170ba6f",
+      "c923dfb4-0555-4961-815a-05fa1b41ad91",
+      "f4fb9449-935e-4725-9c1a-966ab1c48329",
+      "1170e1c2-f69a-469c-a276-5822d8d7b9e8",
+      "bc4490b2-0a3d-4141-b766-38e59bad53fb",
+      "4aa9f144-34ec-41d4-8da4-a49fc23c4cf8",
+      "ccf7b4a1-71d1-42c9-b3bf-c83944831976",
+      "1f33c0a0-0a17-454b-b3b9-61ee27ab7e94",
+      "ca8edb0f-56b2-4b83-b521-b04c3872d641",
+      "fec62417-243f-4c5e-8dc9-e6da3cb84715",
+      "5938b9fb-e301-44bc-a81e-7dd408e2e252",
+      "2ee7d891-8925-4005-81f2-7e68f23de399",
+      "8fa5a339-a6bd-4fbf-81f9-e6a16c156677",
+      "14bf0b7d-fb6b-4cfc-98fc-209956dd0d2e",
+      "2bb24073-f3fe-47f8-9bdd-7aa90e9c3a07",
+      "64a4222a-32e5-415c-8c29-4b64df350c70",
+      "d1bb2cb8-4b46-4103-9cb8-517167834ae9",
+      "845aa9cd-67c4-41d1-8f2d-5688fa0d4f0e",
+      "1f8bfb5d-064f-4d92-8704-ff514e4ea296",
+      "019852ac-1591-4a8c-bbb0-827df732335d",
+      "8f54d997-e0e6-4a84-8d4a-04857d3977d0",
+      "d389c73b-4707-4a32-8112-ce6888e8649f"
+    ],
+    "criterion_ids": [
+      "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>1b277fd0-98d7-42c7-8cc6-56788c953a4b",
+      "a8a95866-fc85-4e83-ad6d-0a59f4e6204b>22f62c9d-13dd-4ac6-8d35-facb2c6a4910"
+    ]
+  }
+}
