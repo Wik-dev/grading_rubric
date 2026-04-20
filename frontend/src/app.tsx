@@ -20,19 +20,28 @@ import { InputScreen } from "@/screens/input-screen";
 import { RunningScreen } from "@/screens/running-screen";
 import { ReviewScreen } from "@/screens/review-screen";
 
+export type ReviewMode = "approval" | "completed";
 type ScreenName = "input" | "running" | "review";
 
 export function App() {
   const [screen, setScreen] = useState<ScreenName>("input");
   const [runId, setRunId] = useState<string | null>(null);
+  const [reviewMode, setReviewMode] = useState<ReviewMode>("completed");
 
   const handleRunStarted = (newRunId: string) => {
     setRunId(newRunId);
     setScreen("running");
   };
 
-  const handleRunReady = () => {
+  const handleRunReady = (mode: ReviewMode) => {
+    setReviewMode(mode);
     setScreen("review");
+  };
+
+  const handleApprovalSubmitted = () => {
+    // After teacher submits decisions, go back to Running to wait for
+    // score + render to complete.
+    setScreen("running");
   };
 
   const handleClose = () => {
@@ -54,5 +63,12 @@ export function App() {
     );
   }
 
-  return <ReviewScreen runId={runId} onClose={handleClose} />;
+  return (
+    <ReviewScreen
+      runId={runId}
+      mode={reviewMode}
+      onApprovalSubmitted={handleApprovalSubmitted}
+      onClose={handleClose}
+    />
+  );
 }

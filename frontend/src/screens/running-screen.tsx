@@ -21,10 +21,11 @@ import { getRunState } from "@/lib/api";
 import { STAGE_LABEL, STAGE_ORDER } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import type { ValidanceTaskStatus } from "@/lib/types";
+import type { ReviewMode } from "@/app";
 
 interface RunningScreenProps {
   runId: string;
-  onRunReady: () => void;
+  onRunReady: (mode: ReviewMode) => void;
   onCancel: () => void;
 }
 
@@ -60,8 +61,10 @@ export function RunningScreen({
   useEffect(() => {
     if (!runState.data) return;
     const status = runState.data.status;
-    if (status === "success" || status === "awaiting_approval") {
-      onRunReady();
+    if (status === "awaiting_approval") {
+      onRunReady("approval");
+    } else if (status === "success") {
+      onRunReady("completed");
     }
   }, [runState.data, onRunReady]);
 

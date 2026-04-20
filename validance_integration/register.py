@@ -56,6 +56,8 @@ def _workflow_payload(wf, description: str) -> dict[str, Any]:
         }
         if getattr(task, "gate", "auto-approve") != "auto-approve":
             entry["gate"] = task.gate
+        if getattr(task, "gate_timeout", 300) != 300:
+            entry["gate_timeout"] = task.gate_timeout
         if getattr(task, "secret_refs", None):
             entry["secret_refs"] = list(task.secret_refs)
         if getattr(task, "persistent", False):

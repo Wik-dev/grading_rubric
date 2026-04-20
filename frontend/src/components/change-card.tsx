@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfidenceDots } from "@/components/confidence-dots";
 import { CRITERION_LABEL } from "@/lib/labels";
-import { cn } from "@/lib/utils";
+import { cn, humanizeObservation } from "@/lib/utils";
 import type {
   AssessmentFinding,
   EvidenceProfile,
@@ -32,6 +32,7 @@ interface ChangeCardProps {
   change: ProposedChange;
   findings: AssessmentFinding[];
   evidenceProfile: EvidenceProfile;
+  criterionNameMap: Map<string, string>;
   decision: TeacherDecision | null;
   onAccept: () => void;
   onReject: () => void;
@@ -41,6 +42,7 @@ export function ChangeCard({
   change,
   findings,
   evidenceProfile,
+  criterionNameMap,
   decision,
   onAccept,
   onReject,
@@ -100,7 +102,7 @@ export function ChangeCard({
               {linkedFindings.length > 0 ? (
                 <ul className="list-disc space-y-1 pl-4">
                   {linkedFindings.map((f) => (
-                    <li key={f.id}>{f.observation}</li>
+                    <li key={f.id}>{humanizeObservation(f.observation, criterionNameMap)}</li>
                   ))}
                 </ul>
               ) : (

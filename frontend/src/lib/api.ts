@@ -306,6 +306,44 @@ export async function getExplainedRubric(
   );
 }
 
+/**
+ * Fetch the propose stage output during the approval gate phase.
+ *
+ * Returns a partial ExplainedRubricFile assembled from propose_outputs.json
+ * so the Review screen can show proposed changes for accept/reject before
+ * score + render have run.
+ */
+export async function getProposedChangesForReview(
+  runId: string,
+): Promise<ExplainedRubricFile> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = await jsonFetch<any>(
+    `/api/files/${encodeURIComponent(runId)}/download?task_name=propose&file_name=propose_outputs.json`,
+  );
+
+  const evidenceProfile = raw.assessed?.parsed?.ingest?.evidence_profile ?? {
+    starting_rubric_present: false,
+    exam_question_present: false,
+    teaching_material_present: false,
+    student_copies_present: false,
+    synthetic_responses_used: false,
+  };
+
+  return {
+    schema_version: "1.0.0",
+    generated_at: new Date().toISOString(),
+    run_id: runId,
+    starting_rubric: raw.starting_rubric ?? null,
+    improved_rubric: raw.improved_rubric ?? { id: "", title: "", total_points: 0, criteria: [] },
+    findings: raw.findings ?? [],
+    proposed_changes: raw.proposed_changes ?? [],
+    explanation: { by_criterion: {} as ExplainedRubricFile["explanation"]["by_criterion"] },
+    quality_scores: [],
+    previous_quality_scores: null,
+    evidence_profile: evidenceProfile,
+  };
+}
+
 /** SR-OBS-03 — *View audit bundle* link target (DR-INT-05 harvester). */
 export function auditBundleUrl(runId: string): string {
   return `${BASE_URL}/api/audit/${encodeURIComponent(runId)}`;
