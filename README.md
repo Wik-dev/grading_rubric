@@ -4,6 +4,8 @@ An AI-powered pipeline that assesses and improves the quality of grading rubrics
 
 ![Grading Rubric Studio — Input screen](docs/ui-screen.png)
 
+**Live demo:** [https://api.validance.io](https://api.validance.io) — upload your exam question and rubric, review proposed changes, download the improved rubric. No local installation required.
+
 ## Approach
 
 ### Core idea
