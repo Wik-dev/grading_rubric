@@ -4,7 +4,7 @@ An AI-powered pipeline that assesses and improves the quality of grading rubrics
 
 ![Grading Rubric Studio — Input screen](docs/ui-screen.png)
 
-**Live demo:** [https://api.validance.io](https://api.validance.io) — upload your exam question and rubric, review proposed changes, download the improved rubric. No local installation required.
+**Live demo:** [https://epfl-rubric.validance.io](https://epfl-rubric.validance.io) — upload your exam question and rubric, review proposed changes, download the improved rubric. No local installation required.
 
 ## Approach
 
@@ -238,9 +238,9 @@ The largest improvement was applicability (+0.39): the original rubric reference
 
 ### Web UI (Validance-orchestrated)
 
-A browser-based interface is available at **[https://api.validance.io](https://api.validance.io)**. It runs the same six-stage pipeline orchestrated by a Validance instance with an approval gate — the teacher reviews and accepts/rejects each proposed change before scoring.
+A browser-based interface is available at **[https://epfl-rubric.validance.io](https://epfl-rubric.validance.io)**. It runs the same six-stage pipeline orchestrated by a Validance instance (`https://api.validance.io`) with an approval gate — the teacher reviews and accepts/rejects each proposed change before scoring.
 
-1. Open [https://api.validance.io](https://api.validance.io)
+1. Open [https://epfl-rubric.validance.io](https://epfl-rubric.validance.io)
 2. Upload your exam question, teaching materials, student copies, and (optionally) a starting rubric
 3. Click **Start** — the pipeline runs server-side
 4. When the approval gate fires, review each proposed change and accept or reject it
